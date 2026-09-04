@@ -247,7 +247,7 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
                 Keine Vertretungen
               </p>
               <p className="mt-2 text-sm leading-6 text-muted">
-                Heute sind fuer deine Klasse keine Aenderungen eingetragen.
+                Heute sind für deine Klasse keine Änderungen eingetragen.
               </p>
             </div>
           ) : null}
