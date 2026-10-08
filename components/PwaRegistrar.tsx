@@ -11,15 +11,27 @@ export function PwaRegistrar() {
       return;
     }
 
-    const register = () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        // Registration failure should never break the app shell.
-      });
+    let registration: ServiceWorkerRegistration | undefined;
+
+    // Installed apps can stay open for days: look for a new version whenever
+    // the app comes back to the foreground.
+    const checkForUpdate = () => {
+      if (document.visibilityState === "visible") {
+        registration?.update().catch(() => undefined);
+      }
     };
 
-    window.addEventListener("load", register, { once: true });
+    navigator.serviceWorker
+      .register("/sw.js", { updateViaCache: "none" })
+      .then((result) => {
+        registration = result;
+      })
+      .catch(() => {
+        // Registration failure should never break the app shell.
+      });
 
-    return () => window.removeEventListener("load", register);
+    document.addEventListener("visibilitychange", checkForUpdate);
+    return () => document.removeEventListener("visibilitychange", checkForUpdate);
   }, []);
 
   return null;

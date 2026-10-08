@@ -1,8 +1,15 @@
-import { parseSubstitutionPage } from "@/lib/parser";
-import type { FetchedPage, SubstitutionEntry, SubstitutionPayload } from "@/lib/types";
+import { normalizeWhitespace, parseSubstitutionPage } from "@/lib/parser";
+import type {
+  DayNotice,
+  FetchedPage,
+  SubstitutionEntry,
+  SubstitutionPayload,
+} from "@/lib/types";
 
 const BASE_URL = "https://monitor2020.meckenheim-kag.com/schueler/subst_";
-const REQUEST_TIMEOUT_MS = 8_000;
+const REQUEST_TIMEOUT_MS = 6_000;
+const RETRY_DELAY_MS = 400;
+const MAX_ATTEMPTS = 2;
 const PARALLEL_PAGE_LIMIT = 3;
 const MAX_FALLBACK_PAGES = 16;
 
@@ -10,8 +17,8 @@ function buildPageUrl(pageNumber: number) {
   return `${BASE_URL}${pageNumber.toString().padStart(3, "0")}.htm`;
 }
 
-function normalizeWhitespace(value: string) {
-  return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function resolveCharset(contentType: string | null) {
@@ -55,34 +62,33 @@ async function fetchPage(pageNumber: number, attempt = 1): Promise<FetchedPage> 
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
+    if (response.status === 404) {
+      return { kind: "missing", pageNumber, url, reason: "HTTP 404" };
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
     const html = decodeHtml(
       await response.arrayBuffer(),
       response.headers.get("content-type"),
     );
-
-    if (!response.ok) {
-      return response.status === 404
-        ? { kind: "missing", pageNumber, url, reason: "HTTP 404" }
-        : {
-            kind: "error",
-            pageNumber,
-            url,
-            reason: `HTTP ${response.status}`,
-          };
-    }
 
     if (!pageLooksValid(html)) {
       return {
         kind: "missing",
         pageNumber,
         url,
-        reason: "Seite enthaelt keinen gueltigen Vertretungsplan",
+        reason: "Seite enthält keinen gültigen Vertretungsplan",
       };
     }
 
     return { kind: "ok", pageNumber, url, html };
   } catch (error) {
-    if (attempt < 2) {
+    // Network errors, timeouts and 5xx responses are retried once.
+    if (attempt < MAX_ATTEMPTS) {
+      await wait(RETRY_DELAY_MS);
       return fetchPage(pageNumber, attempt + 1);
     }
 
@@ -118,18 +124,24 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+function lessonStart(lesson: string) {
+  return Number(lesson.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
+}
+
 function sortEntries(entries: SubstitutionEntry[]) {
   return [...entries].sort((left, right) => {
+    if (left.date !== right.date) {
+      return left.date.localeCompare(right.date);
+    }
+
     if (left.className !== right.className) {
       return left.className.localeCompare(right.className, "de-DE", {
         numeric: true,
       });
     }
 
-    const leftLesson = Number(left.lesson.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
-    const rightLesson = Number(
-      right.lesson.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER,
-    );
+    const leftLesson = lessonStart(left.lesson);
+    const rightLesson = lessonStart(right.lesson);
 
     if (leftLesson !== rightLesson) {
       return leftLesson - rightLesson;
@@ -144,6 +156,7 @@ function toFailurePayload(error: string): SubstitutionPayload {
     success: false,
     stale: false,
     date: null,
+    dates: [],
     dayLabel: null,
     weekLabel: null,
     pageCount: 0,
@@ -183,7 +196,7 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
       }
 
       if (result.kind === "error") {
-        warnings.push(`Seite ${pageNumber} konnte nicht geprueft werden.`);
+        warnings.push(`Seite ${pageNumber} konnte nicht geprüft werden.`);
         pageCount = pageNumber - 1;
         break;
       }
@@ -224,22 +237,36 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
   ).sort((left, right) =>
     left.localeCompare(right, "de-DE", { numeric: true }),
   );
-  const notices = Array.from(
-    new Set(fetchedPages.flatMap((page) => page.meta.notices).filter(Boolean)),
-  );
+  const noticeMap = new Map<string, DayNotice>();
+  fetchedPages.forEach(({ meta }) => {
+    meta.notices.forEach((text) => {
+      noticeMap.set(`${meta.date}|${text}`, { date: meta.date, text });
+    });
+  });
+  const notices = Array.from(noticeMap.values());
+  const dates = Array.from(
+    new Set(
+      fetchedPages
+        .map((page) => page.meta.date)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ).sort();
   const latestSourceUpdatedAt =
     fetchedPages
       .map((page) => page.meta.sourceUpdatedAt)
       .filter((value): value is string => Boolean(value))
       .sort()
       .at(-1) ?? null;
-  const firstMeta = fetchedPages[0]?.meta;
+  const firstMeta =
+    fetchedPages.find((page) => page.meta.date === dates[0])?.meta ??
+    fetchedPages[0]?.meta;
   const now = new Date().toISOString();
 
   return {
     success: true,
     stale: false,
-    date: firstMeta?.date ?? null,
+    date: dates[0] ?? null,
+    dates,
     dayLabel: firstMeta?.dayLabel ?? null,
     weekLabel: firstMeta?.weekLabel ?? null,
     pageCount,

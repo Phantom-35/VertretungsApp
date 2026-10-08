@@ -1,14 +1,43 @@
+export type HeaderStatus = "current" | "updating" | "offline" | "outdated";
+
 type HeaderProps = {
-  selectedClass: string;
+  selectedClass: string | null | undefined;
   dateLabel: string;
-  lastUpdatedLabel: string;
+  dateIsPast: boolean;
+  sourceUpdatedLabel: string;
+  fetchedLabel: string;
+  status: HeaderStatus;
+};
+
+const statusBadges: Record<HeaderStatus, { label: string; className: string }> = {
+  current: {
+    label: "Aktuell",
+    className: "border-accent/10 bg-accent-soft text-accent-strong",
+  },
+  updating: {
+    label: "Aktualisiere…",
+    className: "border-accent/10 bg-accent-soft text-accent-strong animate-pulse",
+  },
+  offline: {
+    label: "Offline",
+    className: "border-warn/15 bg-warn-soft text-warn",
+  },
+  outdated: {
+    label: "Veraltet",
+    className: "border-warn/15 bg-warn-soft text-warn",
+  },
 };
 
 export function Header({
   selectedClass,
   dateLabel,
-  lastUpdatedLabel,
+  dateIsPast,
+  sourceUpdatedLabel,
+  fetchedLabel,
+  status,
 }: HeaderProps) {
+  const badge = statusBadges[status];
+
   return (
     <header className="relative overflow-hidden rounded-[2rem] border border-white/60 bg-[linear-gradient(145deg,rgba(255,255,255,0.95),rgba(244,239,229,0.84))] p-5 shadow-[0_24px_60px_rgba(18,41,39,0.10)] backdrop-blur">
       <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(31,107,103,0.16),transparent_65%)]" />
@@ -18,31 +47,45 @@ export function Header({
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-accent-strong/70">
               KAG Vertretungsplan
             </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-foreground">
-              {selectedClass || "Klasse waehlen"}
+            <h1 className="mt-2 min-h-9 text-3xl font-semibold tracking-[-0.04em] text-foreground">
+              {selectedClass === undefined ? "" : (selectedClass ?? "Klasse wählen")}
             </h1>
           </div>
-          <div className="rounded-full border border-accent/10 bg-accent-soft px-3 py-1 text-sm font-semibold text-accent-strong">
-            Live
+          <div
+            className={`shrink-0 rounded-full border px-3 py-1 text-sm font-semibold ${badge.className}`}
+          >
+            {badge.label}
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-[1.4rem] border border-line bg-white/70 p-4 sm:grid-cols-2">
+        <div className="grid gap-3 rounded-[1.4rem] border border-line bg-white/70 p-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
-              Heute
+              Plan für
             </p>
-            <p className="mt-1 text-base font-medium text-foreground">
+            <p
+              className={`mt-1 text-base font-medium ${dateIsPast ? "text-warn" : "text-foreground"}`}
+            >
               {dateLabel}
             </p>
           </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
-              Letzte Aktualisierung
-            </p>
-            <p className="mt-1 text-base font-medium text-foreground">
-              {lastUpdatedLabel}
-            </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
+                Stand Schule
+              </p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {sourceUpdatedLabel}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
+                Abgerufen
+              </p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {fetchedLabel}
+              </p>
+            </div>
           </div>
         </div>
       </div>

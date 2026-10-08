@@ -12,10 +12,18 @@ export type SubstitutionEntry = {
   page: number;
 };
 
+export type DayNotice = {
+  date: string | null;
+  text: string;
+};
+
 export type SubstitutionPayload = {
   success: boolean;
   stale: boolean;
+  /** Earliest plan date, kept for the header. */
   date: string | null;
+  /** All plan dates covered by the fetched pages, ascending. */
+  dates: string[];
   dayLabel: string | null;
   weekLabel: string | null;
   pageCount: number;
@@ -25,7 +33,7 @@ export type SubstitutionPayload = {
   sourceUpdatedAt: string | null;
   classes: string[];
   entries: SubstitutionEntry[];
-  notices: string[];
+  notices: DayNotice[];
   warnings: string[];
   error: string | null;
 };

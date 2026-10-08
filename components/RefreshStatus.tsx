@@ -1,40 +1,57 @@
 type RefreshStatusProps = {
-  sourceUpdatedLabel: string | null;
+  /** The app's own server was not reachable. */
+  connectionError: string | null;
+  /** The server answered with the last known plan because the school site is down. */
   stale: boolean;
+  /** Error reported by the server for a partial result. */
   error: string | null;
-  notices: string[];
+  warnings: string[];
+  lastSuccessLabel: string;
+  onRetry: () => void;
 };
 
 export function RefreshStatus({
-  sourceUpdatedLabel,
+  connectionError,
   stale,
   error,
-  notices,
+  warnings,
+  lastSuccessLabel,
+  onRetry,
 }: RefreshStatusProps) {
-  return (
-    <section className="space-y-3">
-      {error ? (
-        <div className="rounded-[1.4rem] border border-warn/15 bg-warn-soft px-4 py-3 text-sm leading-6 text-warn">
-          {stale
-            ? `Vertretungsplan momentan nicht erreichbar. Zuletzt erfolgreich aktualisiert: ${sourceUpdatedLabel ?? "unbekannt"}.`
-            : "Vertretungsplan momentan nicht erreichbar."}
-        </div>
-      ) : null}
+  let title: string | null = null;
+  let message: string | null = null;
 
-      {notices.length > 0 ? (
-        <div className="rounded-[1.5rem] border border-line bg-white/72 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
-            Hinweise zum Tag
-          </p>
-          <div className="mt-3 space-y-2">
-            {notices.map((notice) => (
-              <p key={notice} className="text-sm leading-6 text-foreground">
-                {notice}
-              </p>
-            ))}
-          </div>
-        </div>
-      ) : null}
+  if (connectionError) {
+    title = connectionError;
+    message = `Angezeigt wird der zuletzt geladene Stand (${lastSuccessLabel}).`;
+  } else if (stale) {
+    title = "Die Webseite der Schule antwortet gerade nicht.";
+    message = `Angezeigt wird der Stand von ${lastSuccessLabel}.`;
+  } else if (error) {
+    title = error;
+    message = warnings.length > 0 ? warnings.join(" ") : null;
+  }
+
+  if (!title) {
+    return null;
+  }
+
+  return (
+    <section
+      role="status"
+      className="flex items-start gap-3 rounded-[1.4rem] border border-warn/15 bg-warn-soft px-4 py-3 text-sm leading-6 text-warn"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">{title}</p>
+        {message ? <p>{message}</p> : null}
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="shrink-0 rounded-full border border-warn/20 bg-white/60 px-3 py-1 text-xs font-semibold"
+      >
+        Erneut
+      </button>
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
+import { schoolLocalToIso } from "@/lib/time";
 import type { PageMetadata, ParsedPage, SubstitutionEntry } from "@/lib/types";
 
 const tableHeaderAliases: Record<string, keyof ParsedRow> = {
@@ -29,25 +30,25 @@ type ParsedRow = {
   text: string;
 };
 
-function normalizeWhitespace(value: string) {
-  return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+// Untis fills cells without a real value with these markers (e.g. EVA rows).
+const placeholderValues = new Set(["+", "-", "---", "???"]);
+
+export function normalizeWhitespace(value: string) {
+  // `\s` also covers non-breaking spaces (&nbsp;).
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function normalizeHeader(value: string) {
   return normalizeWhitespace(value).toLowerCase();
 }
 
-function pad(value: number) {
-  return value.toString().padStart(2, "0");
+function normalizeCell(value: string) {
+  const normalized = normalizeWhitespace(value);
+  return placeholderValues.has(normalized) ? "" : normalized;
 }
 
-function formatTimezoneOffset(date: Date) {
-  const offsetMinutes = -date.getTimezoneOffset();
-  const sign = offsetMinutes >= 0 ? "+" : "-";
-  const absolute = Math.abs(offsetMinutes);
-  const hours = Math.floor(absolute / 60);
-  const minutes = absolute % 60;
-  return `${sign}${pad(hours)}:${pad(minutes)}`;
+function pad(value: number) {
+  return value.toString().padStart(2, "0");
 }
 
 function parseGermanDateTime(value: string) {
@@ -60,14 +61,13 @@ function parseGermanDateTime(value: string) {
   }
 
   const [, dayText, monthText, yearText, hourText, minuteText] = match;
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-  const localDate = new Date(year, month - 1, day, hour, minute, 0);
-
-  return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00${formatTimezoneOffset(localDate)}`;
+  return schoolLocalToIso(
+    Number(yearText),
+    Number(monthText),
+    Number(dayText),
+    Number(hourText),
+    Number(minuteText),
+  );
 }
 
 function parseGermanDate(value: string) {
@@ -99,7 +99,7 @@ function extractMetadata($: cheerio.CheerioAPI, pageNumber: number): PageMetadat
   const sourceLine = lines.find((line) => line.includes("Stand:")) ?? "";
   const pageMatch = titleLine.match(/Seite\s+(\d+)\s*\/\s*(\d+)/i);
   const dateMatch = titleLine.match(
-    /(\d{1,2}\.\d{1,2}\.\d{4})\s+([A-Za-zA-ZÄÖÜäöüß]+),\s+(Woche\s+[A-Z])/i,
+    /(\d{1,2}\.\d{1,2}\.\d{4})\s+([A-Za-zÄÖÜäöüß]+),\s+(Woche\s+[A-Z])/i,
   );
   const notices = (() => {
     const noticeIndex = lines.findIndex((line) =>
@@ -140,21 +140,18 @@ function extractMetadata($: cheerio.CheerioAPI, pageNumber: number): PageMetadat
   };
 }
 
-function getHeaderMap(table: cheerio.Cheerio<Element>) {
+function getHeaderMap($: cheerio.CheerioAPI, table: cheerio.Cheerio<Element>) {
   const rows = table.find("tr").toArray();
 
   for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index];
-    const cells = cheerio
-      .load(row)
-      .root()
+    // Keep empty cells so that column indices stay aligned with the data rows.
+    const cells = $(rows[index])
       .find("th, td")
       .toArray()
-      .map((cell) => normalizeHeader(cheerio.load(cell).root().text()))
-      .filter(Boolean);
+      .map((cell) => normalizeHeader($(cell).text()));
 
     if (
-      cells.length >= 4 &&
+      cells.filter(Boolean).length >= 4 &&
       cells.some((cell) => cell.includes("klasse")) &&
       cells.some((cell) => cell.includes("stunde"))
     ) {
@@ -195,13 +192,13 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
 
   $("table").each((_, tableElement) => {
     const table = $(tableElement);
-    const header = getHeaderMap(table);
+    const header = getHeaderMap($, table);
 
     if (!header || header.mapping.size === 0) {
       return;
     }
 
-    const rows = table.find("tr").toArray();
+    const rows = table.find("tr").toArray().slice(header.headerRowIndex + 1);
 
     rows.forEach((rowElement) => {
       const cells = $(rowElement).find("td, th").toArray();
@@ -226,11 +223,12 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
           return;
         }
 
-        row[key] = normalizeWhitespace($(cell).text());
+        row[key] = normalizeCell($(cell).text());
       });
 
+      // Long tables can repeat the header row.
       if (
-        normalizeHeader(row.className) === "klasse(n)" &&
+        normalizeHeader(row.className).startsWith("klasse") &&
         normalizeHeader(row.lesson) === "stunde"
       ) {
         return;
@@ -243,6 +241,7 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
         !row.substitute &&
         !row.teacher &&
         !row.room &&
+        !row.subject &&
         !row.text
       ) {
         return;

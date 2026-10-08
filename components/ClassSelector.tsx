@@ -1,6 +1,6 @@
 type ClassSelectorProps = {
   classes: string[];
-  selectedClass: string;
+  selectedClass: string | null | undefined;
   onChange: (value: string) => void;
 };
 
@@ -17,15 +17,17 @@ export function ClassSelector({
       >
         Meine Klasse
       </label>
-      <div className="mt-3">
+      <div className="relative mt-3">
         <select
           id="class-selector"
-          value={selectedClass}
+          value={selectedClass ?? ""}
           onChange={(event) => onChange(event.target.value)}
-          className="w-full appearance-none rounded-[1.15rem] border border-line bg-white px-4 py-4 text-lg font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none transition focus:border-accent/35 focus:ring-4 focus:ring-accent/10"
+          className="w-full appearance-none rounded-[1.15rem] border border-line bg-white px-4 py-4 pr-12 text-lg font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none transition focus:border-accent/35 focus:ring-4 focus:ring-accent/10"
         >
-          {classes.length === 0 ? (
-            <option value="">Keine Klassen gefunden</option>
+          {!selectedClass ? (
+            <option value="" disabled>
+              Klasse auswählen …
+            </option>
           ) : null}
           {classes.map((className) => (
             <option key={className} value={className}>
@@ -33,6 +35,18 @@ export function ClassSelector({
             </option>
           ))}
         </select>
+        <svg
+          aria-hidden
+          viewBox="0 0 20 20"
+          className="pointer-events-none absolute right-4 top-1/2 size-5 -translate-y-1/2 text-muted"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m5 8 5 5 5-5" />
+        </svg>
       </div>
     </section>
   );

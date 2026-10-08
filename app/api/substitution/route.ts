@@ -10,13 +10,16 @@ export async function GET(request: Request) {
 
   const payload = await getCachedSubstitutionData({ force });
   const status = payload.success ? 200 : 503;
+  // Only fresh, complete results may be cached by browsers or a CDN. Errors and
+  // stale fallbacks must never outlive the outage.
+  const cacheable = payload.success && !payload.stale && !payload.error && !force;
 
   return NextResponse.json(payload, {
     status,
     headers: {
-      "Cache-Control": force
-        ? "no-store"
-        : "public, max-age=60, s-maxage=600, stale-while-revalidate=300",
+      "Cache-Control": cacheable
+        ? "public, max-age=0, s-maxage=60, stale-while-revalidate=240"
+        : "no-store",
     },
   });
 }

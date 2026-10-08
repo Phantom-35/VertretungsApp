@@ -23,7 +23,6 @@ export default function AppleIcon() {
           fontSize: 64,
           fontWeight: 700,
           letterSpacing: "-0.06em",
-          borderRadius: 40,
         }}
       >
         KAG
