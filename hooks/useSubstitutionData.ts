@@ -34,7 +34,9 @@ type State = {
 
 function readStoredPayload() {
   try {
-    LEGACY_DATA_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+    LEGACY_DATA_STORAGE_KEYS.forEach((key) =>
+      window.localStorage.removeItem(key),
+    );
     const raw = window.localStorage.getItem(DATA_STORAGE_KEY);
     if (!raw) {
       return null;
@@ -53,6 +55,16 @@ function storePayload(payload: SubstitutionPayload) {
   } catch {
     // Storage full or unavailable: the app still works without it.
   }
+}
+
+function isNewer(
+  candidate: SubstitutionPayload,
+  current: SubstitutionPayload | null,
+) {
+  if (!current) {
+    return true;
+  }
+  return (candidate.lastUpdated ?? "") > (current.lastUpdated ?? "");
 }
 
 function wait(ms: number) {
@@ -86,62 +98,80 @@ export function useSubstitutionData(initialData: SubstitutionPayload | null) {
     connectionError: null,
   });
   const inFlightRef = useRef<Promise<void> | null>(null);
+  const inFlightForcedRef = useRef(false);
   const lastAttemptRef = useRef(0);
 
   const refresh = useCallback((force = false) => {
-    if (inFlightRef.current) {
-      return inFlightRef.current;
-    }
+    const start = (force: boolean): Promise<void> => {
+      if (inFlightRef.current) {
+        // A pull-to-refresh during a background refresh must still ask the
+        // school website, not just receive the server's cached copy.
+        return force && !inFlightForcedRef.current
+          ? inFlightRef.current.then(() => start(true))
+          : inFlightRef.current;
+      }
 
-    const run = async () => {
-      lastAttemptRef.current = Date.now();
-      const stored = readStoredPayload();
+      const run = async () => {
+        lastAttemptRef.current = Date.now();
+        const stored = readStoredPayload();
 
-      setState((current) => {
-        if (current.data) {
-          return { ...current, status: "refreshing" };
-        }
-        // Show the last copy from this device while loading.
-        return stored
-          ? { ...current, data: stored, fromDevice: true, status: "refreshing" }
-          : { ...current, status: "loading" };
-      });
-
-      try {
-        const payload = await fetchPayload(force);
-
-        if (payload.success) {
-          setState({
-            data: payload,
-            fromDevice: false,
-            status: "idle",
-            connectionError: null,
-          });
-          if (!payload.stale) {
-            storePayload(payload);
+        setState((current) => {
+          // Show the device's copy while loading if it is newer than what is on
+          // screen (e.g. an old page from the service worker cache).
+          if (stored && isNewer(stored, current.data)) {
+            return {
+              ...current,
+              data: stored,
+              fromDevice: true,
+              status: "refreshing",
+            };
           }
-        } else {
+          return {
+            ...current,
+            status: current.data ? "refreshing" : "loading",
+          };
+        });
+
+        try {
+          const payload = await fetchPayload(force);
+
+          if (payload.success) {
+            setState({
+              data: payload,
+              fromDevice: false,
+              status: "idle",
+              connectionError: null,
+            });
+            if (!payload.stale) {
+              storePayload(payload);
+            }
+          } else {
+            setState((current) => ({
+              ...current,
+              status: "idle",
+              connectionError:
+                payload.error ?? "Vertretungsplan momentan nicht erreichbar.",
+            }));
+          }
+        } catch {
           setState((current) => ({
             ...current,
             status: "idle",
-            connectionError:
-              payload.error ?? "Vertretungsplan momentan nicht erreichbar.",
+            connectionError: OFFLINE_MESSAGE,
           }));
+        } finally {
+          lastAttemptRef.current = Date.now();
+          inFlightRef.current = null;
+          inFlightForcedRef.current = false;
         }
-      } catch {
-        setState((current) => ({
-          ...current,
-          status: "idle",
-          connectionError: OFFLINE_MESSAGE,
-        }));
-      } finally {
-        lastAttemptRef.current = Date.now();
-        inFlightRef.current = null;
-      }
+      };
+
+      inFlightForcedRef.current = force;
+      inFlightRef.current = run();
+      return inFlightRef.current;
     };
 
-    inFlightRef.current = run();
-    return inFlightRef.current;
+    return start(force);
   }, []);
 
   useEffect(() => {

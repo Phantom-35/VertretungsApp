@@ -15,8 +15,8 @@ export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySe
     <div
       role="tablist"
       aria-label="Tag auswählen"
-      className="grid gap-2 rounded-[1.5rem] border border-line bg-card p-1.5 shadow-[0_12px_30px_rgba(18,41,39,0.06)]"
-      style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}
+      // Many days (e.g. before holidays) scroll sideways instead of squeezing.
+      className="grid auto-cols-[minmax(6.25rem,1fr)] grid-flow-col gap-2 overflow-x-auto rounded-[1.5rem] border border-line bg-card p-1.5 shadow-[0_12px_30px_rgba(18,41,39,0.06)]"
     >
       {days.map((day) => {
         const selected = day.date === selectedDate;

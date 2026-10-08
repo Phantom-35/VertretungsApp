@@ -21,6 +21,7 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
   // must not move the content around.
   const [refreshing, setRefreshing] = useState(false);
   const startYRef = useRef<number | null>(null);
+  const startXRef = useRef(0);
   const distanceRef = useRef(0);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
     };
 
     const onTouchStart = (event: TouchEvent) => {
+      startXRef.current = event.touches[0]?.clientX ?? 0;
       startYRef.current =
         window.scrollY <= 0 && event.touches.length === 1
           ? event.touches[0].clientY
@@ -43,6 +45,16 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
       }
 
       const delta = event.touches[0].clientY - startYRef.current;
+      const sideways = Math.abs(event.touches[0].clientX - startXRef.current);
+      // Decide the direction only after a few pixels; sideways swipes (e.g.
+      // over the day tabs) are not a pull.
+      if (distanceRef.current === 0 && Math.max(sideways, Math.abs(delta)) < 10) {
+        return;
+      }
+      if (distanceRef.current === 0 && sideways > delta) {
+        startYRef.current = null;
+        return;
+      }
       if (delta <= 0 || window.scrollY > 0) {
         if (distanceRef.current !== 0) {
           distanceRef.current = 0;
