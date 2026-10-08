@@ -84,6 +84,8 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
     headerStatus = "offline";
   } else if (!data || data.stale || fromDevice || planIsPast) {
     headerStatus = "outdated";
+  } else if (data.error) {
+    headerStatus = "incomplete";
   }
 
   const dateLabel = selectedDay
@@ -155,6 +157,7 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
                 data.lastSuccessfulUpdate ?? data.lastUpdated,
                 now,
               )}
+              sourceUrl={data.sourceUrl}
               onRetry={() => void forceRefresh()}
             />
           ) : null}

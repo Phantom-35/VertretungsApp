@@ -7,6 +7,8 @@ type RefreshStatusProps = {
   error: string | null;
   warnings: string[];
   lastSuccessLabel: string;
+  /** Original plan on the school website, for checking by hand. */
+  sourceUrl: string | undefined;
   onRetry: () => void;
 };
 
@@ -16,6 +18,7 @@ export function RefreshStatus({
   error,
   warnings,
   lastSuccessLabel,
+  sourceUrl,
   onRetry,
 }: RefreshStatusProps) {
   let title: string | null = null;
@@ -44,6 +47,16 @@ export function RefreshStatus({
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{title}</p>
         {message ? <p>{message}</p> : null}
+        {sourceUrl ? (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-block font-semibold underline underline-offset-2"
+          >
+            Original-Plan der Schule öffnen
+          </a>
+        ) : null}
       </div>
       <button
         type="button"

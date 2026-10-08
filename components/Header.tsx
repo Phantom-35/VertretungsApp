@@ -1,4 +1,4 @@
-export type HeaderStatus = "current" | "updating" | "offline" | "outdated";
+export type HeaderStatus = "current" | "updating" | "offline" | "outdated" | "incomplete";
 
 type HeaderProps = {
   selectedClass: string | null | undefined;
@@ -24,6 +24,10 @@ const statusBadges: Record<HeaderStatus, { label: string; className: string }> =
   },
   outdated: {
     label: "Veraltet",
+    className: "border-warn/15 bg-warn-soft text-warn",
+  },
+  incomplete: {
+    label: "Unvollständig",
     className: "border-warn/15 bg-warn-soft text-warn",
   },
 };

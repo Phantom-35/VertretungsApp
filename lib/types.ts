@@ -39,6 +39,10 @@ export type SubstitutionPayload = {
   entries: SubstitutionEntry[];
   notices: DayNotice[];
   warnings: string[];
+  /** Results of the self-check; non-empty means the plan may be incomplete. */
+  diagnostics: string[];
+  /** Link to the original plan, for checking by hand. */
+  sourceUrl: string;
   error: string | null;
 };
 
@@ -56,9 +60,19 @@ export type PageMetadata = {
   notices: string[];
 };
 
+export type ParseStats = {
+  /** A substitution table header ("Klasse(n)", "Stunde", …) was recognised. */
+  headerFound: boolean;
+  /** Distinct data rows in the page's tables, counted independently of the parser. */
+  tableRows: number;
+  /** Header cells the parser does not know; their content is not shown. */
+  unknownColumns: string[];
+};
+
 export type ParsedPage = {
   meta: PageMetadata;
   entries: SubstitutionEntry[];
+  stats: ParseStats;
 };
 
 export type FetchedPage =

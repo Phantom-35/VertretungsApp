@@ -163,15 +163,18 @@ function getHeaderMap($: cheerio.CheerioAPI, table: cheerio.Cheerio<Element>) {
       cells.some((cell) => cell.includes("stunde"))
     ) {
       const mapping = new Map<number, keyof ParsedRow>();
+      const unknownColumns: string[] = [];
 
       cells.forEach((cell, cellIndex) => {
         const alias = tableHeaderAliases[cell];
         if (alias) {
           mapping.set(cellIndex, alias);
+        } else if (cell) {
+          unknownColumns.push(cell);
         }
       });
 
-      return { headerRowIndex: index, mapping };
+      return { headerRowIndex: index, mapping, unknownColumns };
     }
   }
 
@@ -192,10 +195,39 @@ function buildEntryId(entry: Omit<SubstitutionEntry, "id">) {
   ].join("|");
 }
 
+/**
+ * Counts the data rows of the substitution tables without relying on the
+ * header detection, so that the parse result can be cross-checked.
+ */
+function countDataRows($: cheerio.CheerioAPI) {
+  const rows = new Set<string>();
+
+  $("table")
+    .not(".info, .mon_head")
+    .find("tr")
+    .each((_, rowElement) => {
+      const cells = $(rowElement)
+        .find("td")
+        .toArray()
+        .map((cell) => normalizeCell($(cell).text()));
+      const isHeader =
+        normalizeHeader(cells[0] ?? "").startsWith("klasse") &&
+        normalizeHeader(cells[1] ?? "") === "stunde";
+
+      if (cells.length >= 4 && !isHeader && cells.some(Boolean)) {
+        rows.add(cells.join("|"));
+      }
+    });
+
+  return rows.size;
+}
+
 export function parseSubstitutionPage(html: string, pageNumber: number): ParsedPage {
   const $ = cheerio.load(html);
   const meta = extractMetadata($, pageNumber);
   const parsedEntries: SubstitutionEntry[] = [];
+  let headerFound = false;
+  const unknownColumns = new Set<string>();
 
   $("table").each((_, tableElement) => {
     const table = $(tableElement);
@@ -204,6 +236,9 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
     if (!header || header.mapping.size === 0) {
       return;
     }
+
+    headerFound = true;
+    header.unknownColumns.forEach((column) => unknownColumns.add(column));
 
     const rows = table.find("tr").toArray().slice(header.headerRowIndex + 1);
 
@@ -278,5 +313,13 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
     new Map(parsedEntries.map((entry) => [entry.id, entry])).values(),
   );
 
-  return { meta, entries: uniqueEntries };
+  return {
+    meta,
+    entries: uniqueEntries,
+    stats: {
+      headerFound,
+      tableRows: countDataRows($),
+      unknownColumns: Array.from(unknownColumns),
+    },
+  };
 }

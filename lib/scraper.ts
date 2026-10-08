@@ -165,6 +165,8 @@ function toFailurePayload(error: string): SubstitutionPayload {
     success: false,
     stale: false,
     days: [],
+    diagnostics: [],
+    sourceUrl: buildPageUrl(1),
     pageCount: 0,
     fetchedPages: 0,
     lastUpdated: null,
@@ -199,6 +201,7 @@ function withInheritedDate(page: ParsedPage, previous: ParsedPage): ParsedPage {
 
   const date = previous.meta.date;
   return {
+    ...page,
     meta: { ...page.meta, date, dayLabel: previous.meta.dayLabel, weekLabel: previous.meta.weekLabel },
     entries: page.entries.map((entry) => ({ ...entry, date })),
   };
@@ -300,6 +303,48 @@ async function collectPages(firstPage: ParsedPage, warnings: string[]) {
   return { pages, failedPages, pageCount: highestPage };
 }
 
+/**
+ * Self-check: compares the parse result with an independent row count and
+ * looks for missing basics. Problems mean the plan may be shown incompletely,
+ * typically because the school's Untis export changed its format.
+ */
+export function checkParsedPages(pages: ParsedPage[]) {
+  const problems: string[] = [];
+  const notes: string[] = [];
+
+  pages.forEach(({ meta, entries, stats }) => {
+    const label = `Seite ${meta.pageNumber}`;
+
+    if (!meta.date) {
+      problems.push(`${label}: Datum nicht erkannt.`);
+    }
+
+    if (!stats.headerFound) {
+      if (stats.tableRows > 0) {
+        problems.push(`${label}: Tabellenformat nicht erkannt.`);
+      }
+    } else if (entries.length !== stats.tableRows) {
+      problems.push(
+        `${label}: ${stats.tableRows} Zeilen auf der Seite, aber ${entries.length} gelesen.`,
+      );
+    }
+
+    // A lesson without a number means the columns were mapped wrongly.
+    const implausible = entries.filter(
+      (entry) => !entry.className || !/\d/.test(entry.lesson),
+    ).length;
+    if (implausible > 0) {
+      problems.push(`${label}: ${implausible} Einträge ohne gültige Klasse oder Stunde.`);
+    }
+
+    stats.unknownColumns.forEach((column) => {
+      notes.push(`${label}: Unbekannte Spalte „${column}“ wird nicht angezeigt.`);
+    });
+  });
+
+  return { problems, notes: Array.from(new Set(notes)) };
+}
+
 export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
   const warnings: string[] = [];
   const firstPage = await fetchPage(1);
@@ -314,6 +359,12 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
     parseSubstitutionPage(firstPage.html, 1),
     warnings,
   );
+
+  const { problems, notes } = checkParsedPages(fetchedPages);
+  const diagnostics = [...problems, ...notes];
+  if (diagnostics.length > 0) {
+    console.warn("[substitution] Selbstkontrolle:", diagnostics.join(" "));
+  }
 
   const allEntries = sortEntries(
     fetchedPages.flatMap((page) => page.entries).filter((entry) => entry.className),
@@ -355,6 +406,8 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
     success: true,
     stale: false,
     days,
+    diagnostics,
+    sourceUrl: buildPageUrl(1),
     pageCount,
     fetchedPages: fetchedPages.length,
     lastUpdated: now,
@@ -363,7 +416,12 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
     classes,
     entries: allEntries,
     notices,
-    warnings,
-    error: failedPages > 0 ? "Ein Teil der Seiten konnte nicht geladen werden." : null,
+    warnings: [...warnings, ...problems],
+    error:
+      problems.length > 0
+        ? "Der Plan konnte nicht vollständig gelesen werden."
+        : failedPages > 0
+          ? "Ein Teil der Seiten konnte nicht geladen werden."
+          : null,
   };
 }
