@@ -21,15 +21,6 @@ export function RefreshStatus({
         </div>
       ) : null}
 
-      {sourceUpdatedLabel ? (
-        <div className="rounded-[1.4rem] border border-line bg-white/72 px-4 py-3 text-sm text-muted">
-          Quelle aktualisiert:{" "}
-          <span className="font-semibold text-foreground">
-            {sourceUpdatedLabel}
-          </span>
-        </div>
-      ) : null}
-
       {notices.length > 0 ? (
         <div className="rounded-[1.5rem] border border-line bg-white/72 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">

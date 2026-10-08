@@ -89,14 +89,14 @@ function normalizeSelectedClass(value: string) {
 
 function entryAppliesToClass(entryClassName: string, selectedClass: string) {
   const sourceClass = entryClassName.replace(/\s+/g, "").toUpperCase();
-  const schoolClass = selectedClass.toUpperCase();
+  const schoolClass = selectedClass.replace(/\s+/g, "").toUpperCase();
 
   if (sourceClass === schoolClass) {
     return true;
   }
 
   const selectedMatch = schoolClass.match(/^(\d{1,2})([A-D])$/);
-  const sourceMatch = sourceClass.match(/^0?(\d{1,2})([A-D]+)$/);
+  const sourceMatch = sourceClass.replace(/^0+(?=\d)/, "").match(/^(\d{1,2})([A-D]+)$/);
 
   return Boolean(
     selectedMatch &&
@@ -263,6 +263,12 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
             </div>
           ) : null}
         </section>
+
+        <p className="px-1 text-xs text-muted">
+          Quelle veröffentlicht: {formatDateTimeLabel(
+            data.sourceUpdatedAt ?? data.lastSuccessfulUpdate,
+          )}
+        </p>
       </main>
 
       <div className="pointer-events-none fixed inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,rgba(247,245,239,0),rgba(247,245,239,0.94)_70%)]" />

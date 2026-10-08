@@ -201,7 +201,7 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
       return;
     }
 
-    const rows = table.find("tr").toArray().slice(header.headerRowIndex + 1);
+    const rows = table.find("tr").toArray();
 
     rows.forEach((rowElement) => {
       const cells = $(rowElement).find("td, th").toArray();
@@ -228,6 +228,13 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
 
         row[key] = normalizeWhitespace($(cell).text());
       });
+
+      if (
+        normalizeHeader(row.className) === "klasse(n)" &&
+        normalizeHeader(row.lesson) === "stunde"
+      ) {
+        return;
+      }
 
       if (
         !row.lesson &&
