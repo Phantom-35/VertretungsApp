@@ -1,17 +1,26 @@
 import { normalizeWhitespace, parseSubstitutionPage } from "@/lib/parser";
 import type {
   DayNotice,
+  ParsedPage,
+  PlanDay,
   FetchedPage,
   SubstitutionEntry,
   SubstitutionPayload,
 } from "@/lib/types";
 
-const BASE_URL = "https://monitor2020.meckenheim-kag.com/schueler/subst_";
+const BASE_URL =
+  process.env.SUBSTITUTION_BASE_URL ??
+  "https://monitor2020.meckenheim-kag.com/schueler/subst_";
 const REQUEST_TIMEOUT_MS = 6_000;
 const RETRY_DELAY_MS = 400;
 const MAX_ATTEMPTS = 2;
 const PARALLEL_PAGE_LIMIT = 3;
-const MAX_FALLBACK_PAGES = 16;
+const MAX_PAGES = 30;
+/**
+ * The server keeps old subst_XXX.htm files from earlier uploads around. Pages
+ * whose "Stand" is much older than page 1 are such leftovers.
+ */
+const LEFTOVER_PAGE_AGE_MS = 12 * 60 * 60_000;
 
 function buildPageUrl(pageNumber: number) {
   return `${BASE_URL}${pageNumber.toString().padStart(3, "0")}.htm`;
@@ -155,10 +164,7 @@ function toFailurePayload(error: string): SubstitutionPayload {
   return {
     success: false,
     stale: false,
-    date: null,
-    dates: [],
-    dayLabel: null,
-    weekLabel: null,
+    days: [],
     pageCount: 0,
     fetchedPages: 0,
     lastUpdated: null,
@@ -172,6 +178,128 @@ function toFailurePayload(error: string): SubstitutionPayload {
   };
 }
 
+function range(from: number, to: number) {
+  return Array.from({ length: Math.max(0, to - from + 1) }, (_, index) => from + index);
+}
+
+function isLeftoverPage(page: ParsedPage, referenceStand: string | null) {
+  const stand = page.meta.sourceUpdatedAt;
+  return Boolean(
+    referenceStand &&
+      stand &&
+      Date.parse(referenceStand) - Date.parse(stand) > LEFTOVER_PAGE_AGE_MS,
+  );
+}
+
+/** Pages without a readable date belong to the day of the page before. */
+function withInheritedDate(page: ParsedPage, previous: ParsedPage): ParsedPage {
+  if (page.meta.date || !previous.meta.date) {
+    return page;
+  }
+
+  const date = previous.meta.date;
+  return {
+    meta: { ...page.meta, date, dayLabel: previous.meta.dayLabel, weekLabel: previous.meta.weekLabel },
+    entries: page.entries.map((entry) => ({ ...entry, date })),
+  };
+}
+
+/**
+ * Follows the Untis monitor chain starting at page 1:
+ * - "Seite x / y" tells how many more pages the current day has; those are
+ *   fetched in parallel.
+ * - After the last page of a day, the meta refresh link points to the first
+ *   page of the next day, or back to page 1 at the end of the plan.
+ * Simply counting up until a 404 is wrong, because outdated pages from
+ * earlier uploads stay on the server.
+ */
+async function collectPages(firstPage: ParsedPage, warnings: string[]) {
+  const pages = [firstPage];
+  const referenceStand = firstPage.meta.sourceUpdatedAt;
+  let failedPages = 0;
+  let highestPage = 1;
+  let current: ParsedPage["meta"] | null = firstPage.meta;
+
+  while (current && highestPage < MAX_PAGES) {
+    const remainingOfDay =
+      current.pageOfDay !== null && current.pagesOfDay !== null
+        ? current.pagesOfDay - current.pageOfDay
+        : 0;
+    const isProbe = remainingOfDay === 0 && current.nextPage === null;
+    let candidates: number[];
+
+    if (remainingOfDay > 0) {
+      candidates = range(current.pageNumber + 1, current.pageNumber + remainingOfDay);
+    } else if (current.nextPage !== null) {
+      // Pointing back (usually to page 1) marks the end of the plan.
+      candidates = current.nextPage > current.pageNumber ? [current.nextPage] : [];
+    } else if (current.pageOfDay === null) {
+      // No hints at all: probe the next page.
+      candidates = [current.pageNumber + 1];
+    } else {
+      candidates = [];
+    }
+
+    candidates = candidates.filter((pageNumber) => pageNumber <= MAX_PAGES);
+    if (candidates.length === 0) {
+      break;
+    }
+
+    const results = await mapWithConcurrency(candidates, PARALLEL_PAGE_LIMIT, (pageNumber) =>
+      fetchPage(pageNumber),
+    );
+    current = null;
+
+    for (const result of results) {
+      highestPage = Math.max(highestPage, result.pageNumber);
+
+      if (result.kind === "ok") {
+        const parsed = withInheritedDate(
+          parseSubstitutionPage(result.html, result.pageNumber),
+          pages[pages.length - 1],
+        );
+
+        if (isLeftoverPage(parsed, referenceStand)) {
+          if (!isProbe) {
+            warnings.push(`Seite ${result.pageNumber} ist veraltet und wurde ignoriert.`);
+          }
+          current = null;
+          break;
+        }
+
+        pages.push(parsed);
+        current = parsed.meta;
+        continue;
+      }
+
+      if (isProbe && result.kind === "missing") {
+        break;
+      }
+
+      failedPages += 1;
+      warnings.push(
+        result.kind === "missing"
+          ? `Seite ${result.pageNumber} war beim Abruf leer oder nicht vorhanden.`
+          : `Seite ${result.pageNumber} konnte nicht geladen werden.`,
+      );
+      // Without this page's refresh link, try the page after it.
+      current = {
+        pageNumber: result.pageNumber,
+        pageOfDay: null,
+        pagesOfDay: null,
+        nextPage: null,
+        date: null,
+        dayLabel: null,
+        weekLabel: null,
+        sourceUpdatedAt: null,
+        notices: [],
+      };
+    }
+  }
+
+  return { pages, failedPages, pageCount: highestPage };
+}
+
 export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
   const warnings: string[] = [];
   const firstPage = await fetchPage(1);
@@ -182,52 +310,10 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
     );
   }
 
-  const parsedFirstPage = parseSubstitutionPage(firstPage.html, 1);
-  let pageCount = parsedFirstPage.meta.totalPages ?? 1;
-  const fetchedPages = [parsedFirstPage];
-
-  if (!parsedFirstPage.meta.totalPages) {
-    for (let pageNumber = 2; pageNumber <= MAX_FALLBACK_PAGES; pageNumber += 1) {
-      const result = await fetchPage(pageNumber);
-
-      if (result.kind === "missing") {
-        pageCount = pageNumber - 1;
-        break;
-      }
-
-      if (result.kind === "error") {
-        warnings.push(`Seite ${pageNumber} konnte nicht geprüft werden.`);
-        pageCount = pageNumber - 1;
-        break;
-      }
-
-      fetchedPages.push(parseSubstitutionPage(result.html, pageNumber));
-      pageCount = pageNumber;
-    }
-  } else if (pageCount > 1) {
-    const remainingPages = Array.from(
-      { length: pageCount - 1 },
-      (_, index) => index + 2,
-    );
-    const results = await mapWithConcurrency(
-      remainingPages,
-      PARALLEL_PAGE_LIMIT,
-      (pageNumber) => fetchPage(pageNumber),
-    );
-
-    results.forEach((result) => {
-      if (result.kind === "ok") {
-        fetchedPages.push(parseSubstitutionPage(result.html, result.pageNumber));
-        return;
-      }
-
-      warnings.push(
-        result.kind === "missing"
-          ? `Seite ${result.pageNumber} war beim Abruf leer oder nicht vorhanden.`
-          : `Seite ${result.pageNumber} konnte nicht geladen werden.`,
-      );
-    });
-  }
+  const { pages: fetchedPages, failedPages, pageCount } = await collectPages(
+    parseSubstitutionPage(firstPage.html, 1),
+    warnings,
+  );
 
   const allEntries = sortEntries(
     fetchedPages.flatMap((page) => page.entries).filter((entry) => entry.className),
@@ -244,31 +330,31 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
     });
   });
   const notices = Array.from(noticeMap.values());
-  const dates = Array.from(
-    new Set(
-      fetchedPages
-        .map((page) => page.meta.date)
-        .filter((value): value is string => Boolean(value)),
-    ),
-  ).sort();
+  const dayMap = new Map<string, PlanDay>();
+  fetchedPages.forEach(({ meta }) => {
+    if (meta.date && !dayMap.has(meta.date)) {
+      dayMap.set(meta.date, {
+        date: meta.date,
+        dayLabel: meta.dayLabel,
+        weekLabel: meta.weekLabel,
+      });
+    }
+  });
+  const days = Array.from(dayMap.values()).sort((left, right) =>
+    left.date.localeCompare(right.date),
+  );
   const latestSourceUpdatedAt =
     fetchedPages
       .map((page) => page.meta.sourceUpdatedAt)
       .filter((value): value is string => Boolean(value))
       .sort()
       .at(-1) ?? null;
-  const firstMeta =
-    fetchedPages.find((page) => page.meta.date === dates[0])?.meta ??
-    fetchedPages[0]?.meta;
   const now = new Date().toISOString();
 
   return {
     success: true,
     stale: false,
-    date: dates[0] ?? null,
-    dates,
-    dayLabel: firstMeta?.dayLabel ?? null,
-    weekLabel: firstMeta?.weekLabel ?? null,
+    days,
     pageCount,
     fetchedPages: fetchedPages.length,
     lastUpdated: now,
@@ -278,9 +364,6 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
     entries: allEntries,
     notices,
     warnings,
-    error:
-      warnings.length > 0 && fetchedPages.length < pageCount
-        ? "Ein Teil der Seiten konnte nicht geladen werden."
-        : null,
+    error: failedPages > 0 ? "Ein Teil der Seiten konnte nicht geladen werden." : null,
   };
 }

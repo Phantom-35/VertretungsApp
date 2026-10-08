@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SubstitutionPayload } from "@/lib/types";
 
-const DATA_STORAGE_KEY = "kag:substitution-cache:v2";
-const LEGACY_DATA_STORAGE_KEYS = ["kag:substitution-cache"];
+const DATA_STORAGE_KEY = "kag:substitution-cache:v3";
+const LEGACY_DATA_STORAGE_KEYS = [
+  "kag:substitution-cache",
+  "kag:substitution-cache:v2",
+];
 /** Refresh in the background this often while the app is open. */
 const AUTO_REFRESH_MS = 5 * 60_000;
 /** Automatic refreshes (focus, visibility, online) are skipped if the last attempt is more recent. */
@@ -38,7 +41,7 @@ function readStoredPayload() {
     }
 
     const payload = JSON.parse(raw) as SubstitutionPayload;
-    return payload.success && Array.isArray(payload.dates) ? payload : null;
+    return payload.success && Array.isArray(payload.days) ? payload : null;
   } catch {
     return null;
   }

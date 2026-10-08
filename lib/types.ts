@@ -17,15 +17,19 @@ export type DayNotice = {
   text: string;
 };
 
+export type PlanDay = {
+  date: string;
+  /** "Donnerstag" */
+  dayLabel: string | null;
+  /** "Woche A" */
+  weekLabel: string | null;
+};
+
 export type SubstitutionPayload = {
   success: boolean;
   stale: boolean;
-  /** Earliest plan date, kept for the header. */
-  date: string | null;
-  /** All plan dates covered by the fetched pages, ascending. */
-  dates: string[];
-  dayLabel: string | null;
-  weekLabel: string | null;
+  /** All days covered by the fetched pages, ascending. */
+  days: PlanDay[];
   pageCount: number;
   fetchedPages: number;
   lastUpdated: string | null;
@@ -40,7 +44,11 @@ export type SubstitutionPayload = {
 
 export type PageMetadata = {
   pageNumber: number;
-  totalPages: number | null;
+  /** "Seite x / y" — Untis numbers pages per day. */
+  pageOfDay: number | null;
+  pagesOfDay: number | null;
+  /** Page the Untis monitor shows next (meta refresh); 1 after the last page. */
+  nextPage: number | null;
   date: string | null;
   dayLabel: string | null;
   weekLabel: string | null;

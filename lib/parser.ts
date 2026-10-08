@@ -81,62 +81,69 @@ function parseGermanDate(value: string) {
   return `${yearText}-${pad(Number(monthText))}-${pad(Number(dayText))}`;
 }
 
-function extractLines($: cheerio.CheerioAPI) {
-  return $("body")
-    .text()
-    .split(/\r?\n/)
-    .map((line) => normalizeWhitespace(line))
+function extractTitle($: cheerio.CheerioAPI) {
+  const title = normalizeWhitespace($(".mon_title").first().text());
+  if (title) {
+    return title;
+  }
+
+  // Fallback for layouts without the CSS class: the line with date and page.
+  return (
+    $("body")
+      .text()
+      .split(/\r?\n/)
+      .map((line) => normalizeWhitespace(line))
+      .find((line) => /\d{1,2}\.\d{1,2}\.\d{4}/.test(line) && /Seite\s+\d+/i.test(line)) ??
+    ""
+  );
+}
+
+/** `<meta http-equiv="refresh" content="10; URL=subst_002.htm">` -> 2 */
+function extractNextPage($: cheerio.CheerioAPI) {
+  const content =
+    $("meta")
+      .filter((_, element) => $(element).attr("http-equiv")?.toLowerCase() === "refresh")
+      .attr("content") ?? "";
+  const match = content.match(/subst_(\d+)\.htm/i);
+  return match ? Number(match[1]) : null;
+}
+
+/** Rows of the "Nachrichten zum Tag" table. */
+function extractNotices($: cheerio.CheerioAPI) {
+  return $("table.info tr")
+    .toArray()
+    .map((row) =>
+      $(row)
+        .find("td")
+        .toArray()
+        .map((cell) => normalizeWhitespace($(cell).text()))
+        .filter(Boolean)
+        .join(" – "),
+    )
     .filter(Boolean);
 }
 
 function extractMetadata($: cheerio.CheerioAPI, pageNumber: number): PageMetadata {
-  const lines = extractLines($);
-  const combinedText = lines.join("\n");
-  const titleLine =
-    lines.find((line) => /Woche\s+[A-Z]/i.test(line) && /\d{1,2}\.\d{1,2}\.\d{4}/.test(line)) ??
-    "";
-
-  const sourceLine = lines.find((line) => line.includes("Stand:")) ?? "";
-  const pageMatch = titleLine.match(/Seite\s+(\d+)\s*\/\s*(\d+)/i);
-  const dateMatch = titleLine.match(
-    /(\d{1,2}\.\d{1,2}\.\d{4})\s+([A-Za-zÄÖÜäöüß]+),\s+(Woche\s+[A-Z])/i,
-  );
-  const notices = (() => {
-    const noticeIndex = lines.findIndex((line) =>
-      /^Nachrichten zum Tag$/i.test(line),
-    );
-
-    if (noticeIndex === -1) {
-      return [];
-    }
-
-    const values: string[] = [];
-
-    for (let index = noticeIndex + 1; index < lines.length; index += 1) {
-      const line = lines[index];
-
-      if (!line || line === "---") {
-        continue;
-      }
-
-      if (/^Klasse/i.test(line) || /^Per\d+/i.test(line)) {
-        break;
-      }
-
-      values.push(line);
-    }
-
-    return values;
-  })();
+  // e.g. "8.10.2026 Donnerstag, Woche A (Seite 1 / 3)". The page counter
+  // restarts for every day.
+  const title = extractTitle($);
+  const dateMatch = title.match(/(\d{1,2}\.\d{1,2}\.\d{4})(?:\s+([A-Za-zÄÖÜäöüß]+))?/);
+  const weekMatch = title.match(/Woche\s+[A-Z]\b/i);
+  const pageMatch = title.match(/Seite\s+(\d+)\s*\/\s*(\d+)/i);
+  const sourceMatch = $("body")
+    .text()
+    .match(/Stand:\s*(\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2})/);
 
   return {
     pageNumber,
-    totalPages: pageMatch ? Number(pageMatch[2]) : null,
-    date: dateMatch ? parseGermanDate(dateMatch[1]) : parseGermanDate(combinedText),
-    dayLabel: dateMatch ? dateMatch[2] : null,
-    weekLabel: dateMatch ? dateMatch[3] : null,
-    sourceUpdatedAt: sourceLine ? parseGermanDateTime(sourceLine) : null,
-    notices,
+    pageOfDay: pageMatch ? Number(pageMatch[1]) : null,
+    pagesOfDay: pageMatch ? Number(pageMatch[2]) : null,
+    nextPage: extractNextPage($),
+    date: dateMatch ? parseGermanDate(dateMatch[1]) : null,
+    dayLabel: dateMatch?.[2] ?? null,
+    weekLabel: weekMatch ? weekMatch[0] : null,
+    sourceUpdatedAt: sourceMatch ? parseGermanDateTime(sourceMatch[1]) : null,
+    notices: extractNotices($),
   };
 }
 

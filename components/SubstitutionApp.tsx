@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { ClassSelector } from "@/components/ClassSelector";
+import { DaySelector } from "@/components/DaySelector";
 import { Header, type HeaderStatus } from "@/components/Header";
 import { LoadingState } from "@/components/LoadingState";
 import { NoticesCard } from "@/components/NoticesCard";
@@ -19,15 +20,9 @@ import {
   entryAppliesToClass,
   formatClassName,
 } from "@/lib/entries";
-import {
-  formatAge,
-  formatPlanDate,
-  formatPlanDateLabel,
-  formatTimestamp,
-  isPastDate,
-  relativeDayLabel,
-} from "@/lib/format";
-import type { SubstitutionPayload } from "@/lib/types";
+import { formatAge, formatPlanDateLabel, formatTimestamp, isPastDate } from "@/lib/format";
+import { schoolToday } from "@/lib/time";
+import type { PlanDay, SubstitutionPayload } from "@/lib/types";
 
 type SubstitutionAppProps = {
   initialData: SubstitutionPayload | null;
@@ -36,14 +31,27 @@ type SubstitutionAppProps = {
 const cardClassName =
   "rounded-[1.75rem] border border-line bg-card p-6 text-center shadow-[0_18px_45px_rgba(18,41,39,0.07)]";
 
-function EmptyDay({ selectedClass }: { selectedClass: string }) {
+/** Today if the plan has it, otherwise the next upcoming day, otherwise the latest. */
+function pickDefaultDay(days: PlanDay[], now: number | null) {
+  if (days.length === 0) {
+    return null;
+  }
+  if (now === null) {
+    return days[0].date;
+  }
+
+  const today = schoolToday(now);
+  return (days.find((day) => day.date >= today) ?? days[days.length - 1]).date;
+}
+
+function EmptyDay({ selectedClass, dayLabel }: { selectedClass: string; dayLabel: string }) {
   return (
     <div className={cardClassName}>
       <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
         Keine Vertretungen
       </p>
       <p className="mt-2 text-sm leading-6 text-muted">
-        Für die {selectedClass} sind keine Änderungen eingetragen.
+        {dayLabel} sind für die {selectedClass} keine Änderungen eingetragen.
       </p>
     </div>
   );
@@ -58,9 +66,15 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
   const forceRefresh = useCallback(() => refresh(true), [refresh]);
   const isBusy = status !== "idle";
 
-  const dates = data?.dates ?? [];
-  const isMultiDay = dates.length > 1;
-  const latestDate = dates.at(-1) ?? null;
+  const [chosenDate, setChosenDate] = useState<string | null>(null);
+
+  const days = data?.days ?? [];
+  // Keep the user's choice while it is still part of the plan.
+  const selectedDate = days.some((day) => day.date === chosenDate)
+    ? chosenDate
+    : pickDefaultDay(days, now);
+  const selectedDay = days.find((day) => day.date === selectedDate) ?? null;
+  const latestDate = days.at(-1)?.date ?? null;
   const planIsPast = latestDate !== null && isPastDate(latestDate, now);
 
   let headerStatus: HeaderStatus = "current";
@@ -72,33 +86,42 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
     headerStatus = "outdated";
   }
 
-  const dateLabel =
-    dates.length === 0
-      ? isBusy
-        ? "Wird geladen …"
-        : "–"
-      : isMultiDay
-        ? dates
-            .map((date) => relativeDayLabel(date, now) ?? formatPlanDate(date))
-            .join(" · ")
-        : formatPlanDateLabel(dates[0], now);
+  const dateLabel = selectedDay
+    ? [formatPlanDateLabel(selectedDay.date, now), selectedDay.weekLabel]
+        .filter(Boolean)
+        .join(" · ")
+    : isBusy
+      ? "Wird geladen …"
+      : "–";
 
-  const visibleEntries =
+  const classEntries =
     data && selectedClass
       ? data.entries
           .filter((entry) => entryAppliesToClass(entry.className, selectedClass))
           .sort(compareEntries)
       : [];
-
-  const groupDates = Array.from(
-    new Set([...dates, ...visibleEntries.map((entry) => entry.date)]),
+  const countsByDate = selectedClass
+    ? new Map(
+        days.map((day) => [
+          day.date,
+          classEntries.filter((entry) => entry.date === day.date).length,
+        ]),
+      )
+    : null;
+  // Entries without a readable date are shown on every day.
+  const visibleEntries = classEntries.filter(
+    (entry) => !selectedDate || !entry.date || entry.date === selectedDate,
   );
-  if (groupDates.length === 0) {
-    groupDates.push("");
-  }
-
-  const getDayHeading = (date: string | null) =>
-    isMultiDay && date ? formatPlanDateLabel(date, now) : null;
+  const visibleNotices = Array.from(
+    new Set(
+      (data?.notices ?? [])
+        .filter((notice) => !selectedDate || !notice.date || notice.date === selectedDate)
+        .map((notice) => notice.text),
+    ),
+  );
+  const emptyDayLabel = selectedDay
+    ? `Am ${selectedDay.dayLabel ?? formatPlanDateLabel(selectedDay.date, null)}`
+    : "Heute";
 
   return (
     <>
@@ -108,7 +131,7 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
           <Header
             selectedClass={selectedClass}
             dateLabel={dateLabel}
-            dateIsPast={planIsPast}
+            dateIsPast={selectedDate !== null && isPastDate(selectedDate, now)}
             sourceUpdatedLabel={formatTimestamp(data?.sourceUpdatedAt ?? null, now)}
             fetchedLabel={
               data?.lastUpdated ? formatAge(data.lastUpdated, now) : "noch nie"
@@ -136,9 +159,17 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
             />
           ) : null}
 
-          {data ? (
-            <NoticesCard notices={data.notices} getDateLabel={getDayHeading} />
+          {days.length > 1 && selectedDate ? (
+            <DaySelector
+              days={days}
+              selectedDate={selectedDate}
+              onChange={setChosenDate}
+              counts={countsByDate}
+              now={now}
+            />
           ) : null}
+
+          <NoticesCard notices={visibleNotices} />
 
           <section className="space-y-4" aria-live="polite">
             {!data && isBusy ? <LoadingState /> : null}
@@ -173,35 +204,19 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
               </div>
             ) : null}
 
-            {data && selectedClass
-              ? groupDates.map((date) => {
-                  const entries = visibleEntries.filter((entry) => entry.date === date);
-                  const heading = getDayHeading(date);
-
-                  return (
-                    <div key={date} className="space-y-3">
-                      {heading ? (
-                        <h2 className="px-1 pt-1 text-sm font-semibold uppercase tracking-[0.18em] text-muted">
-                          {heading}
-                        </h2>
-                      ) : null}
-                      {entries.length > 0 ? (
-                        entries.map((entry) => (
-                          <SubstitutionCard
-                            key={entry.id}
-                            entry={entry}
-                            showClassName={
-                              formatClassName(entry.className) !== selectedClass
-                            }
-                          />
-                        ))
-                      ) : (
-                        <EmptyDay selectedClass={selectedClass} />
-                      )}
-                    </div>
-                  );
-                })
-              : null}
+            {data && selectedClass ? (
+              visibleEntries.length > 0 ? (
+                visibleEntries.map((entry) => (
+                  <SubstitutionCard
+                    key={entry.id}
+                    entry={entry}
+                    showClassName={formatClassName(entry.className) !== selectedClass}
+                  />
+                ))
+              ) : (
+                <EmptyDay selectedClass={selectedClass} dayLabel={emptyDayLabel} />
+              )
+            ) : null}
           </section>
         </main>
       </PullToRefresh>

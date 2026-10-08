@@ -9,6 +9,13 @@ const planDateFormatter = new Intl.DateTimeFormat("de-DE", {
   month: "2-digit",
 });
 
+const shortDateFormatter = new Intl.DateTimeFormat("de-DE", {
+  timeZone: "UTC",
+  weekday: "short",
+  day: "2-digit",
+  month: "2-digit",
+});
+
 const dateTimeFormatter = new Intl.DateTimeFormat("de-DE", {
   timeZone: SCHOOL_TIME_ZONE,
   day: "2-digit",
@@ -26,6 +33,11 @@ const timeFormatter = new Intl.DateTimeFormat("de-DE", {
 /** "2026-10-08" -> "Donnerstag, 08.10." */
 export function formatPlanDate(date: string) {
   return planDateFormatter.format(new Date(`${date}T00:00:00Z`));
+}
+
+/** "2026-10-08" -> "Do., 08.10." */
+export function formatShortDate(date: string) {
+  return shortDateFormatter.format(new Date(`${date}T00:00:00Z`));
 }
 
 /** "Heute", "Morgen", "Gestern" or null; needs the current time. */

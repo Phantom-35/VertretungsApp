@@ -1,12 +1,8 @@
-import type { DayNotice } from "@/lib/types";
-
 type NoticesCardProps = {
-  notices: DayNotice[];
-  /** Returns a heading for a date, or null if only one day is shown. */
-  getDateLabel: (date: string | null) => string | null;
+  notices: string[];
 };
 
-export function NoticesCard({ notices, getDateLabel }: NoticesCardProps) {
+export function NoticesCard({ notices }: NoticesCardProps) {
   if (notices.length === 0) {
     return null;
   }
@@ -17,17 +13,11 @@ export function NoticesCard({ notices, getDateLabel }: NoticesCardProps) {
         Nachrichten zum Tag
       </p>
       <div className="mt-3 space-y-2">
-        {notices.map((notice) => {
-          const dateLabel = getDateLabel(notice.date);
-          return (
-            <p key={`${notice.date}|${notice.text}`} className="text-sm leading-6 text-foreground">
-              {dateLabel ? (
-                <span className="font-semibold text-muted">{dateLabel}: </span>
-              ) : null}
-              {notice.text}
-            </p>
-          );
-        })}
+        {notices.map((notice) => (
+          <p key={notice} className="text-sm leading-6 text-foreground">
+            {notice}
+          </p>
+        ))}
       </div>
     </section>
   );
