@@ -8,10 +8,17 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/** Fixed clock for the browser tests; only with the in-memory test store. */
-function testNow() {
-  const value = process.env.PUSH_TEST_NOW;
-  return process.env.PUSH_STORE === "memory" && value ? Date.parse(value) : null;
+/**
+ * Fixed clock for the browser tests (`?now=` or PUSH_TEST_NOW); only with the
+ * in-memory test store, never in production.
+ */
+function testNow(request: Request) {
+  if (process.env.PUSH_STORE !== "memory") {
+    return null;
+  }
+  const value = new URL(request.url).searchParams.get("now") ?? process.env.PUSH_TEST_NOW;
+  const time = value ? Date.parse(value) : Number.NaN;
+  return Number.isNaN(time) ? null : time;
 }
 
 function authorized(request: Request) {
@@ -43,7 +50,7 @@ async function handle(request: Request) {
     send: service.send,
     // Always fresh from the school website, not from the app's 5-minute cache.
     loadPlan: fetchSubstitutionData,
-    now: testNow() ?? Date.now(),
+    now: testNow(request) ?? Date.now(),
   });
   return json(result);
 }

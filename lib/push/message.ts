@@ -7,7 +7,8 @@ import {
 import { formatShortDate, relativeDayLabel } from "@/lib/format";
 import type { KeyedEntry } from "@/lib/seen";
 import { describeEntry, lessonLabel } from "@/lib/share";
-import { NEXT_DAY_FROM_HOUR, schoolHour, schoolToday } from "@/lib/time";
+import { EVENING_SUMMARY_HOUR, notifyGroupOf, type NotifyGroup } from "@/lib/notify";
+import { NEXT_DAY_FROM_HOUR, daysBetween, schoolHour, schoolToday } from "@/lib/time";
 import type { PlanDiff } from "@/lib/push/diff";
 
 export type Change =
@@ -28,7 +29,12 @@ export type PushPayload = {
 /** Notifications list at most this many changes; the rest is counted. */
 const MAX_LINES = 4;
 
-export type Audience = { schoolClass: string; teachers: readonly string[] };
+export type Audience = {
+  schoolClass: string;
+  teachers: readonly string[];
+  /** Kinds of changes to notify about; all when missing. */
+  notifyGroups?: readonly NotifyGroup[];
+};
 
 /**
  * Whether a change matters to a subscriber: their class (and courses, in the
@@ -70,11 +76,24 @@ export function changesFor(diff: Pick<PlanDiff, "added" | "removed">, audience: 
     entries.forEach((entry) => changes.push({ kind: "removed", entry })),
   );
 
-  return changes.sort(
+  return changes.filter((change) => matchesGroups(change, audience.notifyGroups)).sort(
     (left, right) =>
       left.entry.date.localeCompare(right.entry.date) ||
       lessonStart(left.entry.lesson) - lessonStart(right.entry.lesson),
   );
+}
+
+/**
+ * Whether a change is of a kind the subscriber wants. An edited entry counts
+ * if either its old or its new kind is wanted: someone who only follows
+ * cancellations still learns that one was withdrawn.
+ */
+function matchesGroups(change: Change, groups: readonly NotifyGroup[] | undefined) {
+  if (!groups) {
+    return true;
+  }
+  const types = change.kind === "changed" ? [change.entry.type, change.previous.type] : [change.entry.type];
+  return types.some((type) => groups.includes(notifyGroupOf(type)));
 }
 
 /** "Heute", "Morgen" or "Mo., 12.10." */
@@ -133,4 +152,62 @@ export const QUIET_UNTIL_HOUR = 6;
 export function isQuietTime(now: number) {
   const hour = schoolHour(now);
   return hour >= QUIET_FROM_HOUR || hour < QUIET_UNTIL_HOUR;
+}
+
+/** Evening summaries go out between EVENING_SUMMARY_HOUR and the quiet time. */
+export function isSummaryTime(now: number) {
+  const hour = schoolHour(now);
+  return hour >= EVENING_SUMMARY_HOUR && hour < QUIET_FROM_HOUR;
+}
+
+/**
+ * The day an evening summary is about: tomorrow, if it is a school day
+ * (Mon–Fri) and the school has already published its plan. Otherwise null,
+ * e.g. on Friday and Saturday evenings or in the holidays.
+ */
+export function summaryDate(planDates: readonly string[], now: number) {
+  const today = schoolToday(now);
+  const tomorrow = planDates.find((date) => daysBetween(today, date) === 1);
+  if (!tomorrow) {
+    return null;
+  }
+  const weekday = new Date(`${tomorrow}T12:00:00Z`).getUTCDay();
+  return weekday === 0 || weekday === 6 ? null : tomorrow;
+}
+
+/** "5A · Morgen: 2 Änderungen" with one line per change, or "keine Änderungen". */
+export function buildSummary(
+  audience: Audience,
+  entries: readonly KeyedEntry[],
+  date: string,
+  now: number,
+): PushPayload {
+  const teachers = isCourseClass(audience.schoolClass) ? audience.teachers : [];
+  const own = entries
+    .filter(
+      (entry) =>
+        entry.date === date &&
+        entryAppliesToClass(entry.className, audience.schoolClass) &&
+        entryMatchesTeachers(entry, teachers),
+    )
+    .sort((left, right) => lessonStart(left.lesson) - lessonStart(right.lesson));
+  const day = dayLabel(date, now);
+  const url = `/?day=${date}`;
+  const tag = `kag-summary-${date}`;
+
+  if (own.length === 0) {
+    return { title: `${audience.schoolClass} · ${day}`, body: "Keine Änderungen eingetragen.", url, tag };
+  }
+
+  const lines = own
+    .slice(0, MAX_LINES)
+    .map((entry) => `${lessonLabel(entry.lesson)}: ${describeEntry(entry, audience.schoolClass)}`);
+  const rest = own.length - MAX_LINES;
+  return {
+    title: `${audience.schoolClass} · ${day}: ${own.length === 1 ? "1 Änderung" : `${own.length} Änderungen`}`,
+    body: [...lines, ...(rest > 0 ? [`… und ${rest} weitere`] : [])].join("\n"),
+    url,
+    tag,
+    badgeCount: own.length,
+  };
 }

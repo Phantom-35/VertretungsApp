@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from "react";
+import { NOTIFY_GROUPS, parseNotifyGroups, type NotifyGroup } from "@/lib/notify";
 import { SETTINGS_STORAGE_KEY } from "@/lib/theme";
 import { NEXT_DAY_FROM_HOUR } from "@/lib/time";
 
@@ -8,6 +9,10 @@ export type Settings = {
   /** "Neu" badges for changes since the last visit. */
   showNewBadges: boolean;
   textSize: TextSize;
+  /** Kinds of changes push notifications are sent for. */
+  notifyGroups: NotifyGroup[];
+  /** Summary of the next school day at 19 h. */
+  eveningSummary: boolean;
 };
 
 export type TextSize = "normal" | "large";
@@ -21,6 +26,8 @@ const DEFAULTS: Settings = {
   nextDayFromHour: NEXT_DAY_FROM_HOUR,
   showNewBadges: true,
   textSize: "normal",
+  notifyGroups: [...NOTIFY_GROUPS],
+  eveningSummary: false,
 };
 const STORAGE_KEY = SETTINGS_STORAGE_KEY;
 
@@ -40,6 +47,8 @@ function parse(raw: string | null): Settings {
       showNewBadges:
         typeof stored.showNewBadges === "boolean" ? stored.showNewBadges : DEFAULTS.showNewBadges,
       textSize: stored.textSize === "large" ? "large" : "normal",
+      notifyGroups: parseNotifyGroups(stored.notifyGroups) ?? DEFAULTS.notifyGroups,
+      eveningSummary: stored.eveningSummary === true,
     };
   } catch {
     return DEFAULTS;

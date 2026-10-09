@@ -1,5 +1,13 @@
 import { diffPlan } from "@/lib/push/diff";
-import { buildNotification, changesFor, isQuietTime } from "@/lib/push/message";
+import {
+  buildNotification,
+  buildSummary,
+  changesFor,
+  isQuietTime,
+  isSummaryTime,
+  summaryDate,
+  type PushPayload,
+} from "@/lib/push/message";
 import type { SendPush } from "@/lib/push/sender";
 import type { PushStore, Subscriber } from "@/lib/push/store";
 import { schoolToday } from "@/lib/time";
@@ -13,7 +21,7 @@ export type CheckResult =
   | { status: "quiet" }
   | { status: "busy" }
   | { status: "incomplete"; reason: string }
-  | { status: "initialized"; entries: number }
+  | { status: "initialized"; entries: number; summaries: number }
   | {
       status: "checked";
       added: number;
@@ -22,6 +30,8 @@ export type CheckResult =
       notified: number;
       failed: number;
       expired: number;
+      /** Evening summaries sent in this run. */
+      summaries: number;
     };
 
 type CheckOptions = {
@@ -31,9 +41,13 @@ type CheckOptions = {
   now?: number;
 };
 
+/** Bookkeeping key: the day the last evening summary was about. */
+const SUMMARY_META = "summary-day";
+
 /**
  * Compares the current plan with the last known one and notifies every
- * subscriber about the changes that concern them. Meant to run every few
+ * subscriber about the changes that concern them; in the evening it also
+ * sends the summaries of the next school day. Meant to run every few
  * minutes; runs that overlap are skipped.
  */
 export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: CheckOptions): Promise<CheckResult> {
@@ -56,32 +70,41 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
     const diff = diffPlan(await store.getPlanState(), plan.entries, schoolToday(now), new Date(now));
     // Saved before sending: a failed run must not notify twice.
     await store.savePlanState(diff.state);
-    if (diff.initial) {
-      return { status: "initialized", entries: diff.state.keys.length };
+
+    const hasChanges = !diff.initial && diff.added.length + diff.removed.length > 0;
+    const day = isSummaryTime(now) ? summaryDate(plan.days.map((planDay) => planDay.date), now) : null;
+    // Once per day; recorded before sending, like the plan state.
+    const summaryDue = day !== null && (await store.getMeta(SUMMARY_META)) !== day;
+    if (summaryDue) {
+      await store.setMeta(SUMMARY_META, day);
     }
 
-    const subscribers =
-      diff.added.length + diff.removed.length > 0 ? await store.listSubscribers() : [];
-    let notified = 0;
-    let failed = 0;
-    let expired = 0;
+    const subscribers = hasChanges || summaryDue ? await store.listSubscribers() : [];
+    const stats = { notified: 0, failed: 0, expired: 0, summaries: 0 };
+
+    const deliver = async (subscriber: Subscriber, payload: PushPayload) => {
+      const result = await send(subscriber.subscription, payload);
+      if (result === "gone") {
+        stats.expired += 1;
+        await store.deleteSubscriber(subscriber.id);
+      } else if (result === "failed") {
+        stats.failed += 1;
+      }
+      return result === "sent";
+    };
 
     const notify = async (subscriber: Subscriber) => {
-      const changes = changesFor(diff, subscriber, now);
-      if (changes.length === 0) {
-        return;
+      const changes = hasChanges ? changesFor(diff, subscriber, now) : [];
+      if (changes.length > 0) {
+        if (!(await deliver(subscriber, buildNotification(subscriber.schoolClass, changes, now)))) {
+          return;
+        }
+        stats.notified += 1;
       }
-      const result = await send(
-        subscriber.subscription,
-        buildNotification(subscriber.schoolClass, changes, now),
-      );
-      if (result === "sent") {
-        notified += 1;
-      } else if (result === "gone") {
-        expired += 1;
-        await store.deleteSubscriber(subscriber.id);
-      } else {
-        failed += 1;
+      if (summaryDue && subscriber.eveningSummary) {
+        if (await deliver(subscriber, buildSummary(subscriber, plan.entries, day, now))) {
+          stats.summaries += 1;
+        }
       }
     };
 
@@ -89,14 +112,15 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
       await Promise.all(subscribers.slice(index, index + PARALLEL_SENDS).map(notify));
     }
 
+    if (diff.initial) {
+      return { status: "initialized", entries: diff.state.keys.length, summaries: stats.summaries };
+    }
     return {
       status: "checked",
       added: diff.added.length,
       removed: diff.removed.length,
       subscribers: subscribers.length,
-      notified,
-      failed,
-      expired,
+      ...stats,
     };
   } finally {
     await store.releaseLock(LOCK_NAME);

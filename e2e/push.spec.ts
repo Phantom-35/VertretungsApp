@@ -70,8 +70,9 @@ async function useDevice(context: BrowserContext, device: Device) {
   }, device.subscription);
 }
 
-async function check(request: APIRequestContext) {
-  const response = await request.get("/api/push/check", {
+async function check(request: APIRequestContext, now?: string) {
+  const query = now ? `?now=${encodeURIComponent(now)}` : "";
+  const response = await request.get(`/api/push/check${query}`, {
     headers: { authorization: `Bearer ${CRON_SECRET}` },
   });
   expect(response.status()).toBe(200);
@@ -183,6 +184,58 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     expect(await check(request)).toMatchObject({ status: "checked", notified: 1 });
     await page.waitForTimeout(500);
     expect(service.received.filter((push) => push.path === "/phone")).toHaveLength(4);
+  } finally {
+    await service.close();
+  }
+});
+
+test("notifies only about the chosen kinds, and sends the evening summary", async ({ page, context, request }) => {
+  const service = await startFakePushService();
+  try {
+    const phone = createDevice(`${service.url}/choices`);
+    await useDevice(context, phone);
+    // Take over whatever earlier tests left in the plan state.
+    await check(request);
+
+    await page.goto("/");
+    await chooseClass(page, "5A");
+    const settings = page.getByRole("group", { name: "Benachrichtigungen" });
+    await settings.getByRole("button", { name: "Einschalten" }).click();
+    await waitForPushes(service.received, "/choices", 1);
+
+    // No substitutions, but the evening summary.
+    await page.getByRole("button", { name: "Einstellungen" }).click();
+    const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+    let synced = page.waitForRequest(
+      (req) => req.url().endsWith("/api/push/subscribe") && !(req.postDataJSON().notifyGroups as string[]).includes("substitution"),
+    );
+    await dialog.getByText("Vertretungen & Betreuung", { exact: true }).click();
+    await synced;
+    synced = page.waitForRequest(
+      (req) => req.url().endsWith("/api/push/subscribe") && req.postDataJSON().eveningSummary === true,
+    );
+    await dialog.getByText("Abends Überblick für morgen", { exact: true }).click();
+    const body = (await synced).postDataJSON();
+    expect(body.notifyGroups).toEqual(["cancelled", "room", "exam"]);
+    await page.waitForTimeout(300);
+
+    // A new substitution: not wanted.
+    await changePlan(request, 4, row("05AB", "3 - 4", "Statt-Vertretung", "SKA"), row("05AB", "3 - 4", "Vertretung", "KER"));
+    expect(await check(request)).toMatchObject({ status: "checked", notified: 0 });
+    // Now cancelled: wanted.
+    await changePlan(request, 4, row("05AB", "3 - 4", "Vertretung", "KER"), row("05AB", "3 - 4", "Entfall", "---"));
+    expect(await check(request)).toMatchObject({ status: "checked", notified: 1 });
+    const [, cancelled] = await waitForPushes(service.received, "/choices", 2);
+    expect(read(phone, cancelled).body).toBe("Jetzt: Entfall · 5AB · SVA · Raum 004 (vorher Vertretung)");
+
+    // 19:05: the summary of Friday, once.
+    expect(await check(request, "2026-10-08T19:05:00+02:00")).toMatchObject({ summaries: 1 });
+    const [, , summary] = await waitForPushes(service.received, "/choices", 3);
+    const fiveA = read(phone, summary);
+    expect(fiveA.title).toMatch(/^5A · Morgen: \d+ Änderung/);
+    expect(fiveA.url).toBe("/?day=2026-10-09");
+    expect(fiveA.body).toContain("3.–4. Std.: Entfall · 5AB");
+    expect(await check(request, "2026-10-08T19:35:00+02:00")).toMatchObject({ summaries: 0 });
   } finally {
     await service.close();
   }

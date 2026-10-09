@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isIos, isStandalone } from "@/lib/device";
+import type { NotifyGroup } from "@/lib/notify";
 
 export type PushStatus =
   /** Still finding out. */
@@ -45,13 +46,18 @@ async function post(path: string, body: unknown) {
   return { status: response.status, ok: response.ok, data };
 }
 
-type Audience = { schoolClass: string | null; teachers: readonly string[] };
+type Audience = {
+  schoolClass: string | null;
+  teachers: readonly string[];
+  notifyGroups: readonly NotifyGroup[];
+  eveningSummary: boolean;
+};
 
 /**
  * Web push for the selected class (and courses). Keeps the server's copy of
  * class and teachers in sync while notifications are on.
  */
-export function usePushNotifications({ schoolClass, teachers }: Audience) {
+export function usePushNotifications({ schoolClass, teachers, notifyGroups, eveningSummary }: Audience) {
   const [status, setStatus] = useState<PushStatus>("checking");
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,6 +67,7 @@ export function usePushNotifications({ schoolClass, teachers }: Audience) {
   // Updates are sent one after another, so the last class chosen wins.
   const syncChainRef = useRef<Promise<unknown>>(Promise.resolve());
   const teachersKey = teachers.join(",");
+  const groupsKey = notifyGroups.join(",");
 
   useEffect(() => {
     let cancelled = false;
@@ -120,6 +127,8 @@ export function usePushNotifications({ schoolClass, teachers }: Audience) {
         subscription: subscription.toJSON(),
         schoolClass,
         teachers: teachersKey ? teachersKey.split(",") : [],
+        notifyGroups: groupsKey ? groupsKey.split(",") : [],
+        eveningSummary,
       });
       if (result.status === 410 && !cancelled) {
         await subscription.unsubscribe().catch(() => undefined);
@@ -131,7 +140,7 @@ export function usePushNotifications({ schoolClass, teachers }: Audience) {
     return () => {
       cancelled = true;
     };
-  }, [status, schoolClass, teachersKey]);
+  }, [status, schoolClass, teachersKey, groupsKey, eveningSummary]);
 
   const enable = useCallback(async () => {
     const registration = registrationRef.current;
@@ -163,6 +172,8 @@ export function usePushNotifications({ schoolClass, teachers }: Audience) {
         subscription: subscription.toJSON(),
         schoolClass,
         teachers,
+        notifyGroups,
+        eveningSummary,
       });
       if (!result.ok) {
         await subscription.unsubscribe().catch(() => undefined);
@@ -176,7 +187,7 @@ export function usePushNotifications({ schoolClass, teachers }: Audience) {
     } finally {
       setBusy(false);
     }
-  }, [publicKey, schoolClass, teachers]);
+  }, [publicKey, schoolClass, teachers, notifyGroups, eveningSummary]);
 
   const disable = useCallback(async () => {
     setBusy(true);

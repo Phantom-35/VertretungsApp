@@ -54,6 +54,10 @@ describe("Redis push store (Upstash REST)", () => {
       await store.savePlanState(state);
       expect(await store.getPlanState()).toEqual(state);
 
+      expect(await store.getMeta("summary-day")).toBeNull();
+      await store.setMeta("summary-day", "2026-10-09");
+      expect(await store.getMeta("summary-day")).toBe("2026-10-09");
+
       expect(await store.acquireLock("check", 60)).toBe(true);
       expect(await store.acquireLock("check", 60)).toBe(false);
       await store.releaseLock("check");

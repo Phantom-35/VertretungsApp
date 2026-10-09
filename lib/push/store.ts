@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import type { NotifyGroup } from "@/lib/notify";
 import type { PlanState } from "@/lib/push/diff";
 
 export type PushSubscriptionData = {
@@ -16,6 +17,10 @@ export type Subscriber = {
   updatedAt: string;
   /** Last test notification (ms), to limit how often one can be sent. */
   lastTestAt?: number;
+  /** Kinds of changes to notify about; all when missing (older subscribers). */
+  notifyGroups?: NotifyGroup[];
+  /** Summary of the next school day in the evening. */
+  eveningSummary?: boolean;
 };
 
 export interface PushStore {
@@ -26,6 +31,9 @@ export interface PushStore {
   countSubscribers(): Promise<number>;
   getPlanState(): Promise<PlanState | null>;
   savePlanState(state: PlanState): Promise<void>;
+  /** Small bookkeeping values, e.g. the day of the last evening summary. */
+  getMeta(name: string): Promise<string | null>;
+  setMeta(name: string, value: string): Promise<void>;
   /** True if the lock was free; it expires by itself after `seconds`. */
   acquireLock(name: string, seconds: number): Promise<boolean>;
   releaseLock(name: string): Promise<void>;
@@ -34,6 +42,7 @@ export interface PushStore {
 const SUBSCRIBERS_KEY = "push:subscribers";
 const PLAN_KEY = "push:plan";
 const LOCK_PREFIX = "push:lock:";
+const META_PREFIX = "push:meta:";
 
 /** Upstash may return stored JSON already parsed. */
 function parse<T>(value: unknown): T | null {
@@ -84,6 +93,15 @@ class RedisStore implements PushStore {
     await this.redis.set(PLAN_KEY, JSON.stringify(state));
   }
 
+  async getMeta(name: string) {
+    const value = await this.redis.get<unknown>(META_PREFIX + name);
+    return value === null || value === undefined ? null : String(value);
+  }
+
+  async setMeta(name: string, value: string) {
+    await this.redis.set(META_PREFIX + name, value);
+  }
+
   async acquireLock(name: string, seconds: number) {
     return (await this.redis.set(LOCK_PREFIX + name, "1", { nx: true, ex: seconds })) === "OK";
   }
@@ -98,6 +116,7 @@ export class MemoryStore implements PushStore {
   subscribers = new Map<string, Subscriber>();
   plan: PlanState | null = null;
   locks = new Map<string, number>();
+  meta = new Map<string, string>();
 
   async getSubscriber(id: string) {
     return structuredClone(this.subscribers.get(id) ?? null);
@@ -119,6 +138,12 @@ export class MemoryStore implements PushStore {
   }
   async savePlanState(state: PlanState) {
     this.plan = structuredClone(state);
+  }
+  async getMeta(name: string) {
+    return this.meta.get(name) ?? null;
+  }
+  async setMeta(name: string, value: string) {
+    this.meta.set(name, value);
   }
   async acquireLock(name: string, seconds: number) {
     const now = Date.now();

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { diffPlan, type PlanState } from "@/lib/push/diff";
-import { buildNotification, changesFor, isQuietTime, isRelevant } from "@/lib/push/message";
+import {
+  buildNotification,
+  buildSummary,
+  changesFor,
+  isQuietTime,
+  isRelevant,
+  isSummaryTime,
+  summaryDate,
+} from "@/lib/push/message";
+import { notifyGroupOf, type NotifyGroup } from "@/lib/notify";
 import { entryKey, parseEntryKey, type KeyedEntry } from "@/lib/seen";
 
 const entry = (overrides: Partial<KeyedEntry>): KeyedEntry => ({
@@ -196,5 +205,91 @@ describe("notification text", () => {
     expect(isQuietTime(Date.parse("2026-10-08T06:00:00+02:00"))).toBe(false);
     expect(isQuietTime(Date.parse("2026-12-08T20:59:00+01:00"))).toBe(false);
     expect(isQuietTime(Date.parse("2026-12-08T05:30:00+01:00"))).toBe(true);
+  });
+});
+
+describe("notification groups", () => {
+  const audience = (notifyGroups: NotifyGroup[]) => ({ schoolClass: "5A", teachers: [], notifyGroups });
+
+  it("sorts every kind of entry into a group", () => {
+    expect(["Entfall", "EVA", "Vertretung", "Betreuung", "Raum-Vtr.", "Verlegung", "Klausur", "Veranst."].map(notifyGroupOf)).toEqual([
+      "cancelled",
+      "cancelled",
+      "substitution",
+      "substitution",
+      "room",
+      "room",
+      "exam",
+      "exam",
+    ]);
+  });
+
+  it("only reports the chosen kinds", () => {
+    const added = [entry({ lesson: "1", type: "Entfall" }), entry({ lesson: "2", type: "Vertretung" })];
+    expect(changesFor({ added, removed: [] }, audience(["cancelled"]), MORNING).map((change) => change.entry.lesson)).toEqual(["1"]);
+    expect(changesFor({ added, removed: [] }, audience([]), MORNING)).toEqual([]);
+    // Older subscribers without a choice get everything.
+    expect(changesFor({ added, removed: [] }, { schoolClass: "5A", teachers: [] }, MORNING)).toHaveLength(2);
+  });
+
+  it("reports a withdrawn cancellation to someone who only follows cancellations", () => {
+    const before = entry({ type: "Entfall" });
+    const after = entry({ type: "Vertretung", substitute: "DEF" });
+    expect(changesFor({ added: [after], removed: [before] }, audience(["cancelled"]), MORNING)).toEqual([
+      { kind: "changed", entry: after, previous: before },
+    ]);
+  });
+});
+
+describe("evening summary", () => {
+  const EVENING = Date.parse("2026-10-08T19:05:00+02:00"); // Thursday
+  const audience = { schoolClass: "5A", teachers: [] };
+
+  it("is sent between 19 and 21 h", () => {
+    expect(isSummaryTime(Date.parse("2026-10-08T18:59:00+02:00"))).toBe(false);
+    expect(isSummaryTime(EVENING)).toBe(true);
+    expect(isSummaryTime(Date.parse("2026-10-08T20:59:00+02:00"))).toBe(true);
+    expect(isSummaryTime(Date.parse("2026-12-08T19:10:00+01:00"))).toBe(true);
+  });
+
+  it("is about tomorrow if it is a school day with a published plan", () => {
+    expect(summaryDate(["2026-10-08", "2026-10-09"], EVENING)).toBe("2026-10-09");
+    // No plan for tomorrow yet (or holidays): nothing.
+    expect(summaryDate(["2026-10-08"], EVENING)).toBeNull();
+    // Friday and Saturday evening: no school tomorrow.
+    expect(summaryDate(["2026-10-09", "2026-10-10", "2026-10-12"], Date.parse("2026-10-09T19:05:00+02:00"))).toBeNull();
+    // Sunday evening: Monday.
+    expect(summaryDate(["2026-10-12"], Date.parse("2026-10-11T19:05:00+02:00"))).toBe("2026-10-12");
+  });
+
+  it("lists tomorrow's changes for the class", () => {
+    const entries = [
+      entry({ lesson: "5", type: "Vertretung", substitute: "DEF" }),
+      entry({ lesson: "1" }),
+      entry({ className: "07B", lesson: "2" }),
+      entry({ date: "2026-10-12", lesson: "3" }),
+    ];
+    expect(buildSummary(audience, entries, "2026-10-09", EVENING)).toEqual({
+      title: "5A · Morgen: 2 Änderungen",
+      body: "1. Std.: Entfall · ABC · Raum 101\n5. Std.: Vertretung · ABC → DEF · Raum 101",
+      url: "/?day=2026-10-09",
+      tag: "kag-summary-2026-10-09",
+      badgeCount: 2,
+    });
+  });
+
+  it("says so when nothing changes", () => {
+    expect(buildSummary(audience, [], "2026-10-09", EVENING)).toEqual({
+      title: "5A · Morgen",
+      body: "Keine Änderungen eingetragen.",
+      url: "/?day=2026-10-09",
+      tag: "kag-summary-2026-10-09",
+    });
+  });
+
+  it("respects the course filter in the upper school", () => {
+    const entries = [entry({ className: "Q1", teacher: "RUK" }), entry({ className: "Q1", teacher: "KER" })];
+    const summary = buildSummary({ schoolClass: "Q1", teachers: ["RUK"] }, entries, "2026-10-09", EVENING);
+    expect(summary.title).toBe("Q1 · Morgen: 1 Änderung");
   });
 });

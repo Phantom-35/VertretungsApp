@@ -7,6 +7,7 @@ import { createSender, isAllowedEndpoint, subscriberId, type SendResult } from "
 import { sendTest, subscribe, type PushService } from "@/lib/push/service";
 import { MemoryStore, type PushSubscriptionData } from "@/lib/push/store";
 import { parseSubscribeRequest, parseSubscription } from "@/lib/push/validate";
+import { NOTIFY_GROUPS } from "@/lib/notify";
 import type { SubstitutionEntry, SubstitutionPayload } from "@/lib/types";
 import { startFakePushService } from "./fake-push-service";
 
@@ -181,13 +182,65 @@ describe("runPushCheck", () => {
   });
 });
 
+describe("evening summary in the check", () => {
+  const EVENING = Date.parse("2026-10-08T19:05:00+02:00"); // Thursday
+  const withDays = (entries: SubstitutionEntry[], days: string[]) =>
+    ({ ...plan(entries), days: days.map((date) => ({ date, dayLabel: null, weekLabel: null })) }) as SubstitutionPayload;
+
+  it("sends one summary per evening to those who want it", async () => {
+    const store = new MemoryStore();
+    const wants = await addSubscriber(store, "wants", "5A");
+    await store.saveSubscriber({ ...(await store.getSubscriber(subscriberId(wants.endpoint)))!, eveningSummary: true });
+    await addSubscriber(store, "not", "5A");
+    const { sent, send } = fakeSender();
+    const loadPlan = async () => withDays([entry({ lesson: "1" })], ["2026-10-08", "2026-10-09"]);
+
+    // Too early: no summary.
+    await runPushCheck({ store, send, loadPlan, now: Date.parse("2026-10-08T18:50:00+02:00") });
+    expect(sent).toHaveLength(0);
+
+    expect(await runPushCheck({ store, send, loadPlan, now: EVENING })).toMatchObject({ summaries: 1, notified: 0 });
+    expect(sent.map((item) => item.endpoint)).toEqual([wants.endpoint]);
+    expect(sent[0].payload.title).toBe("5A · Morgen: 1 Änderung");
+
+    // Later the same evening: not again.
+    await runPushCheck({ store, send, loadPlan, now: EVENING + 30 * 60_000 });
+    expect(sent).toHaveLength(1);
+  });
+
+  it("waits while tomorrow's plan is not published", async () => {
+    const store = new MemoryStore();
+    const sub = await addSubscriber(store, "wants", "5A");
+    await store.saveSubscriber({ ...(await store.getSubscriber(subscriberId(sub.endpoint)))!, eveningSummary: true });
+    const { sent, send } = fakeSender();
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-08"]), now: EVENING });
+    expect(sent).toHaveLength(0);
+    // Uploaded at 19:40: the summary still comes.
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-08", "2026-10-09"]), now: EVENING + 35 * 60_000 });
+    expect(sent.map((item) => item.payload.body)).toEqual(["Keine Änderungen eingetragen."]);
+  });
+
+  it("does not send summaries at night", async () => {
+    const store = new MemoryStore();
+    const { sent, send } = fakeSender();
+    const result = await runPushCheck({
+      store,
+      send,
+      loadPlan: async () => withDays([], ["2026-10-08", "2026-10-09"]),
+      now: Date.parse("2026-10-08T21:30:00+02:00"),
+    });
+    expect(result).toEqual({ status: "quiet" });
+    expect(sent).toHaveLength(0);
+  });
+});
+
 describe("subscriptions", () => {
   const service = (send: PushService["send"]) => ({ store: new MemoryStore(), send, publicKey: "k" });
 
   it("confirms a new device once and keeps its settings up to date", async () => {
     const { sent, send } = fakeSender();
     const push = service(send);
-    const request = { subscription: subscription("phone"), schoolClass: "5A", teachers: [] };
+    const request = { subscription: subscription("phone"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false };
     expect(await subscribe(push, request)).toEqual({ ok: true, created: true });
     expect(sent).toHaveLength(1);
     expect(sent[0].payload.title).toBe("Benachrichtigungen sind an");
@@ -204,7 +257,7 @@ describe("subscriptions", () => {
   it("refuses a device whose push subscription does not work", async () => {
     const { send } = fakeSender({ [subscription("dead").endpoint]: "gone" });
     const push = service(send);
-    const result = await subscribe(push, { subscription: subscription("dead"), schoolClass: "5A", teachers: [] });
+    const result = await subscribe(push, { subscription: subscription("dead"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false });
     expect(result).toMatchObject({ ok: false, status: 410 });
     expect(await push.store.countSubscribers()).toBe(0);
   });
@@ -212,7 +265,7 @@ describe("subscriptions", () => {
   it("does not store a device the confirmation could not reach", async () => {
     const { send } = fakeSender({ [subscription("flaky").endpoint]: "failed" });
     const push = service(send);
-    const result = await subscribe(push, { subscription: subscription("flaky"), schoolClass: "5A", teachers: [] });
+    const result = await subscribe(push, { subscription: subscription("flaky"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false });
     expect(result).toMatchObject({ ok: false, status: 502 });
     expect(await push.store.countSubscribers()).toBe(0);
   });
@@ -221,7 +274,7 @@ describe("subscriptions", () => {
     const { sent, send } = fakeSender();
     const push = service(send);
     const sub = subscription("phone");
-    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [] });
+    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false });
     expect(await sendTest(push, sub.endpoint, NOW)).toBe("sent");
     expect(await sendTest(push, sub.endpoint, NOW + 30_000)).toBe("too-soon");
     expect(await sendTest(push, sub.endpoint, NOW + 61_000)).toBe("sent");
@@ -250,7 +303,21 @@ describe("request validation", () => {
         schoolClass: "q1",
         teachers: ["ruk", "RUK", "k1", 5, "ker"],
       }),
-    ).toEqual({ subscription: subscription("phone"), schoolClass: "Q1", teachers: ["RUK", "KER"] });
+    ).toEqual({
+      subscription: subscription("phone"),
+      schoolClass: "Q1",
+      teachers: ["RUK", "KER"],
+      notifyGroups: [...NOTIFY_GROUPS],
+      eveningSummary: false,
+    });
+    expect(
+      parseSubscribeRequest({
+        subscription: subscription("phone"),
+        schoolClass: "5A",
+        notifyGroups: ["room", "cancelled", "bogus", "room"],
+        eveningSummary: true,
+      }),
+    ).toMatchObject({ notifyGroups: ["cancelled", "room"], eveningSummary: true });
     expect(parseSubscribeRequest({ subscription: subscription("phone"), schoolClass: "11Z" })).toBe(
       "Unbekannte Klasse.",
     );

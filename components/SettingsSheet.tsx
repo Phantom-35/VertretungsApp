@@ -4,6 +4,7 @@ import { TeacherChooser } from "@/components/TeacherFilter";
 import { ThemeChoice } from "@/components/ThemeSettings";
 import { NEXT_DAY_HOURS, useSettings, type TextSize } from "@/hooks/useSettings";
 import { isIos, isStandalone } from "@/lib/device";
+import { EVENING_SUMMARY_HOUR, NOTIFY_GROUP_LABELS, NOTIFY_GROUPS } from "@/lib/notify";
 import { resetDevice } from "@/lib/reset";
 
 export type SettingsFocus = "teachers" | null;
@@ -53,6 +54,34 @@ function Setting({ title, description, children }: { title: string; description?
       </div>
       {children}
     </section>
+  );
+}
+
+/** A labelled on/off switch row. */
+function Switch({ label, hint, checked, onChange }: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3">
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{label}</span>
+        {hint ? <span className="mt-0.5 block text-xs leading-5 text-muted">{hint}</span> : null}
+      </span>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden
+        className="relative h-7 w-12 shrink-0 rounded-full bg-foreground/15 transition peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40 after:absolute after:left-1 after:top-1 after:size-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5"
+      />
+    </label>
   );
 }
 
@@ -283,20 +312,43 @@ export function SettingsSheet({ open, onClose, focus = null, courseFilter, sourc
           title="„Neu“-Markierungen"
           description="Hebt Änderungen hervor, die seit dem letzten Öffnen dazugekommen sind."
         >
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-line bg-card px-4 py-3">
-            <span className="text-sm font-medium">Neue Änderungen markieren</span>
-            <input
-              type="checkbox"
-              role="switch"
+          <div className="rounded-2xl border border-line bg-card">
+            <Switch
+              label="Neue Änderungen markieren"
               checked={settings.showNewBadges}
-              onChange={(event) => updateSettings({ showNewBadges: event.target.checked })}
-              className="peer sr-only"
+              onChange={(showNewBadges) => updateSettings({ showNewBadges })}
             />
-            <span
-              aria-hidden
-              className="relative h-7 w-12 shrink-0 rounded-full bg-surface-muted transition peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40 after:absolute after:left-1 after:top-1 after:size-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5"
+          </div>
+        </Setting>
+
+        <Setting
+          title="Benachrichtigungen"
+          description="Worüber du eine Mitteilung bekommst, wenn Benachrichtigungen unter „Meine Klasse“ eingeschaltet sind."
+        >
+          <div className="divide-y divide-line rounded-2xl border border-line bg-card">
+            {NOTIFY_GROUPS.map((group) => (
+              <Switch
+                key={group}
+                label={NOTIFY_GROUP_LABELS[group]}
+                checked={settings.notifyGroups.includes(group)}
+                onChange={(on) =>
+                  updateSettings({
+                    notifyGroups: NOTIFY_GROUPS.filter((item) =>
+                      item === group ? on : settings.notifyGroups.includes(item),
+                    ),
+                  })
+                }
+              />
+            ))}
+          </div>
+          <div className="rounded-2xl border border-line bg-card">
+            <Switch
+              label="Abends Überblick für morgen"
+              hint={`Um ${EVENING_SUMMARY_HOUR} Uhr vor jedem Schultag, sobald der Plan da ist – auch wenn sich nichts ändert.`}
+              checked={settings.eveningSummary}
+              onChange={(eveningSummary) => updateSettings({ eveningSummary })}
             />
-          </label>
+          </div>
         </Setting>
 
         {courseFilter ? (

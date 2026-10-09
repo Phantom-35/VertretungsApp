@@ -67,6 +67,8 @@ export async function subscribe(
     subscription: request.subscription,
     schoolClass: request.schoolClass,
     teachers: request.teachers,
+    notifyGroups: request.notifyGroups,
+    eveningSummary: request.eveningSummary,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
   });
@@ -81,7 +83,7 @@ export async function unsubscribe({ store }: PushService, endpoint: string) {
 export async function resubscribe(
   service: PushService,
   oldEndpoint: string,
-  request: Omit<SubscribeRequest, "schoolClass" | "teachers">,
+  request: Pick<SubscribeRequest, "subscription">,
 ) {
   const old = await service.store.getSubscriber(subscriberId(oldEndpoint));
   if (!old) {

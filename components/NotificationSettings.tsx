@@ -1,4 +1,5 @@
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useSettings } from "@/hooks/useSettings";
 
 type NotificationSettingsProps = {
   schoolClass: string | null | undefined;
@@ -11,9 +12,12 @@ const buttonClass =
 
 /** Push notifications for the selected class, part of the class card. */
 export function NotificationSettings({ schoolClass, teachers }: NotificationSettingsProps) {
+  const [settings] = useSettings();
   const { status, busy, message, enable, disable, sendTest } = usePushNotifications({
     schoolClass: schoolClass ?? null,
     teachers,
+    notifyGroups: settings.notifyGroups,
+    eveningSummary: settings.eveningSummary,
   });
 
   if (status === "checking" || status === "unavailable") {

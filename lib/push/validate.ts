@@ -1,4 +1,5 @@
 import { normalizeSelectedClass, normalizeTeacher } from "@/lib/entries";
+import { NOTIFY_GROUPS, parseNotifyGroups, type NotifyGroup } from "@/lib/notify";
 import { isAllowedEndpoint } from "@/lib/push/sender";
 import type { PushSubscriptionData } from "@/lib/push/store";
 
@@ -40,6 +41,8 @@ export type SubscribeRequest = {
   subscription: PushSubscriptionData;
   schoolClass: string;
   teachers: string[];
+  notifyGroups: NotifyGroup[];
+  eveningSummary: boolean;
 };
 
 export function parseSubscribeRequest(value: unknown): SubscribeRequest | string {
@@ -63,7 +66,14 @@ export function parseSubscribeRequest(value: unknown): SubscribeRequest | string
         .filter((teacher): teacher is string => teacher !== null),
     ),
   ).slice(0, MAX_TEACHERS);
-  return { subscription, schoolClass, teachers };
+  return {
+    subscription,
+    schoolClass,
+    teachers,
+    // Older app versions send no choice: everything, no summary.
+    notifyGroups: parseNotifyGroups(value.notifyGroups) ?? [...NOTIFY_GROUPS],
+    eveningSummary: value.eveningSummary === true,
+  };
 }
 
 /** `{ endpoint }` of an existing subscription. */

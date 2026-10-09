@@ -1,0 +1,22 @@
+# Weekly update pull requests; CI (tests, build, browser tests) checks each one.
+# Security updates also need "Dependabot security updates" switched on under
+# Settings → Code security.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    groups:
+      # Small updates together in one pull request.
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

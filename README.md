@@ -58,6 +58,17 @@ später am Tag erneut hoch, wird nur gemeldet, was sich seitdem geändert hat. V
 Ein unvollständig gelesener Plan wird nie verglichen, und ein Eintrag gilt erst als
 zurückgenommen, wenn er bei zwei Prüfungen hintereinander fehlt.
 
+In den Einstellungen lässt sich wählen, worüber benachrichtigt wird (Ausfälle & EVA,
+Vertretungen & Betreuung, Raumänderungen & Verlegungen, Klausuren & Veranstaltungen),
+und ein **Überblick für morgen** einschalten: um 19 Uhr vor jedem Schultag (So–Do), sobald
+der Plan für den nächsten Tag veröffentlicht ist, auch wenn sich nichts ändert.
+
+## Abhängigkeiten aktuell halten
+
+`.github/dependabot.yml` lässt GitHub wöchentlich Update-Pull-Requests öffnen, die die CI
+prüft. Für Sicherheits-Updates zusätzlich unter *Settings → Code security*
+„Dependabot alerts“ und „Dependabot security updates“ einschalten.
+
 **iPhone/iPad:** ab iOS 16.4, nur in der App auf dem Home-Bildschirm (in Safari „Teilen“ →
 „Zum Home-Bildschirm“, dann die App von dort öffnen und unter „Meine Klasse“ →
 „Benachrichtigungen“ einschalten).
