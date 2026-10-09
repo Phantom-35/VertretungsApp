@@ -72,6 +72,51 @@ test("compact cards on busy days, a short status line and neutral day counts", a
   expect(await otherCount.evaluate((badge) => badge.className)).not.toContain("warn");
 });
 
+test("shows the install steps of the browser in use", async ({ browser }) => {
+  const cases = [
+    {
+      name: "Chrome on an iPhone",
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1",
+      expected: ["Oben in der Adressleiste auf", "Zum Home-Bildschirm"],
+    },
+    {
+      name: "Firefox on an iPhone",
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/131.0 Mobile/15E148 Safari/605.1.15",
+      expected: ["Das Menü", "Zum Home-Bildschirm"],
+    },
+    {
+      name: "Instagram on an iPhone",
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0.0.0.0 (iPhone15,2; iOS 18_0; de_DE)",
+      expected: ["Aus dieser App heraus", "In Safari öffnen", "Link kopieren"],
+    },
+    {
+      name: "Samsung Internet",
+      userAgent:
+        "Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36",
+      expected: ["Seite hinzufügen zu", "Startbildschirm"],
+    },
+    {
+      name: "Firefox on Android",
+      userAgent: "Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0",
+      expected: ["Installieren", "Zum Startbildschirm hinzufügen"],
+    },
+  ];
+  for (const { name, userAgent, expected } of cases) {
+    const context = await browser.newContext({ userAgent, viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    await page.goto("/");
+    await page.getByRole("button", { name: "Einstellungen" }).click();
+    const card = page.getByRole("dialog", { name: "Einstellungen" }).locator("section", { hasText: "Als App installieren" });
+    for (const text of expected) {
+      await expect(card.getByText(text, { exact: false }).first(), `${name}: ${text}`).toBeVisible();
+    }
+    await context.close();
+  }
+});
+
 test("reminds gently to install the app on the 3rd and 10th visit", async ({ page }) => {
   const reminder = page.getByRole("region", { name: "Als App installieren?" });
   /** Opens the app anew, as a new visit (a reload is the same visit). */
@@ -94,7 +139,7 @@ test("reminds gently to install the app on the 3rd and 10th visit", async ({ pag
   await visit(); // 3rd
   await expect(reminder).toBeVisible();
   await reminder.getByRole("button", { name: "Zeigen" }).click();
-  await expect(reminder.getByText("App installieren", { exact: true })).toBeVisible();
+  await expect(reminder.getByText("Seite als App installieren", { exact: true })).toBeVisible();
   // Stays during this visit, also after a reload, until it is closed.
   await page.reload();
   await expect(reminder).toBeVisible();
@@ -170,7 +215,8 @@ test.describe("first start", () => {
 
     // In the browser: how to install it as an app.
     await expect(intro.getByRole("heading", { name: "Als App installieren" })).toBeVisible();
-    await expect(intro.getByText("App installieren", { exact: true })).toBeVisible();
+    // Steps for this browser (Chrome on a computer).
+    await expect(intro.getByText("Seite als App installieren", { exact: true })).toBeVisible();
     await intro.getByRole("button", { name: "Später" }).click();
 
     await expect(intro.getByRole("heading", { name: "Nichts mehr verpassen" })).toBeVisible();
@@ -552,7 +598,7 @@ test("settings: page stays still, text size, install hint and reset", async ({ b
 
   // In the browser (not installed): how to install.
   await page.getByRole("button", { name: "Einstellungen" }).click();
-  await expect(dialog.getByText("Als App installieren")).toBeVisible();
+  await expect(dialog.getByText("Als App installieren", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("link", { name: "Original-Plan der Schule öffnen" })).toBeVisible();
 
   // Reset asks first, then forgets everything.
