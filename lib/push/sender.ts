@@ -44,8 +44,9 @@ export type VapidConfig = { publicKey: string; privateKey: string; subject: stri
 
 /** VAPID keys identify this server to the push services (and Apple requires them). */
 export function getVapidConfig(): VapidConfig | null {
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  // Pasted values often carry a stray space or line break.
+  const publicKey = process.env.VAPID_PUBLIC_KEY?.trim();
+  const privateKey = process.env.VAPID_PRIVATE_KEY?.trim();
   if (!publicKey || !privateKey) {
     return null;
   }
@@ -57,10 +58,39 @@ export function getVapidConfig(): VapidConfig | null {
 }
 
 export type SendResult = "sent" | "gone" | "failed";
-export type SendPush = (subscription: PushSubscriptionData, payload: PushPayload) => Promise<SendResult>;
+export type SendPush = (
+  subscription: PushSubscriptionData,
+  payload: PushPayload,
+  /** Why sending failed, e.g. "Apple: BadJwtToken (403)". */
+  onFailure?: (reason: string) => void,
+) => Promise<SendResult>;
+
+/** Apple's reasons for a device that no longer exists. */
+const GONE_REASONS = new Set(["BadDeviceToken", "Unregistered", "ExpiredToken"]);
+
+function failureReason(error: unknown) {
+  const { statusCode, body, endpoint, message } = error as {
+    statusCode?: number;
+    body?: string;
+    endpoint?: string;
+    message?: string;
+  };
+  if (!statusCode) {
+    // Thrown before anything was sent, e.g. an invalid VAPID key.
+    return message ?? String(error);
+  }
+  let reason = "";
+  try {
+    reason = (JSON.parse(body ?? "") as { reason?: string }).reason ?? "";
+  } catch {
+    reason = (body ?? "").slice(0, 120);
+  }
+  const service = endpoint ? new URL(endpoint).hostname.split(".").slice(-2, -1)[0] : "Push-Dienst";
+  return `${service === "apple" ? "Apple" : service}: ${reason || "Fehler"} (${statusCode})`;
+}
 
 export function createSender(vapid: VapidConfig): SendPush {
-  return async (subscription, payload) => {
+  return async (subscription, payload, onFailure) => {
     if (!isAllowedEndpoint(subscription.endpoint)) {
       return "gone";
     }
@@ -74,11 +104,13 @@ export function createSender(vapid: VapidConfig): SendPush {
       return "sent";
     } catch (error) {
       const status = (error as { statusCode?: number }).statusCode;
-      // The subscription expired or the app was removed: forget it.
-      if (status === 404 || status === 410) {
+      const reason = failureReason(error);
+      // The subscription expired, the app was removed or the device is unknown: forget it.
+      if (status === 404 || status === 410 || [...GONE_REASONS].some((item) => reason.includes(item))) {
         return "gone";
       }
-      console.warn("[push] Senden fehlgeschlagen:", status ?? error);
+      console.warn("[push] Senden fehlgeschlagen:", reason);
+      onFailure?.(reason);
       return "failed";
     }
   };

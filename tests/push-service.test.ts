@@ -313,6 +313,45 @@ describe("web push delivery", () => {
     }
   });
 
+  it("explains why a notification was refused", async () => {
+    const service = await startFakePushService(403, JSON.stringify({ reason: "BadJwtToken" }));
+    const { subscription: sub } = deviceSubscription(`${service.url}/push/x`);
+    const reasons: string[] = [];
+    try {
+      const send = createSender({ ...webpush.generateVAPIDKeys(), subject: "https://kag.example" });
+      expect(await send(sub, { title: "t", body: "b", url: "/" }, (reason) => reasons.push(reason))).toBe("failed");
+    } finally {
+      await service.close();
+    }
+    expect(reasons[0]).toMatch(/BadJwtToken \(403\)$/);
+  });
+
+  it("forgets devices Apple does not know", async () => {
+    const service = await startFakePushService(400, JSON.stringify({ reason: "BadDeviceToken" }));
+    const { subscription: sub } = deviceSubscription(`${service.url}/push/x`);
+    try {
+      const send = createSender({ ...webpush.generateVAPIDKeys(), subject: "https://kag.example" });
+      expect(await send(sub, { title: "t", body: "b", url: "/" })).toBe("gone");
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("reports an unusable private key instead of failing silently", async () => {
+    const service = await startFakePushService(201);
+    const { subscription: sub } = deviceSubscription(`${service.url}/push/x`);
+    const reasons: string[] = [];
+    try {
+      const keys = webpush.generateVAPIDKeys();
+      const send = createSender({ ...keys, privateKey: keys.privateKey.slice(0, 20), subject: "https://kag.example" });
+      expect(await send(sub, { title: "t", body: "b", url: "/" }, (reason) => reasons.push(reason))).toBe("failed");
+    } finally {
+      await service.close();
+    }
+    expect(reasons[0]).toMatch(/private key/i);
+    expect(service.received).toHaveLength(0);
+  });
+
   it("refuses to send anywhere but a push service", async () => {
     vi.stubEnv("PUSH_ALLOW_ANY_ENDPOINT", "");
     const send = createSender({ ...webpush.generateVAPIDKeys(), subject: "https://kag.example" });

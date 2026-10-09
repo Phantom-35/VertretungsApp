@@ -33,12 +33,19 @@ export async function subscribe(
   if (!existing) {
     // Confirms that notifications reach the device. Only devices that can be
     // reached are stored, so made-up registrations cannot pile up.
-    const result = await send(request.subscription, {
-      title: "Benachrichtigungen sind an",
-      body: `Du bekommst eine Mitteilung, sobald sich der Vertretungsplan für die ${request.schoolClass} ändert.`,
-      url: "/",
-      tag: "kag-welcome",
-    });
+    let reason = "";
+    const result = await send(
+      request.subscription,
+      {
+        title: "Benachrichtigungen sind an",
+        body: `Du bekommst eine Mitteilung, sobald sich der Vertretungsplan für die ${request.schoolClass} ändert.`,
+        url: "/",
+        tag: "kag-welcome",
+      },
+      (failure) => {
+        reason = failure;
+      },
+    );
     if (result === "gone") {
       return { ok: false, status: 410, error: "Die Push-Anmeldung ist ungültig." };
     }
@@ -46,7 +53,9 @@ export async function subscribe(
       return {
         ok: false,
         status: 502,
-        error: "Die Bestätigung konnte nicht zugestellt werden. Bitte gleich noch einmal versuchen.",
+        error: `Die Bestätigung konnte nicht zugestellt werden. Bitte gleich noch einmal versuchen.${
+          reason ? ` (${reason})` : ""
+        }`,
       };
     }
   }

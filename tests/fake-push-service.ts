@@ -26,14 +26,14 @@ export function createCertificate() {
  * Stands in for a browser push service (FCM, Apple, …): records every
  * notification and answers with `status`.
  */
-export async function startFakePushService(status = 201) {
+export async function startFakePushService(status = 201, body = "") {
   const received: ReceivedPush[] = [];
   const server = createServer(createCertificate(), (request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       received.push({ path: request.url ?? "", headers: request.headers, body: Buffer.concat(chunks) });
-      response.writeHead(status).end();
+      response.writeHead(status).end(body);
     });
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
