@@ -129,3 +129,69 @@ export const entryKindHints: Partial<Record<EntryKind, string>> = {
   moved: "Stunde wurde verlegt",
   supervision: "Klasse wird beaufsichtigt",
 };
+
+const kindLabels: Record<EntryKind, [singular: string, plural: string]> = {
+  cancelled: ["Ausfall", "Ausfälle"],
+  "self-study": ["EVA", "EVA"],
+  exam: ["Klausur", "Klausuren"],
+  event: ["Veranstaltung", "Veranstaltungen"],
+  moved: ["Verlegung", "Verlegungen"],
+  supervision: ["Betreuung", "Betreuungen"],
+  room: ["Raumänderung", "Raumänderungen"],
+  substitution: ["Vertretung", "Vertretungen"],
+};
+
+/** "1 Ausfall", "2 Klausuren" … per kind, most important first. */
+export function summarizeEntries(entries: Pick<SubstitutionEntry, "type">[]) {
+  const counts = new Map<EntryKind, number>();
+  entries.forEach((entry) => {
+    const kind = getEntryKind(entry.type);
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  });
+
+  return (Object.keys(kindLabels) as EntryKind[])
+    .filter((kind) => counts.has(kind))
+    .map((kind) => {
+      const count = counts.get(kind)!;
+      const [singular, plural] = kindLabels[kind];
+      return { kind, count, label: `${count} ${count === 1 ? singular : plural}` };
+    });
+}
+
+/** Classes of the upper school, where students attend courses, not one class. */
+export function isCourseClass(schoolClass: string) {
+  return /^(EF|Q1|Q2)$/.test(schoolClass);
+}
+
+/** "kag" -> "KAG"; null if it does not look like a teacher abbreviation. */
+export function normalizeTeacher(value: string) {
+  const normalized = value.trim().toUpperCase();
+  return /^[A-ZÄÖÜ]{2,4}$/.test(normalized) ? normalized : null;
+}
+
+/**
+ * Teachers that identify the course of an entry: the "(Lehrer)" column, or
+ * for exams (no teacher) the abbreviations in the text, e.g. "Q1 S GK RUK".
+ */
+export function courseTeachers(entry: Pick<SubstitutionEntry, "teacher" | "text">) {
+  const source = entry.teacher || entry.text;
+  return (source.match(/[A-ZÄÖÜ]+/g) ?? []).filter(
+    (token) => token.length >= 3 && token.length <= 4,
+  );
+}
+
+/**
+ * Whether an entry belongs to one of the student's courses, identified by
+ * their teachers. Without a filter, or when the entry names no teacher,
+ * everything is shown: better one entry too many than a missed change.
+ */
+export function entryMatchesTeachers(
+  entry: Pick<SubstitutionEntry, "teacher" | "text">,
+  teachers: readonly string[],
+) {
+  if (teachers.length === 0) {
+    return true;
+  }
+  const own = courseTeachers(entry);
+  return own.length === 0 || own.some((teacher) => teachers.includes(teacher));
+}

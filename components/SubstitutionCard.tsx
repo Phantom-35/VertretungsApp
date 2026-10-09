@@ -13,14 +13,14 @@ type SubstitutionCardProps = {
   showClassName: boolean;
 };
 
-const kindStyles: Record<EntryKind, string> = {
+export const kindStyles: Record<EntryKind, string> = {
   cancelled: "bg-warn-soft text-warn border-warn/15",
   "self-study": "bg-warn-soft text-warn border-warn/15",
-  exam: "bg-[#ece6f7] text-[#5b3f8f] border-[#5b3f8f]/15",
-  event: "bg-[#e3eef9] text-[#2c5a86] border-[#2c5a86]/15",
-  moved: "bg-[#e8e7f8] text-[#3f3d8f] border-[#3f3d8f]/15",
-  supervision: "bg-[#eef0e0] text-[#58602a] border-[#58602a]/15",
-  room: "bg-stone-100 text-stone-700 border-stone-700/10",
+  exam: "bg-[#ece6f7] text-[#5b3f8f] border-[#5b3f8f]/15 dark:bg-[#2b2540] dark:text-[#cdb9f2] dark:border-[#cdb9f2]/20",
+  event: "bg-[#e3eef9] text-[#2c5a86] border-[#2c5a86]/15 dark:bg-[#1d2c3d] dark:text-[#a9cdf2] dark:border-[#a9cdf2]/20",
+  moved: "bg-[#e8e7f8] text-[#3f3d8f] border-[#3f3d8f]/15 dark:bg-[#26264a] dark:text-[#c3c1f5] dark:border-[#c3c1f5]/20",
+  supervision: "bg-[#eef0e0] text-[#58602a] border-[#58602a]/15 dark:bg-[#2b2f1c] dark:text-[#d3db9c] dark:border-[#d3db9c]/20",
+  room: "bg-surface-muted text-foreground/80 border-line",
   substitution: "bg-accent-soft text-accent-strong border-accent/10",
 };
 
@@ -61,14 +61,28 @@ function TeacherLine({ teacher, substitute }: { teacher: string; substitute: str
 export function SubstitutionCard({ entry, showClassName }: SubstitutionCardProps) {
   const kind = getEntryKind(entry.type);
   const hint = entryKindHints[kind];
+  // A cancelled lesson is what students look for first: make it stand out.
+  const cancelled = kind === "cancelled";
 
   return (
-    <article className="flex gap-4 rounded-[1.6rem] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(252,249,243,0.92))] p-4 shadow-[0_18px_40px_rgba(18,41,39,0.08)]">
-      <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-[1.15rem] bg-accent-soft/70 py-3 text-accent-strong">
+    <article
+      className={`flex gap-4 rounded-[1.6rem] border bg-[linear-gradient(180deg,var(--entry-from),var(--entry-to))] p-4 shadow-[0_18px_40px_rgba(18,41,39,0.08)] ${
+        cancelled ? "border-warn/40" : "border-edge"
+      }`}
+    >
+      <div
+        className={`flex w-16 shrink-0 flex-col items-center justify-center rounded-[1.15rem] py-3 ${
+          cancelled ? "bg-warn-soft text-warn" : "bg-accent-soft/70 text-accent-strong"
+        }`}
+      >
         <span className="text-[0.62rem] font-semibold uppercase tracking-[0.18em]">
           Std.
         </span>
-        <span className="mt-0.5 text-2xl font-semibold tracking-[-0.04em]">
+        <span
+          className={`mt-0.5 text-2xl font-semibold tracking-[-0.04em] ${
+            cancelled ? "line-through decoration-2" : ""
+          }`}
+        >
           {entry.lesson ? formatLesson(entry.lesson) : "?"}
         </span>
       </div>
@@ -87,7 +101,13 @@ export function SubstitutionCard({ entry, showClassName }: SubstitutionCardProps
           ) : null}
         </div>
 
-        {hint ? <p className="text-sm font-medium text-foreground">{hint}</p> : null}
+        {hint ? (
+          <p
+            className={`text-sm ${cancelled ? "font-semibold text-warn" : "font-medium text-foreground"}`}
+          >
+            {hint}
+          </p>
+        ) : null}
 
         {entry.subject ? (
           <p className="text-sm text-foreground">

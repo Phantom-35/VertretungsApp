@@ -1,0 +1,58 @@
+import { kindStyles } from "@/components/SubstitutionCard";
+import { summarizeEntries } from "@/lib/entries";
+import type { SubstitutionEntry } from "@/lib/types";
+
+type DaySummaryProps = {
+  entries: SubstitutionEntry[];
+  /** Changes of other courses, filtered out by the teacher filter. */
+  otherCourses: number;
+  /** Whether those are currently shown anyway. */
+  showingOtherCourses: boolean;
+  onToggleOtherCourses: () => void;
+};
+
+/** "4 Änderungen" with one chip per kind, e.g. "1 Ausfall". */
+export function DaySummary({
+  entries,
+  otherCourses,
+  showingOtherCourses,
+  onToggleOtherCourses,
+}: DaySummaryProps) {
+  const items = summarizeEntries(entries);
+  if (entries.length < 2 && otherCourses === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-2 px-1">
+      {entries.length >= 2 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-foreground">
+            {entries.length} Änderungen
+          </span>
+          {items.map((item) => (
+            <span
+              key={item.kind}
+              className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${kindStyles[item.kind]}`}
+            >
+              {item.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {otherCourses > 0 ? (
+        <p className="text-sm text-muted">
+          {otherCourses === 1 ? "1 Änderung" : `${otherCourses} Änderungen`} anderer Kurse{" "}
+          {showingOtherCourses ? "werden mit angezeigt. " : "ausgeblendet. "}
+          <button
+            type="button"
+            onClick={onToggleOtherCourses}
+            className="font-semibold text-accent-strong underline underline-offset-2"
+          >
+            {showingOtherCourses ? "Ausblenden" : "Anzeigen"}
+          </button>
+        </p>
+      ) : null}
+    </div>
+  );
+}

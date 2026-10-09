@@ -1,24 +1,30 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { BottomNav } from "@/components/BottomNav";
 import { ClassSelector } from "@/components/ClassSelector";
 import { DaySelector } from "@/components/DaySelector";
+import { DaySummary } from "@/components/DaySummary";
 import { Header, type HeaderStatus } from "@/components/Header";
 import { LoadingState } from "@/components/LoadingState";
 import { NoticesCard } from "@/components/NoticesCard";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { PwaRegistrar } from "@/components/PwaRegistrar";
+import { RefreshButton } from "@/components/RefreshButton";
 import { RefreshStatus } from "@/components/RefreshStatus";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
+import { TeacherFilter } from "@/components/TeacherFilter";
 import { useNow } from "@/hooks/useNow";
 import { useSelectedClass } from "@/hooks/useSelectedClass";
+import { useStoredList } from "@/hooks/useStoredList";
 import { useSubstitutionData } from "@/hooks/useSubstitutionData";
 import {
   SCHOOL_CLASSES,
   compareEntries,
   entryAppliesToClass,
+  entryMatchesTeachers,
   formatClassName,
+  isCourseClass,
+  normalizeTeacher,
 } from "@/lib/entries";
 import { formatAge, formatPlanDateLabel, formatTimestamp, isPastDate } from "@/lib/format";
 import { pickDefaultDate } from "@/lib/time";
@@ -28,17 +34,30 @@ type SubstitutionAppProps = {
   initialData: SubstitutionPayload | null;
 };
 
+/** How many other classes are kept for switching with one tap. */
+const MAX_RECENT_CLASSES = 4;
+
 const cardClassName =
   "rounded-[1.75rem] border border-line bg-card p-6 text-center shadow-[0_18px_45px_rgba(18,41,39,0.07)]";
 
-function EmptyDay({ selectedClass, dayLabel }: { selectedClass: string; dayLabel: string }) {
+function EmptyDay({
+  selectedClass,
+  dayLabel,
+  filtered,
+}: {
+  selectedClass: string;
+  dayLabel: string;
+  /** Only the student's own courses are shown. */
+  filtered: boolean;
+}) {
   return (
     <div className={cardClassName}>
       <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
         Keine Vertretungen
       </p>
       <p className="mt-2 text-sm leading-6 text-muted">
-        {dayLabel} sind für die {selectedClass} keine Änderungen eingetragen.
+        {dayLabel} sind {filtered ? `für deine Kurse in der ${selectedClass}` : `für die ${selectedClass}`}{" "}
+        keine Änderungen eingetragen.
       </p>
     </div>
   );
@@ -48,7 +67,27 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
   const { data, fromDevice, status, connectionError, refresh } =
     useSubstitutionData(initialData);
   const [selectedClass, setSelectedClass] = useSelectedClass();
+  const [recentClasses, setRecentClasses] = useStoredList("kag:recent-classes");
+  const courseFilterKey = `kag:teachers:${selectedClass ?? ""}`;
+  const [storedTeachers, setTeachers] = useStoredList(courseFilterKey);
+  const [showOtherCourses, setShowOtherCourses] = useState(false);
   const now = useNow();
+
+  const usesCourseFilter = Boolean(selectedClass && isCourseClass(selectedClass));
+  const teachers = usesCourseFilter ? storedTeachers : [];
+
+  const chooseClass = (value: string) => {
+    // Remember the class that is being left, e.g. to switch back to a sibling's.
+    if (selectedClass && selectedClass !== value) {
+      setRecentClasses(
+        [selectedClass, ...recentClasses.filter((item) => item !== selectedClass && item !== value)]
+          .slice(0, MAX_RECENT_CLASSES),
+      );
+    }
+    setShowOtherCourses(false);
+    setSelectedClass(value);
+  };
+  const otherRecentClasses = recentClasses.filter((item) => item !== selectedClass);
 
   const forceRefresh = useCallback(() => refresh(true), [refresh]);
   const isBusy = status !== "idle";
@@ -79,9 +118,7 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
   }
 
   const dateLabel = selectedDay
-    ? [formatPlanDateLabel(selectedDay.date, now), selectedDay.weekLabel]
-        .filter(Boolean)
-        .join(" · ")
+    ? formatPlanDateLabel(selectedDay.date, now)
     : isBusy
       ? "Wird geladen …"
       : "–";
@@ -92,17 +129,29 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
           .filter((entry) => entryAppliesToClass(entry.className, selectedClass))
           .sort(compareEntries)
       : [];
+  // Upper school: only the courses of the student's teachers, unless asked.
+  const ownEntries = classEntries.filter((entry) => entryMatchesTeachers(entry, teachers));
+  const shownEntries = showOtherCourses ? classEntries : ownEntries;
   const countsByDate = selectedClass
     ? new Map(
         days.map((day) => [
           day.date,
-          classEntries.filter((entry) => entry.date === day.date).length,
+          shownEntries.filter((entry) => entry.date === day.date).length,
         ]),
       )
     : null;
   // Entries without a readable date are shown on every day.
-  const visibleEntries = classEntries.filter(
-    (entry) => !selectedDate || !entry.date || entry.date === selectedDate,
+  const onSelectedDay = (entry: { date: string }) =>
+    !selectedDate || !entry.date || entry.date === selectedDate;
+  const visibleEntries = shownEntries.filter(onSelectedDay);
+  const otherCourseCount =
+    classEntries.filter(onSelectedDay).length - ownEntries.filter(onSelectedDay).length;
+  const teacherSuggestions = Array.from(
+    new Set(
+      classEntries
+        .map((entry) => normalizeTeacher(entry.teacher))
+        .filter((teacher): teacher is string => teacher !== null),
+    ),
   );
   const visibleNotices = Array.from(
     new Set(
@@ -119,10 +168,11 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
     <>
       <PwaRegistrar />
       <PullToRefresh onRefresh={forceRefresh}>
-        <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 px-4 pb-28 pt-[max(1rem,env(safe-area-inset-top))] sm:px-5">
+        <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top))] sm:px-5">
           <Header
             selectedClass={selectedClass}
             dateLabel={dateLabel}
+            weekLabel={selectedDay?.weekLabel ?? null}
             dateIsPast={selectedDate !== null && isPastDate(selectedDate, now)}
             sourceUpdatedLabel={formatTimestamp(data?.sourceUpdatedAt ?? null, now)}
             fetchedLabel={
@@ -134,8 +184,25 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
           <ClassSelector
             classes={SCHOOL_CLASSES}
             selectedClass={selectedClass}
-            onChange={setSelectedClass}
-          />
+            onChange={chooseClass}
+            recentClasses={otherRecentClasses}
+            onForget={(value) =>
+              setRecentClasses(recentClasses.filter((item) => item !== value))
+            }
+          >
+            {usesCourseFilter && selectedClass ? (
+              <TeacherFilter
+                key={selectedClass}
+                schoolClass={selectedClass}
+                selected={storedTeachers}
+                suggestions={teacherSuggestions}
+                onChange={(value) => {
+                  setShowOtherCourses(false);
+                  setTeachers(value);
+                }}
+              />
+            ) : null}
+          </ClassSelector>
 
           {data ? (
             <RefreshStatus
@@ -178,7 +245,7 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
                 <button
                   type="button"
                   onClick={() => void forceRefresh()}
-                  className="mt-4 rounded-full bg-warn px-5 py-2 text-sm font-semibold text-white"
+                  className="mt-4 rounded-full bg-warn px-5 py-2 text-sm font-semibold text-on-warn"
                 >
                   Erneut versuchen
                 </button>
@@ -198,6 +265,15 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
             ) : null}
 
             {data && selectedClass ? (
+              <DaySummary
+                entries={visibleEntries}
+                otherCourses={otherCourseCount}
+                showingOtherCourses={showOtherCourses}
+                onToggleOtherCourses={() => setShowOtherCourses((value) => !value)}
+              />
+            ) : null}
+
+            {data && selectedClass ? (
               visibleEntries.length > 0 ? (
                 visibleEntries.map((entry) => (
                   <SubstitutionCard
@@ -207,17 +283,18 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
                   />
                 ))
               ) : (
-                <EmptyDay selectedClass={selectedClass} dayLabel={emptyDayLabel} />
+                <EmptyDay
+                  selectedClass={selectedClass}
+                  dayLabel={emptyDayLabel}
+                  filtered={teachers.length > 0 && !showOtherCourses}
+                />
               )
             ) : null}
           </section>
         </main>
       </PullToRefresh>
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,rgba(247,245,239,0),rgba(247,245,239,0.94)_70%)]" />
-      <div className="fixed inset-x-0 bottom-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
-        <BottomNav onRefresh={() => void forceRefresh()} refreshing={isBusy} />
-      </div>
+      <RefreshButton onRefresh={() => void forceRefresh()} refreshing={isBusy} />
     </>
   );
 }

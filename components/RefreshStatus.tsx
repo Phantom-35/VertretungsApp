@@ -61,7 +61,7 @@ export function RefreshStatus({
       <button
         type="button"
         onClick={onRetry}
-        className="shrink-0 rounded-full border border-warn/20 bg-white/60 px-3 py-1 text-xs font-semibold"
+        className="shrink-0 rounded-full border border-warn/20 bg-surface/60 px-3 py-1 text-xs font-semibold"
       >
         Erneut
       </button>

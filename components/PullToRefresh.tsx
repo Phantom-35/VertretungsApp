@@ -110,7 +110,7 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
           transition: isPulling ? "none" : "transform 200ms ease, opacity 200ms ease",
         }}
       >
-        <div className="mt-2 flex size-9 items-center justify-center rounded-full border border-line bg-white shadow-[0_8px_24px_rgba(18,41,39,0.14)]">
+        <div className="mt-2 flex size-9 items-center justify-center rounded-full border border-line bg-surface shadow-[0_8px_24px_rgba(18,41,39,0.14)]">
           <svg
             viewBox="0 0 24 24"
             className={`size-5 text-accent ${refreshing && !isPulling ? "animate-spin" : ""}`}

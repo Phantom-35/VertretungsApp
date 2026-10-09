@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  courseTeachers,
   entryAppliesToClass,
+  entryMatchesTeachers,
+  isCourseClass,
+  normalizeTeacher,
+  summarizeEntries,
   formatClassName,
   formatLesson,
   getEntryKind,
@@ -176,5 +181,56 @@ describe("default day", () => {
   it("handles missing time and empty plans", () => {
     expect(pickDefaultDate(plan, null)).toBe("2026-10-08");
     expect(pickDefaultDate([], at("2026-10-08T06:00:00Z"))).toBeNull();
+  });
+});
+
+describe("course filter", () => {
+  const entry = (teacher: string, text = "") => ({ teacher, text });
+
+  it("recognises the upper school", () => {
+    expect(["EF", "Q1", "Q2"].every(isCourseClass)).toBe(true);
+    expect(isCourseClass("9A")).toBe(false);
+  });
+
+  it("normalises teacher abbreviations", () => {
+    expect(normalizeTeacher(" kag ")).toBe("KAG");
+    expect(normalizeTeacher("häR")).toBe("HÄR");
+    expect(normalizeTeacher("K1")).toBeNull();
+    expect(normalizeTeacher("")).toBeNull();
+  });
+
+  it("finds the course teachers of an entry", () => {
+    expect(courseTeachers(entry("RUK"))).toEqual(["RUK"]);
+    expect(courseTeachers(entry("", "Q1 S GK RUK"))).toEqual(["RUK"]);
+    expect(courseTeachers(entry("", "EF D GK DRE/SNE/WOR + NTA"))).toEqual([
+      "DRE",
+      "SNE",
+      "WOR",
+      "NTA",
+    ]);
+    expect(courseTeachers(entry("", "Praktikumsmesse"))).toEqual([]);
+  });
+
+  it("filters by the student's teachers", () => {
+    expect(entryMatchesTeachers(entry("RUK"), [])).toBe(true);
+    expect(entryMatchesTeachers(entry("RUK"), ["RUK"])).toBe(true);
+    expect(entryMatchesTeachers(entry("KER"), ["RUK"])).toBe(false);
+    expect(entryMatchesTeachers(entry("", "Q2 D LK SNE"), ["SNE"])).toBe(true);
+    expect(entryMatchesTeachers(entry("", "Q2 D LK HPT"), ["SNE"])).toBe(false);
+    // Nothing to tell the course by: keep it visible.
+    expect(entryMatchesTeachers(entry("", "Praktikumsmesse"), ["SNE"])).toBe(true);
+  });
+});
+
+describe("day summary", () => {
+  it("counts entries per kind, most important first", () => {
+    const types = ["Vertretung", "Entfall", "Klausur", "Entfall", "Raum-Vtr.", "Statt-Vertretung"];
+    expect(summarizeEntries(types.map((type) => ({ type }))).map((item) => item.label)).toEqual([
+      "2 Ausfälle",
+      "1 Klausur",
+      "1 Raumänderung",
+      "2 Vertretungen",
+    ]);
+    expect(summarizeEntries([])).toEqual([]);
   });
 });

@@ -8,7 +8,7 @@ export function NoticesCard({ notices }: NoticesCardProps) {
   }
 
   return (
-    <section className="rounded-[1.5rem] border border-line bg-white/72 p-4">
+    <section className="rounded-[1.5rem] border border-line bg-surface/70 p-4">
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
         Nachrichten zum Tag
       </p>

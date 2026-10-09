@@ -75,9 +75,9 @@ export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySe
                   count === 0
                     ? selected
                       ? "bg-white/20 text-white/80"
-                      : "bg-stone-100 text-muted"
+                      : "bg-surface-muted text-muted"
                     : selected
-                      ? "bg-white text-accent-strong"
+                      ? "bg-white text-accent"
                       : "bg-warn-soft text-warn"
                 }`}
               >

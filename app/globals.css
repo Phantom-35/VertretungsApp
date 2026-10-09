@@ -1,20 +1,62 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light dark;
   --background: #f5efe2;
   --background-soft: #fbf8f1;
   --foreground: #172126;
   --muted: #5f6d73;
   --line: rgba(23, 33, 38, 0.08);
   --card: rgba(255, 255, 255, 0.82);
+  /* Solid surfaces (inputs, chips) and their muted variant. */
+  --surface: #ffffff;
+  --surface-muted: #f5f5f4;
+  /* Light rim around raised cards. */
+  --edge: rgba(255, 255, 255, 0.65);
+  --header-from: rgba(255, 255, 255, 0.95);
+  --header-to: rgba(244, 239, 229, 0.84);
+  --entry-from: rgba(255, 255, 255, 0.96);
+  --entry-to: rgba(252, 249, 243, 0.92);
+  --page-from: #f8f2e7;
+  --page-mid: #f4eee1;
+  --page-to: #f7f5ef;
   --accent: #1f6b67;
   --accent-strong: #0f4b49;
   --accent-soft: #d8ece8;
   --warn: #a95f2a;
   --warn-soft: #fae6d6;
+  /* Text on a `warn` background. */
+  --on-warn: #ffffff;
   --danger: #8e3f2b;
   --font-sans: "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
   --font-mono: "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #12191b;
+    --background-soft: #1a2326;
+    --foreground: #e6ecec;
+    --muted: #9cabb0;
+    --line: rgba(255, 255, 255, 0.09);
+    --card: rgba(28, 37, 40, 0.88);
+    --surface: #1f292c;
+    --surface-muted: #2a3538;
+    --edge: rgba(255, 255, 255, 0.07);
+    --header-from: #1f2a2d;
+    --header-to: #172023;
+    --entry-from: #1f292c;
+    --entry-to: #1b2427;
+    --page-from: #131b1d;
+    --page-mid: #11181a;
+    --page-to: #101618;
+    --accent-strong: #8fd3cb;
+    --accent-soft: #183c3a;
+    --warn: #f0a46b;
+    --warn-soft: #3a2a1e;
+    --on-warn: #1d140d;
+    --danger: #f08f78;
+  }
 }
 
 @theme inline {
@@ -24,11 +66,15 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-card: var(--card);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-edge: var(--edge);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
+  --color-on-warn: var(--on-warn);
   --color-danger: var(--danger);
   --font-mono: var(--font-mono);
 }
@@ -40,7 +86,7 @@
 html {
   background:
     radial-gradient(circle at top, rgba(31, 107, 103, 0.14), transparent 35%),
-    linear-gradient(180deg, #f8f2e7 0%, #f4eee1 46%, #f7f5ef 100%);
+    linear-gradient(180deg, var(--page-from) 0%, var(--page-mid) 46%, var(--page-to) 100%);
   color: var(--foreground);
   scroll-behavior: smooth;
   /* The app has its own pull-to-refresh; avoid the browser's bounce/reload. */
