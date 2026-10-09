@@ -15,6 +15,12 @@ updates:
       # Small updates together in one pull request.
       minor-and-patch:
         update-types: [minor, patch]
+    # Major versions (TypeScript 7, ESLint 10, Vitest 5, ...) bring breaking
+    # changes and need manual work; @types/node follows the Node version on
+    # Vercel.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

@@ -33,6 +33,8 @@ jobs:
           APP_URL: ${{ vars.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
+          # A pasted secret often carries a trailing space or line break.
+          CRON_SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '[:space:]')"
           if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
             echo "::notice::APP_URL oder CRON_SECRET fehlt – Push-Check ist noch nicht eingerichtet."
             exit 0

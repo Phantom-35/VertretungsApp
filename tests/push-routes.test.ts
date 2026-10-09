@@ -40,6 +40,18 @@ describe("push API", () => {
     expect((await call("Bearer s3cret-valuX")).status).toBe(401);
 
     vi.stubEnv("CRON_SECRET", "");
-    expect((await call("Bearer ")).status).toBe(401);
+    const missing = await call("Bearer ");
+    expect(missing.status).toBe(503);
+    expect((await missing.json()).error).toMatch(/CRON_SECRET/);
+  });
+
+  it("ignores spaces and line breaks around the pasted secret", async () => {
+    vi.stubEnv("CRON_SECRET", " s3cret-value\n");
+    vi.stubEnv("PUSH_STORE", "memory");
+    const { GET } = await import("@/app/api/push/check/route");
+    const response = await GET(
+      new Request("http://localhost/api/push/check", { headers: { authorization: "Bearer s3cret-value" } }),
+    );
+    expect(response.status).not.toBe(401);
   });
 });

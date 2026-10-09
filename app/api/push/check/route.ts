@@ -21,12 +21,11 @@ function testNow(request: Request) {
   return Number.isNaN(time) ? null : time;
 }
 
-function authorized(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  const header = request.headers.get("authorization") ?? "";
-  if (!secret) {
-    return false;
-  }
+// Trimmed: a pasted secret often carries a trailing space or line break.
+const cronSecret = () => process.env.CRON_SECRET?.trim() ?? "";
+
+function authorized(request: Request, secret: string) {
+  const header = request.headers.get("authorization")?.trim() ?? "";
   const expected = Buffer.from(`Bearer ${secret}`);
   const given = Buffer.from(header);
   return given.length === expected.length && timingSafeEqual(given, expected);
@@ -38,7 +37,12 @@ function authorized(request: Request) {
  * `Authorization: Bearer $CRON_SECRET`.
  */
 async function handle(request: Request) {
-  if (!authorized(request)) {
+  const secret = cronSecret();
+  if (!secret) {
+    // Says so plainly, otherwise this looks like a wrong secret in the scheduler.
+    return json({ error: "CRON_SECRET ist auf dem Server nicht gesetzt." }, 503);
+  }
+  if (!authorized(request, secret)) {
     return json({ error: "Nicht berechtigt." }, 401);
   }
   const service = getPushService();
