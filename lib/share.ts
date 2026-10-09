@@ -1,4 +1,4 @@
-import { formatClassName, formatLesson } from "@/lib/entries";
+import { formatClassName, formatLesson, isOpenSubstitute } from "@/lib/entries";
 import type { SubstitutionEntry } from "@/lib/types";
 
 type ShareOptions = {
@@ -18,6 +18,9 @@ export function lessonLabel(lesson: string) {
 }
 
 function teacherLabel({ teacher, substitute }: Pick<SubstitutionEntry, "teacher" | "substitute">) {
+  if (isOpenSubstitute(substitute)) {
+    return teacher ? `${teacher} → noch offen` : "noch offen";
+  }
   if (teacher && substitute && teacher !== substitute) {
     return `${teacher} → ${substitute}`;
   }

@@ -71,6 +71,16 @@ describe("parseSubstitutionPage", () => {
     });
   });
 
+  it("keeps '???' as substitute: nobody has been found yet", () => {
+    // Row as on the live plan of 09.10.2026.
+    const html = loadFixture(1).replace(
+      /(<tr class='list odd'>)/,
+      `<tr class='list odd'><td class="list" align="center">05B</td><td class="list" align="center">1 - 2</td><td class="list" align="center">Vertretung</td><td class="list" align="center">???</td><td class="list">&nbsp;</td><td class="list" align="center">FCH</td><td class="list" align="center">???</td></tr>$1`,
+    );
+    const open = parseSubstitutionPage(html, 1).entries.find((entry) => entry.className === "05B");
+    expect(open).toMatchObject({ type: "Vertretung", substitute: "???", teacher: "FCH", room: "" });
+  });
+
   it("reads 'Nachrichten zum Tag'", () => {
     expect(parseSubstitutionPage(loadFixture(7), 7).meta.notices).toEqual([
       "Unterrichtsfrei – 7-11 Std.",

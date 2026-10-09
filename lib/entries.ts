@@ -164,6 +164,16 @@ export function isCourseClass(schoolClass: string) {
   return /^(EF|Q1|Q2)$/.test(schoolClass);
 }
 
+/**
+ * Untis writes "???" as substitute while nobody has been found yet. It is
+ * kept (unlike other placeholders) so the app can say so.
+ */
+export const OPEN_SUBSTITUTE = "???";
+
+export function isOpenSubstitute(substitute: string) {
+  return substitute === OPEN_SUBSTITUTE;
+}
+
 /** "kag" -> "KAG"; null if it does not look like a teacher abbreviation. */
 export function normalizeTeacher(value: string) {
   const normalized = value.trim().toUpperCase();

@@ -3,6 +3,7 @@ import {
   formatClassName,
   formatLesson,
   getEntryKind,
+  isOpenSubstitute,
   type EntryKind,
 } from "@/lib/entries";
 import type { SubstitutionEntry } from "@/lib/types";
@@ -29,6 +30,24 @@ export const kindStyles: Record<EntryKind, string> = {
 function TeacherLine({ teacher, substitute }: { teacher: string; substitute: string }) {
   if (!teacher && !substitute) {
     return null;
+  }
+
+  // "???" in the plan: the lesson takes place, but nobody has been found yet.
+  if (isOpenSubstitute(substitute)) {
+    return (
+      <p className="text-sm text-foreground">
+        <span className="text-muted">Lehrer </span>
+        {teacher ? (
+          <>
+            <span className="text-muted line-through">{teacher}</span>
+            <span aria-label="wird vertreten durch" className="px-1 text-muted">
+              →
+            </span>
+          </>
+        ) : null}
+        <span className="font-semibold text-warn">noch offen</span>
+      </p>
+    );
   }
 
   if (!substitute || substitute === teacher) {

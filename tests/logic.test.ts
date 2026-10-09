@@ -347,4 +347,11 @@ describe("share text", () => {
     expect(formatShareBlock({ ...base, type: "Entfall", teacher: "ABC" }, "5A")).toBe("1. Std. · Entfall\nLehrer ABC");
     expect(formatShareBlock({ ...base, lesson: "", type: "" }, "5A")).toBe("Std. ? · Änderung");
   });
+
+  it("says when no substitute has been found yet", () => {
+    expect(formatShareBlock({ ...base, teacher: "FCH", substitute: "???", room: "TU2" }, "5A")).toBe(
+      "1. Std. · Vertretung\nLehrer FCH → noch offen · Raum TU2",
+    );
+    expect(formatShareLine({ ...base, substitute: "???" }, "5A")).toBe("• 1. Std.: Vertretung · noch offen");
+  });
 });

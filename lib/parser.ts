@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
+import { OPEN_SUBSTITUTE } from "@/lib/entries";
 import { schoolLocalToIso } from "@/lib/time";
 import type { PageMetadata, ParsedPage, SubstitutionEntry } from "@/lib/types";
 
@@ -265,7 +266,9 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
           return;
         }
 
-        row[key] = normalizeCell($(cell).text());
+        const value = normalizeWhitespace($(cell).text());
+        // "???" as substitute: nobody found yet, which students should see.
+        row[key] = key === "substitute" && value === OPEN_SUBSTITUTE ? value : normalizeCell(value);
       });
 
       // Long tables can repeat the header row.
