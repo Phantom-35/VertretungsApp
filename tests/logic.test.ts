@@ -60,6 +60,22 @@ describe("entry display", () => {
     ["Entfall", "cancelled"],
     ["Klausur", "exam"],
     ["Veranst.", "event"],
+    ["Entf.", "cancelled"],
+    ["Ausfall", "cancelled"],
+    ["Freisetzung", "cancelled"],
+    ["Selbststudium", "self-study"],
+    ["Nachschreibklausur", "exam"],
+    ["Klausuraufsicht", "exam"],
+    ["Sondereins.", "event"],
+    ["Klassenfahrt", "event"],
+    ["Verlegung", "moved"],
+    ["Tausch", "moved"],
+    ["Lehrertausch", "substitution"],
+    ["Betreuung", "supervision"],
+    ["Mitbetreuung", "supervision"],
+    ["Raumtausch", "room"],
+    ["Trotz Absenz", "substitution"],
+    ["", "substitution"],
   ])("classifies %s as %s", (type, kind) => {
     expect(getEntryKind(type)).toBe(kind);
   });

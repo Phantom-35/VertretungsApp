@@ -18,6 +18,8 @@ const kindStyles: Record<EntryKind, string> = {
   "self-study": "bg-warn-soft text-warn border-warn/15",
   exam: "bg-[#ece6f7] text-[#5b3f8f] border-[#5b3f8f]/15",
   event: "bg-[#e3eef9] text-[#2c5a86] border-[#2c5a86]/15",
+  moved: "bg-[#e8e7f8] text-[#3f3d8f] border-[#3f3d8f]/15",
+  supervision: "bg-[#eef0e0] text-[#58602a] border-[#58602a]/15",
   room: "bg-stone-100 text-stone-700 border-stone-700/10",
   substitution: "bg-accent-soft text-accent-strong border-accent/10",
 };

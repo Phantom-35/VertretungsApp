@@ -80,23 +80,36 @@ export type EntryKind =
   | "self-study"
   | "exam"
   | "event"
+  | "moved"
+  | "supervision"
   | "room"
   | "substitution";
 
+// Checked in this order; "Lehrertausch" or "Statt-Vertretung" stay a
+// substitution (same lesson, other teacher).
 export function getEntryKind(type: string): EntryKind {
-  const normalized = type.toLowerCase();
+  const normalized = type.trim().toLowerCase();
 
-  if (/entfall|fällt aus|frei/.test(normalized)) {
+  // "Entfall", "Entf.", "Ausfall", "Freisetzung" (the class is not taught).
+  if (/entf(all|\.|\b)|fällt aus|ausfall|frei/.test(normalized)) {
     return "cancelled";
   }
-  if (/^eva\b|eigenverantw/.test(normalized)) {
+  if (/^eva\b|eigenverantw|selbststudium|stillarbeit/.test(normalized)) {
     return "self-study";
   }
-  if (/klausur|prüfung/.test(normalized)) {
+  if (/klausur|prüfung|nachschreib/.test(normalized)) {
     return "exam";
   }
-  if (/veranst|exkursion|ausflug/.test(normalized)) {
+  if (/veranst|exkursion|ausflug|wandertag|fahrt|sonder/.test(normalized)) {
     return "event";
+  }
+  // "Verlegung", "verlegt", "Tausch" (lessons swap their times).
+  if (/verleg|^tausch/.test(normalized)) {
+    return "moved";
+  }
+  // "Betreuung", "Mitbetreuung", "Aufsicht": supervised instead of taught.
+  if (/betreu|aufsicht/.test(normalized)) {
+    return "supervision";
   }
   if (/raum/.test(normalized)) {
     return "room";
@@ -108,4 +121,6 @@ export function getEntryKind(type: string): EntryKind {
 export const entryKindHints: Partial<Record<EntryKind, string>> = {
   "self-study": "Eigenverantwortliches Arbeiten",
   cancelled: "Unterricht fällt aus",
+  moved: "Stunde wurde verlegt",
+  supervision: "Klasse wird beaufsichtigt",
 };
