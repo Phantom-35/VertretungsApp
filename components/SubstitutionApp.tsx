@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ClassSelector } from "@/components/ClassSelector";
 import { DAY_PANEL_ID, DaySelector, dayTabId } from "@/components/DaySelector";
 import { DaySummary } from "@/components/DaySummary";
@@ -18,6 +18,7 @@ import { Onboarding } from "@/components/Onboarding";
 import { TeacherHint } from "@/components/TeacherFilter";
 import { SettingsSheet, type SettingsFocus } from "@/components/SettingsSheet";
 import { useSeenBaseline } from "@/hooks/useNewEntries";
+import { useFitBottomRoom } from "@/hooks/useFitBottomRoom";
 import { useNow } from "@/hooks/useNow";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -106,6 +107,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     eveningSummary: settings.eveningSummary,
   });
   const onboarding = useOnboarding();
+  const mainRef = useRef<HTMLElement>(null);
+  useFitBottomRoom(mainRef);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsFocus, setSettingsFocus] = useState<SettingsFocus>(null);
   const openSettings = (focus: SettingsFocus = null) => {
@@ -250,10 +253,13 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     <>
       <PwaRegistrar />
       <PullToRefresh onRefresh={forceRefresh}>
-        {/* Room at the bottom so the refresh button (bottom offset + 3.5rem) can
-            only cover the last card's inner padding, not its text; no more,
-            so a page that fits does not scroll. */}
-        <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[calc(max(1rem,env(safe-area-inset-bottom))+2.5rem)] pt-[max(1rem,env(safe-area-inset-top))] sm:px-5">
+        {/* Room at the bottom for the refresh button (bottom offset + 3.5rem):
+            it can only cover the last card's inner padding. useFitBottomRoom
+            trims it when a page that fits would otherwise scroll a little. */}
+        <main
+          ref={mainRef}
+          className="app-enter mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[calc(var(--bottom-room)-var(--bottom-trim,0px))] pt-[max(1rem,env(safe-area-inset-top))] [--bottom-room:calc(max(1rem,env(safe-area-inset-bottom))+2.5rem)] sm:px-5"
+        >
           <Header
             selectedClass={selectedClass}
             dateLabel={dateLabel}

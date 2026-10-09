@@ -12,7 +12,7 @@ export function RefreshButton({ onRefresh, refreshing }: RefreshButtonProps) {
       disabled={refreshing}
       aria-label={refreshing ? "Wird aktualisiert" : "Aktualisieren"}
       title="Aktualisieren"
-      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,calc((100vw-28rem)/2+1rem))] z-20 flex size-14 items-center justify-center rounded-full bg-accent text-white shadow-[0_12px_30px_rgba(18,41,39,0.28)] transition hover:bg-accent-strong active:scale-95 disabled:opacity-85 dark:hover:bg-accent/85"
+      className="fab-enter fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,calc((100vw-28rem)/2+1rem))] z-20 flex size-14 items-center justify-center rounded-full bg-accent text-white shadow-[0_12px_30px_rgba(18,41,39,0.28)] transition hover:bg-accent-strong active:scale-95 disabled:opacity-85 dark:hover:bg-accent/85"
     >
       <svg
         aria-hidden
