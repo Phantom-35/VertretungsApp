@@ -78,7 +78,13 @@ test("shows the install steps of the browser in use", async ({ browser }) => {
       name: "Chrome on an iPhone",
       userAgent:
         "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1",
-      expected: ["Oben in der Adressleiste auf", "Zum Home-Bildschirm"],
+      expected: ["Anleitung für Chrome", "Oben in der Adressleiste auf", "Zum Home-Bildschirm"],
+    },
+    {
+      name: "DuckDuckGo on an iPhone",
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Ddg/18.0 Safari/604.1",
+      expected: ["Anleitung für DuckDuckGo", "Zum Home-Bildschirm"],
     },
     {
       name: "Firefox on an iPhone",
@@ -115,6 +121,23 @@ test("shows the install steps of the browser in use", async ({ browser }) => {
     }
     await context.close();
   }
+
+  // A wrong guess (e.g. Brave, which looks like Safari) can be corrected.
+  const context = await browser.newContext({
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+    viewport: { width: 390, height: 844 },
+  });
+  const page = await context.newPage();
+  await page.goto("/");
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  const card = page.getByRole("dialog", { name: "Einstellungen" }).locator("section", { hasText: "Als App installieren" });
+  await expect(card.getByText("Anleitung für Safari")).toBeVisible();
+  await card.getByRole("button", { name: "Anderer Browser?" }).click();
+  await card.getByLabel("Dein Browser").selectOption("firefox");
+  await expect(card.getByText("Anleitung für Firefox")).toBeVisible();
+  await expect(card.getByText("Das Menü")).toBeVisible();
+  await context.close();
 });
 
 test("reminds gently to install the app on the 3rd and 10th visit", async ({ page }) => {

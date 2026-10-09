@@ -15,7 +15,17 @@ export function isStandalone() {
 }
 
 export type BrowserPlatform = "ios" | "android" | "desktop";
-export type BrowserName = "safari" | "chrome" | "firefox" | "edge" | "samsung" | "opera" | "in-app" | "other";
+export type BrowserName =
+  | "safari"
+  | "chrome"
+  | "firefox"
+  | "edge"
+  | "samsung"
+  | "opera"
+  | "brave"
+  | "duckduckgo"
+  | "in-app"
+  | "other";
 export type BrowserInfo = { platform: BrowserPlatform; browser: BrowserName };
 
 /**
@@ -42,7 +52,9 @@ export function describeBrowser(
           ? "edge"
           : /OPiOS|OPT\//.test(ua)
             ? "opera"
-            : /Safari/.test(ua)
+            : /Ddg\/|DuckDuckGo/.test(ua)
+              ? "duckduckgo"
+              : /Safari/.test(ua)
               ? "safari"
               : "other";
     return { platform, browser };
@@ -64,8 +76,32 @@ export function describeBrowser(
 }
 
 /** The browser this page runs in. */
-export function currentBrowser() {
-  return describeBrowser(navigator.userAgent, {
+export function currentBrowser(): BrowserInfo {
+  const info = describeBrowser(navigator.userAgent, {
     touchMac: navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1,
   });
+  // Brave uses the same user agent as Safari or Chrome, but tells itself apart.
+  const brave = (navigator as Navigator & { brave?: unknown }).brave !== undefined;
+  return brave && info.browser !== "in-app" ? { ...info, browser: "brave" } : info;
 }
+
+/** Names for the browsers, as people know them. */
+export const BROWSER_NAMES: Record<BrowserName, string> = {
+  safari: "Safari",
+  chrome: "Chrome",
+  firefox: "Firefox",
+  edge: "Edge",
+  samsung: "Samsung Internet",
+  opera: "Opera",
+  brave: "Brave",
+  duckduckgo: "DuckDuckGo",
+  "in-app": "App-Browser (z. B. Instagram)",
+  other: "Anderer Browser",
+};
+
+/** The browsers to choose from on each platform, when the guess is wrong. */
+export const BROWSERS_BY_PLATFORM: Record<BrowserPlatform, BrowserName[]> = {
+  ios: ["safari", "chrome", "firefox", "edge", "brave", "duckduckgo", "opera", "in-app", "other"],
+  android: ["chrome", "samsung", "firefox", "edge", "brave", "opera", "in-app", "other"],
+  desktop: ["chrome", "edge", "safari", "firefox", "brave", "opera", "other"],
+};

@@ -13,6 +13,10 @@ const UA = {
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 EdgiOS/129.0.2792.84 Mobile/15E148 Safari/605.1.15",
   iosInstagram:
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0.0.0.0 (iPhone15,2; iOS 18_0; de_DE)",
+  iosDuckDuckGo:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Ddg/18.0 Safari/604.1",
+  iosOpera:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 OPT/5.2.0 Mobile/15E148 Safari/604.1",
   iosTikTok:
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 musical_ly_36.5.0 BytedanceWebview/d8a21c6",
   ipadAsMac:
@@ -41,6 +45,8 @@ describe("describeBrowser", () => {
     ["iosChrome", "ios", "chrome"],
     ["iosFirefox", "ios", "firefox"],
     ["iosEdge", "ios", "edge"],
+    ["iosDuckDuckGo", "ios", "duckduckgo"],
+    ["iosOpera", "ios", "opera"],
     ["iosInstagram", "ios", "in-app"],
     ["iosTikTok", "ios", "in-app"],
     ["androidChrome", "android", "chrome"],

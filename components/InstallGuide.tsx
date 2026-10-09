@@ -1,5 +1,11 @@
 import { useState, useSyncExternalStore, type ReactNode } from "react";
-import { currentBrowser, type BrowserInfo } from "@/lib/device";
+import {
+  BROWSERS_BY_PLATFORM,
+  BROWSER_NAMES,
+  currentBrowser,
+  type BrowserInfo,
+  type BrowserName,
+} from "@/lib/device";
 import { promptInstall, useCanPromptInstall } from "@/lib/install-prompt";
 
 const noSubscribe = () => () => undefined;
@@ -181,15 +187,17 @@ function stepsFor({ platform, browser }: BrowserInfo): ReactNode[] | ReactNode {
           confirmIos,
         ];
       case "edge":
+      case "brave":
+      case "duckduckgo":
         return [
           <>
-            Unten auf{" "}
+            Auf das Menü{" "}
             <Key>
               <MoreSymbol />
             </Key>{" "}
             und dann auf {share} tippen.
           </>,
-          <>{addToHomeScreen} wählen.</>,
+          <>{addToHomeScreen} wählen (falls nötig etwas nach unten scrollen).</>,
           confirmIos,
         ];
       default:
@@ -264,6 +272,7 @@ function stepsFor({ platform, browser }: BrowserInfo): ReactNode[] | ReactNode {
 
   switch (browser) {
     case "chrome":
+    case "brave":
       return [
         <>
           In der Adressleiste rechts auf das Installieren-Symbol klicken, oder im Menü{" "}
@@ -307,20 +316,67 @@ function stepsFor({ platform, browser }: BrowserInfo): ReactNode[] | ReactNode {
   }
 }
 
+/** "Anleitung für Chrome" and a way to pick another browser if the guess is wrong. */
+function BrowserChoice({
+  info,
+  onChoose,
+}: {
+  info: BrowserInfo;
+  onChoose: (browser: BrowserName) => void;
+}) {
+  const [choosing, setChoosing] = useState(false);
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-xs text-muted">
+      <span>
+        Anleitung für <span className="font-semibold text-foreground">{BROWSER_NAMES[info.browser]}</span>
+      </span>
+      {choosing ? (
+        <label className="flex items-center gap-2">
+          <span className="sr-only">Dein Browser</span>
+          <select
+            value={info.browser}
+            onChange={(event) => {
+              onChoose(event.target.value as BrowserName);
+              setChoosing(false);
+            }}
+            className="rounded-lg border border-line bg-surface px-2 py-1 text-xs font-semibold text-foreground"
+          >
+            {BROWSERS_BY_PLATFORM[info.platform].map((browser) => (
+              <option key={browser} value={browser}>
+                {BROWSER_NAMES[browser]}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setChoosing(true)}
+          className="font-semibold text-accent-strong underline underline-offset-2"
+        >
+          Anderer Browser?
+        </button>
+      )}
+    </div>
+  );
+}
+
 /**
- * How to put the app on the home screen, matching the browser it is open in:
- * the browser's own install button where it offers one (Chrome, Edge on
- * Android and computers), otherwise the steps with the symbols to look for.
+ * How to put the app on the home screen, matching the browser it is open in
+ * (recognised from the user agent; the user can correct it): the browser's
+ * own install button where it offers one, otherwise the steps with the
+ * symbols to look for.
  */
 export function InstallGuide() {
-  const browser = useSyncExternalStore(noSubscribe, getBrowser, () => null);
+  const detected = useSyncExternalStore(noSubscribe, getBrowser, () => null);
+  const [chosen, setChosen] = useState<BrowserName | null>(null);
   // Once declined, the browser does not offer it again: the steps show then.
   const canPrompt = useCanPromptInstall();
 
-  if (!browser) {
+  if (!detected) {
     return null;
   }
-  if (canPrompt && browser.browser !== "in-app") {
+  if (canPrompt && !chosen && detected.browser !== "in-app") {
     return (
       <button
         type="button"
@@ -331,6 +387,12 @@ export function InstallGuide() {
       </button>
     );
   }
-  const steps = stepsFor(browser);
-  return Array.isArray(steps) ? <Steps steps={steps} /> : steps;
+  const info = chosen ? { ...detected, browser: chosen } : detected;
+  const steps = stepsFor(info);
+  return (
+    <div>
+      <BrowserChoice info={info} onChoose={setChosen} />
+      {Array.isArray(steps) ? <Steps steps={steps} /> : steps}
+    </div>
+  );
 }
