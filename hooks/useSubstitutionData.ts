@@ -67,6 +67,22 @@ function isNewer(
   return (candidate.lastUpdated ?? "") > (current.lastUpdated ?? "");
 }
 
+/**
+ * The data to show after a successful answer. When the school website is down,
+ * the server falls back to its own last copy, which can be older than the one
+ * already on screen (e.g. a freshly started server instance). Then the newer
+ * copy stays, marked as stale.
+ */
+export function pickDisplayedPayload(
+  payload: SubstitutionPayload,
+  current: SubstitutionPayload | null,
+): SubstitutionPayload {
+  if (payload.stale && current && !isNewer(payload, current)) {
+    return { ...current, stale: true, error: payload.error };
+  }
+  return payload;
+}
+
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -136,12 +152,12 @@ export function useSubstitutionData(initialData: SubstitutionPayload | null) {
           const payload = await fetchPayload(force);
 
           if (payload.success) {
-            setState({
-              data: payload,
+            setState((current) => ({
+              data: pickDisplayedPayload(payload, current.data),
               fromDevice: false,
               status: "idle",
               connectionError: null,
-            });
+            }));
             if (!payload.stale) {
               storePayload(payload);
             }

@@ -8,6 +8,8 @@ import {
 } from "@/lib/entries";
 import { formatPlanDateLabel, isPastDate, relativeDayLabel } from "@/lib/format";
 import { daysBetween, schoolLocalToIso, schoolToday } from "@/lib/time";
+import type { SubstitutionPayload } from "@/lib/types";
+import { pickDisplayedPayload } from "@/hooks/useSubstitutionData";
 
 describe("time", () => {
   it("converts school time to UTC in summer and winter time", () => {
@@ -87,5 +89,25 @@ describe("day labels", () => {
   it("marks past plans", () => {
     expect(isPastDate("2026-10-07", now)).toBe(true);
     expect(isPastDate("2026-10-08", now)).toBe(false);
+  });
+});
+
+describe("displayed data", () => {
+  const payload = (lastUpdated: string, stale = false) =>
+    ({ success: true, stale, lastUpdated, error: stale ? "down" : null }) as SubstitutionPayload;
+
+  it("keeps a newer copy on screen when the server only has an older fallback", () => {
+    const shown = payload("2026-10-08T10:00:00.000Z");
+    const result = pickDisplayedPayload(payload("2026-10-08T08:00:00.000Z", true), shown);
+    expect(result.lastUpdated).toBe(shown.lastUpdated);
+    expect(result.stale).toBe(true);
+    expect(result.error).toBe("down");
+  });
+
+  it("takes the server's answer otherwise", () => {
+    const fresh = payload("2026-10-08T08:00:00.000Z");
+    expect(pickDisplayedPayload(fresh, payload("2026-10-08T10:00:00.000Z"))).toBe(fresh);
+    const newerStale = payload("2026-10-08T12:00:00.000Z", true);
+    expect(pickDisplayedPayload(newerStale, payload("2026-10-08T10:00:00.000Z"))).toBe(newerStale);
   });
 });

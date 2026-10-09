@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { formatShortDate, isPastDate, relativeDayLabel } from "@/lib/format";
 import type { PlanDay } from "@/lib/types";
 
@@ -11,8 +12,30 @@ type DaySelectorProps = {
 };
 
 export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySelectorProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // With many days the selected one can be outside the visible strip; scroll
+  // only the strip (not the page) to bring it into view.
+  useEffect(() => {
+    const list = listRef.current;
+    const tab = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!list || !tab) {
+      return;
+    }
+
+    const listRect = list.getBoundingClientRect();
+    const tabRect = tab.getBoundingClientRect();
+    if (tabRect.left < listRect.left || tabRect.right > listRect.right) {
+      list.scrollBy({
+        left: tabRect.left - listRect.left - (listRect.width - tabRect.width) / 2,
+        behavior: "smooth",
+      });
+    }
+  }, [selectedDate, days.length]);
+
   return (
     <div
+      ref={listRef}
       role="tablist"
       aria-label="Tag auswählen"
       // Many days (e.g. before holidays) scroll sideways instead of squeezing.
