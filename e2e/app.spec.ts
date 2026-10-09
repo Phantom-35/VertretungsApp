@@ -72,6 +72,46 @@ test("compact cards on busy days, a short status line and neutral day counts", a
   expect(await otherCount.evaluate((badge) => badge.className)).not.toContain("warn");
 });
 
+test("reminds gently to install the app on the 3rd and 10th visit", async ({ page }) => {
+  const reminder = page.getByRole("region", { name: "Als App installieren?" });
+  /** Opens the app anew, as a new visit (a reload is the same visit). */
+  const visit = async (setVisits?: number) => {
+    await page.evaluate((visits) => {
+      if (visits !== undefined) {
+        localStorage.setItem("kag:browser-visits", String(visits));
+      }
+      sessionStorage.clear();
+    }, setVisits);
+    await page.reload();
+    await expect(page.locator("h1")).not.toHaveText("");
+  };
+
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  await expect(reminder).toHaveCount(0); // 1st visit
+  await visit(); // 2nd
+  await expect(reminder).toHaveCount(0);
+  await visit(); // 3rd
+  await expect(reminder).toBeVisible();
+  await reminder.getByRole("button", { name: "Zeigen" }).click();
+  await expect(reminder.getByText("App installieren", { exact: true })).toBeVisible();
+  // Stays during this visit, also after a reload, until it is closed.
+  await page.reload();
+  await expect(reminder).toBeVisible();
+  await reminder.getByRole("button", { name: "Erinnerung schließen" }).click();
+  await expect(reminder).toHaveCount(0);
+  await page.reload();
+  await expect(reminder).toHaveCount(0);
+
+  await visit(); // 4th
+  await expect(reminder).toHaveCount(0);
+  await visit(9); // 10th: once more
+  await expect(reminder).toBeVisible();
+  await reminder.getByRole("button", { name: "Erinnerung schließen" }).click();
+  await visit(30); // never again
+  await expect(reminder).toHaveCount(0);
+});
+
 test("opens with the own class; other classes are only looked at", async ({ page, context }) => {
   await page.goto("/");
   // The first class picked becomes the own class.

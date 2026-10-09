@@ -12,6 +12,7 @@ import { PwaRegistrar } from "@/components/PwaRegistrar";
 import { RefreshStatus } from "@/components/RefreshStatus";
 import { ShareButton } from "@/components/ShareButton";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
+import { InstallReminder } from "@/components/InstallReminder";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { Onboarding } from "@/components/Onboarding";
 import { TeacherHint } from "@/components/TeacherFilter";
@@ -283,6 +284,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             status={headerStatus}
             onOpenSettings={() => openSettings()}
           />
+
+          {/* Not during the introduction, which has its own install step. */}
+          {onboarding.done ? <InstallReminder /> : null}
 
           <ClassSelector
             classes={SCHOOL_CLASSES}
