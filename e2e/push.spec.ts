@@ -149,18 +149,36 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     expect(await check(request)).toMatchObject({ status: "checked", added: 0, notified: 0 });
     expect(service.received.filter((push) => push.path === "/other-7b")).toHaveLength(1);
 
-    // Switching the class in the app moves the notifications along.
-    const synced = page.waitForResponse(
-      (response) => response.url().endsWith("/api/push/subscribe") && response.status() === 200,
-    );
+    // Only looking at another class does not move the notifications.
     await chooseClass(page, "7B");
-    await synced;
-    await expect(settings).toContainText("für 7B ändert");
+    await expect(page.getByText("Nur angesehen. Deine Klasse bleibt die 5A")).toBeVisible();
+    await expect(settings).toContainText("für 5A ändert");
     await changePlan(
       request,
       4,
       row("07B", "5 - 6", "Statt-Vertretung", "HSR"),
       row("07B", "5 - 6", "Vertretung", "KER"),
+    );
+    expect(await check(request)).toMatchObject({ status: "checked", notified: 1 });
+    await waitForPushes(service.received, "/other-7b", 2);
+    expect(service.received.filter((push) => push.path === "/phone")).toHaveLength(2);
+
+    // Changing the own class in the settings does.
+    const synced = page.waitForResponse(
+      (response) => response.url().endsWith("/api/push/subscribe") && response.status() === 200,
+    );
+    await page.getByRole("button", { name: "Einstellungen" }).click();
+    const sheet = page.getByRole("dialog", { name: "Einstellungen" });
+    await sheet.getByLabel("Meine Klasse").selectOption("7B");
+    await sheet.getByRole("button", { name: "Fertig" }).click();
+    await synced;
+    await expect(settings).toContainText("für 7B ändert");
+    await expect(page.getByText("Nur angesehen.")).toHaveCount(0);
+    await changePlan(
+      request,
+      4,
+      row("07B", "5 - 6", "Vertretung", "KER"),
+      row("07B", "5 - 6", "Vertretung", "BEC"),
     );
     expect(await check(request)).toMatchObject({ status: "checked", notified: 2 });
     const [, , moved] = await waitForPushes(service.received, "/phone", 3);
@@ -178,7 +196,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     await changePlan(
       request,
       4,
-      row("07B", "5 - 6", "Vertretung", "KER"),
+      row("07B", "5 - 6", "Vertretung", "BEC"),
       row("07B", "5 - 6", "Entfall", "---"),
     );
     expect(await check(request)).toMatchObject({ status: "checked", notified: 1 });

@@ -13,11 +13,14 @@ import { RefreshButton } from "@/components/RefreshButton";
 import { RefreshStatus } from "@/components/RefreshStatus";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { Onboarding } from "@/components/Onboarding";
 import { TeacherHint } from "@/components/TeacherFilter";
 import { SettingsSheet, type SettingsFocus } from "@/components/SettingsSheet";
 import { useSeenBaseline } from "@/hooks/useNewEntries";
 import { useNow } from "@/hooks/useNow";
-import { useSelectedClass } from "@/hooks/useSelectedClass";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useMyClass, useViewedClass } from "@/hooks/useSelectedClass";
 import { useSettings } from "@/hooks/useSettings";
 import { useStoredList } from "@/hooks/useStoredList";
 import { useSubstitutionData } from "@/hooks/useSubstitutionData";
@@ -80,14 +83,27 @@ function EmptyDay({
 export function SubstitutionApp({ initialData, initialDay = null }: SubstitutionAppProps) {
   const { data, fromDevice, status, connectionError, refresh } =
     useSubstitutionData(initialData);
-  const [selectedClass, setSelectedClass] = useSelectedClass();
+  // The student's own class (opens with it, notifications are about it) and
+  // another class only looked at until the app is closed.
+  const [myClass, setMyClass] = useMyClass();
+  const [viewedClass, setViewedClass] = useViewedClass();
+  const selectedClass = viewedClass ?? myClass;
   const [recentClasses, setRecentClasses] = useStoredList("kag:recent-classes");
   const courseFilterKey = `kag:teachers:${selectedClass ?? ""}`;
   const [storedTeachers, setTeachers] = useStoredList(courseFilterKey);
+  const [myStoredTeachers] = useStoredList(`kag:teachers:${myClass ?? ""}`);
+  const myTeachers = myClass && isCourseClass(myClass) ? myStoredTeachers : [];
   const [showOtherCourses, setShowOtherCourses] = useState(false);
   const now = useNow();
   const seenBaseline = useSeenBaseline(data);
   const [settings] = useSettings();
+  const push = usePushNotifications({
+    schoolClass: myClass ?? null,
+    teachers: myTeachers,
+    notifyGroups: settings.notifyGroups,
+    eveningSummary: settings.eveningSummary,
+  });
+  const onboarding = useOnboarding();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsFocus, setSettingsFocus] = useState<SettingsFocus>(null);
   const openSettings = (focus: SettingsFocus = null) => {
@@ -107,7 +123,18 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       );
     }
     setShowOtherCourses(false);
-    setSelectedClass(value);
+    if (!myClass) {
+      // Nothing chosen as own class yet: the first class picked becomes it.
+      setMyClass(value);
+      setViewedClass(null);
+    } else {
+      setViewedClass(value === myClass ? null : value);
+    }
+  };
+  const chooseMyClass = (value: string) => {
+    setShowOtherCourses(false);
+    setMyClass(value);
+    setViewedClass(null);
   };
   const otherRecentClasses = recentClasses.filter((item) => item !== selectedClass);
 
@@ -242,6 +269,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             onForget={(value) =>
               setRecentClasses(recentClasses.filter((item) => item !== value))
             }
+            viewingOther={Boolean(viewedClass && myClass && viewedClass !== myClass)}
           >
             {usesCourseFilter && selectedClass ? (
               <TeacherHint
@@ -250,7 +278,23 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                 onOpenSettings={() => openSettings("teachers")}
               />
             ) : null}
-            <NotificationSettings schoolClass={selectedClass} teachers={teachers} />
+            {viewedClass && myClass && viewedClass !== myClass ? (
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
+                <p className="min-w-0 text-sm leading-5 text-muted">
+                  Nur angesehen. Deine Klasse bleibt die{" "}
+                  <span className="font-semibold text-foreground">{myClass}</span>, auch für
+                  Benachrichtigungen.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => chooseClass(myClass)}
+                  className="shrink-0 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-accent-strong"
+                >
+                  Zur {myClass}
+                </button>
+              </div>
+            ) : null}
+            <NotificationSettings push={push} schoolClass={myClass} teachers={myTeachers} />
           </ClassSelector>
 
           {data ? (
@@ -382,7 +426,21 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             : null
         }
         sourceUrl={data?.sourceUrl}
+        myClass={myClass ?? null}
+        onChooseMyClass={chooseMyClass}
+        onShowIntroduction={() => {
+          setSettingsOpen(false);
+          onboarding.restart();
+        }}
       />
+      {!onboarding.done ? (
+        <Onboarding
+          myClass={myClass ?? null}
+          onChooseClass={chooseMyClass}
+          push={push}
+          onFinish={onboarding.finish}
+        />
+      ) : null}
     </>
   );
 }

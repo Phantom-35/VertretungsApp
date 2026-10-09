@@ -233,3 +233,5 @@ export function usePushNotifications({ schoolClass, teachers, notifyGroups, even
 
   return { status, busy, message, enable, disable, sendTest };
 }
+
+export type PushControls = ReturnType<typeof usePushNotifications>;

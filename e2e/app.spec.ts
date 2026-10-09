@@ -52,17 +52,98 @@ test("shows exactly the changes of every class on every day", async ({ page }) =
   expect(errors).toEqual([]);
 });
 
-test("remembers the class and offers recent classes", async ({ page }) => {
+test("opens with the own class; other classes are only looked at", async ({ page, context }) => {
   await page.goto("/");
+  // The first class picked becomes the own class.
   await chooseClass(page, "5A");
+  await expect(page.locator("main").getByText("Meine Klasse", { exact: true })).toBeVisible();
   await chooseClass(page, "7B");
+  await expect(page.locator("main").getByText("Angesehene Klasse", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nur angesehen. Deine Klasse bleibt die 5A")).toBeVisible();
+  // Kept while the app stays open.
   await page.reload();
   await expect(page.locator("h1")).toHaveText("7B");
 
-  await page.getByRole("button", { name: "5A", exact: true }).click();
+  // Back with one tap, and the other class stays offered.
+  await page.getByRole("button", { name: "Zur 5A" }).click();
   await expect(page.locator("h1")).toHaveText("5A");
+  await expect(page.getByText("Nur angesehen.")).toHaveCount(0);
+  await page.getByRole("button", { name: "7B", exact: true }).click();
+  await expect(page.locator("h1")).toHaveText("7B");
+  await page.getByRole("button", { name: "5A", exact: true }).click();
   await page.getByRole("button", { name: "7B aus der Liste entfernen" }).click();
   await expect(page.getByRole("button", { name: "7B", exact: true })).toHaveCount(0);
+
+  // Opened anew, the app shows the own class again.
+  await chooseClass(page, "7B");
+  const reopened = await context.newPage();
+  await reopened.goto("/");
+  await expect(reopened.locator("h1")).toHaveText("5A");
+
+  // The own class is changed in the settings.
+  await reopened.getByRole("button", { name: "Einstellungen" }).click();
+  const dialog = reopened.getByRole("dialog", { name: "Einstellungen" });
+  await expect(dialog.getByLabel("Meine Klasse")).toHaveValue("5A");
+  await dialog.getByLabel("Meine Klasse").selectOption("9C");
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await expect(reopened.locator("h1")).toHaveText("9C");
+  await expect(reopened.locator("main").getByText("Meine Klasse", { exact: true })).toBeVisible();
+});
+
+test.describe("first start", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("introduces the app once and sets the own class", async ({ page }) => {
+    await page.goto("/");
+    const intro = page.getByRole("dialog");
+    await expect(intro.getByRole("heading", { name: "Willkommen!" })).toBeVisible();
+    await intro.getByRole("button", { name: "Los geht’s" }).click();
+
+    await expect(intro.getByRole("heading", { name: "Deine Klasse" })).toBeVisible();
+    await expect(intro.getByRole("button", { name: "Weiter" })).toBeDisabled();
+    await intro.getByRole("radio", { name: "Q1" }).click();
+    await expect(intro.getByRole("radio", { name: "Q1" })).toHaveAttribute("aria-checked", "true");
+    await expect(intro.getByText(/Lehrkräfte deiner Kurse/)).toBeVisible();
+    await intro.getByRole("button", { name: "Weiter" }).click();
+
+    await expect(intro.getByRole("heading", { name: "Nichts mehr verpassen" })).toBeVisible();
+    await expect(intro.getByRole("button", { name: "Benachrichtigungen einschalten" })).toBeVisible();
+    await intro.getByRole("button", { name: "Später" }).click();
+
+    await expect(intro.getByRole("heading", { name: "Gut zu wissen" })).toBeVisible();
+    await intro.getByRole("button", { name: "Fertig" }).click();
+    await expect(intro).toBeHidden();
+    await expect(page.locator("h1")).toHaveText("Q1");
+
+    // Only once.
+    await page.reload();
+    await expect(page.locator("h1")).toHaveText("Q1");
+    await expect(page.getByRole("heading", { name: "Willkommen!" })).toHaveCount(0);
+
+    // Can be watched again from the settings; Escape skips it.
+    await page.getByRole("button", { name: "Einstellungen" }).click();
+    await page.getByRole("button", { name: "Einführung nochmal ansehen" }).click();
+    await expect(page.getByRole("heading", { name: "Willkommen!" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("heading", { name: "Willkommen!" })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Willkommen!" })).toHaveCount(0);
+  });
+
+  test("can be skipped without choosing a class", async ({ page }) => {
+    await page.goto("/");
+    const intro = page.getByRole("dialog");
+    await intro.getByRole("button", { name: "Los geht’s" }).click();
+    await intro.getByRole("button", { name: "Später festlegen" }).click();
+    await expect(intro.getByText(/Lege zuerst deine Klasse fest/)).toBeVisible();
+    await intro.getByRole("button", { name: "Weiter" }).click();
+    await intro.getByRole("button", { name: "Fertig" }).click();
+    await expect(page.locator("h1")).toHaveText("Klasse wählen");
+    // The first class picked on the page becomes the own class.
+    await chooseClass(page, "6D");
+    await page.getByRole("button", { name: "Einstellungen" }).click();
+    await expect(page.getByRole("dialog", { name: "Einstellungen" }).getByLabel("Meine Klasse")).toHaveValue("6D");
+  });
 });
 
 test("filters the upper school by the student's teachers", async ({ page }) => {
@@ -381,10 +462,12 @@ test("settings: page stays still, text size, install hint and reset", async ({ b
   await expect(page.locator("h1")).toHaveText("9A");
   await dialog.getByRole("button", { name: "App zurücksetzen …" }).click();
   await dialog.getByRole("button", { name: "Zurücksetzen", exact: true }).click();
+  // Like a first start: with the introduction.
+  await expect(page.getByRole("heading", { name: "Willkommen!" })).toBeVisible();
   await expect(page.locator("h1")).toHaveText("Klasse wählen");
   // Choices are gone (the app stores a fresh offline copy right away).
   const kept = await page.evaluate(() => Object.keys(localStorage));
-  for (const key of ["kag:selected-class", "kag:settings", "kag:theme", "kag:recent-classes"]) {
+  for (const key of ["kag:selected-class", "kag:settings", "kag:theme", "kag:recent-classes", "kag:onboarded"]) {
     expect(kept).not.toContain(key);
   }
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe("16px");

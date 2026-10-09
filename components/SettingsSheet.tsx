@@ -4,6 +4,7 @@ import { TeacherChooser } from "@/components/TeacherFilter";
 import { ThemeChoice } from "@/components/ThemeSettings";
 import { NEXT_DAY_HOURS, useSettings, type TextSize } from "@/hooks/useSettings";
 import { isIos, isStandalone } from "@/lib/device";
+import { SCHOOL_CLASSES } from "@/lib/entries";
 import { EVENING_SUMMARY_HOUR, NOTIFY_GROUP_LABELS, NOTIFY_GROUPS } from "@/lib/notify";
 import { resetDevice } from "@/lib/reset";
 
@@ -25,6 +26,10 @@ type SettingsSheetProps = {
   courseFilter: CourseFilter | null;
   /** Original plan on the school website. */
   sourceUrl: string | undefined;
+  /** The student's own class: the app opens with it, notifications are about it. */
+  myClass: string | null;
+  onChooseMyClass: (value: string) => void;
+  onShowIntroduction: () => void;
 };
 
 const nextDayOptions = NEXT_DAY_HOURS.map((hour) => ({
@@ -136,7 +141,16 @@ function lockPageScroll() {
 }
 
 /** Settings as a sheet from the bottom of the screen. */
-export function SettingsSheet({ open, onClose, focus = null, courseFilter, sourceUrl }: SettingsSheetProps) {
+export function SettingsSheet({
+  open,
+  onClose,
+  focus = null,
+  courseFilter,
+  sourceUrl,
+  myClass,
+  onChooseMyClass,
+  onShowIntroduction,
+}: SettingsSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Latest onClose without re-attaching the swipe listeners on every render.
   const onCloseRef = useRef(onClose);
@@ -281,6 +295,46 @@ export function SettingsSheet({ open, onClose, focus = null, courseFilter, sourc
           </div>
         </div>
 
+        <Setting
+          title="Meine Klasse"
+          description="Mit ihr öffnet die App, und für sie kommen Benachrichtigungen. Andere Klassen kannst du auf der Startseite nur ansehen."
+        >
+          <div className="relative">
+            <label htmlFor="my-class" className="sr-only">
+              Meine Klasse
+            </label>
+            <select
+              id="my-class"
+              value={myClass ?? ""}
+              onChange={(event) => onChooseMyClass(event.target.value)}
+              className="w-full appearance-none rounded-2xl border border-line bg-card px-4 py-3 pr-11 text-base font-semibold text-foreground outline-none focus:border-accent/35 focus:ring-4 focus:ring-accent/10"
+            >
+              {!myClass ? (
+                <option value="" disabled>
+                  Klasse auswählen …
+                </option>
+              ) : null}
+              {SCHOOL_CLASSES.map((schoolClass) => (
+                <option key={schoolClass} value={schoolClass}>
+                  {schoolClass}
+                </option>
+              ))}
+            </select>
+            <svg
+              aria-hidden
+              viewBox="0 0 20 20"
+              className="pointer-events-none absolute right-4 top-1/2 size-5 -translate-y-1/2 text-muted"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m5 8 5 5 5-5" />
+            </svg>
+          </div>
+        </Setting>
+
         <Setting title="Darstellung" description="„Automatisch“ richtet sich nach der Einstellung des Geräts.">
           <ThemeChoice />
         </Setting>
@@ -323,7 +377,7 @@ export function SettingsSheet({ open, onClose, focus = null, courseFilter, sourc
 
         <Setting
           title="Benachrichtigungen"
-          description="Worüber du eine Mitteilung bekommst, wenn Benachrichtigungen unter „Meine Klasse“ eingeschaltet sind."
+          description="Worüber du eine Mitteilung bekommst, wenn Benachrichtigungen auf der Startseite eingeschaltet sind."
         >
           <div className="divide-y divide-line rounded-2xl border border-line bg-card">
             {NOTIFY_GROUPS.map((group) => (
@@ -385,6 +439,13 @@ export function SettingsSheet({ open, onClose, focus = null, courseFilter, sourc
             Die Daten stammen vom Vertretungsplan der Schule. Deine Einstellungen werden nur auf
             diesem Gerät gespeichert.{VERSION ? ` Version ${VERSION}.` : ""}
           </p>
+          <button
+            type="button"
+            onClick={onShowIntroduction}
+            className="block text-sm font-semibold text-accent-strong underline underline-offset-2"
+          >
+            Einführung nochmal ansehen
+          </button>
           {sourceUrl ? (
             <a
               href={sourceUrl}

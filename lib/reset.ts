@@ -23,12 +23,14 @@ export async function resetDevice() {
     // Without a service worker there are no notifications to switch off.
   }
 
-  try {
-    Object.keys(window.localStorage)
-      .filter((key) => key.startsWith(STORAGE_PREFIX))
-      .forEach((key) => window.localStorage.removeItem(key));
-  } catch {
-    // Storage unavailable: nothing was stored.
+  for (const storage of ["localStorage", "sessionStorage"] as const) {
+    try {
+      Object.keys(window[storage])
+        .filter((key) => key.startsWith(STORAGE_PREFIX))
+        .forEach((key) => window[storage].removeItem(key));
+    } catch {
+      // Storage unavailable: nothing was stored.
+    }
   }
   window.location.replace("/");
 }

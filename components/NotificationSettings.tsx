@@ -1,24 +1,19 @@
-import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { useSettings } from "@/hooks/useSettings";
+import type { PushControls } from "@/hooks/usePushNotifications";
 
 type NotificationSettingsProps = {
+  push: PushControls;
+  /** The student's own class: notifications are about it. */
   schoolClass: string | null | undefined;
-  /** Upper school course filter; empty means all courses. */
+  /** Upper school course filter of that class; empty means all courses. */
   teachers: readonly string[];
 };
 
 const buttonClass =
   "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 disabled:opacity-60";
 
-/** Push notifications for the selected class, part of the class card. */
-export function NotificationSettings({ schoolClass, teachers }: NotificationSettingsProps) {
-  const [settings] = useSettings();
-  const { status, busy, message, enable, disable, sendTest } = usePushNotifications({
-    schoolClass: schoolClass ?? null,
-    teachers,
-    notifyGroups: settings.notifyGroups,
-    eveningSummary: settings.eveningSummary,
-  });
+/** Push notifications for the student's own class, part of the class card. */
+export function NotificationSettings({ push, schoolClass, teachers }: NotificationSettingsProps) {
+  const { status, busy, message, enable, disable, sendTest } = push;
 
   if (status === "checking" || status === "unavailable") {
     return null;
@@ -69,7 +64,7 @@ export function NotificationSettings({ schoolClass, teachers }: NotificationSett
     case "off":
       description = audience
         ? `Mitteilung aufs Handy, sobald sich der Plan für ${audience} ändert, auch wenn die App geschlossen ist.`
-        : "Wähle zuerst deine Klasse.";
+        : "Lege zuerst in den Einstellungen deine Klasse fest.";
       actions = (
         <button
           type="button"

@@ -7,6 +7,8 @@ type ClassSelectorProps = {
   /** Other classes picked before (e.g. siblings), for switching with one tap. */
   recentClasses: readonly string[];
   onForget: (value: string) => void;
+  /** Another class than the student's own is only being looked at. */
+  viewingOther?: boolean;
   children?: ReactNode;
 };
 
@@ -16,6 +18,7 @@ export function ClassSelector({
   onChange,
   recentClasses,
   onForget,
+  viewingOther = false,
   children,
 }: ClassSelectorProps) {
   return (
@@ -24,7 +27,7 @@ export function ClassSelector({
         htmlFor="class-selector"
         className="text-xs font-semibold uppercase tracking-[0.22em] text-muted"
       >
-        Meine Klasse
+        {viewingOther ? "Angesehene Klasse" : "Meine Klasse"}
       </label>
       <div className="relative mt-3">
         <select

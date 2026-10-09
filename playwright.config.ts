@@ -25,6 +25,13 @@ export default defineConfig({
     locale: "de-DE",
     timezoneId: "Europe/Berlin",
     trace: "retain-on-failure",
+    // The introduction has been seen; its own test starts without this.
+    storageState: {
+      cookies: [],
+      origins: [
+        { origin: `http://localhost:${APP_PORT}`, localStorage: [{ name: "kag:onboarded", value: "1" }] },
+      ],
+    },
   },
   webServer: [
     {
