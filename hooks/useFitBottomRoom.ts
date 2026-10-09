@@ -3,9 +3,10 @@ import { useLayoutEffect, type RefObject } from "react";
 /**
  * How far the room may shrink. Only used when the last card marks its
  * bottom-right corner as free (`data-corner-free`, e.g. the centred "Keine
- * Vertretungen" card): the refresh button then sits over empty card space.
+ * Vertretungen" card): its text ends about 80 px above its bottom edge, with
+ * only the centred share button beside the refresh button below it.
  */
-const MAX_TRIM_PX = 40;
+const MAX_TRIM_PX = 64;
 
 /**
  * The page keeps room at the bottom so the round refresh button does not
@@ -39,7 +40,9 @@ export function useFitBottomRoom(ref: RefObject<HTMLElement | null>) {
         // Stable height: Safari's collapsing toolbar does not change it.
         const overflow = Math.ceil(contentHeight + room - document.documentElement.clientHeight);
         const cornerFree = last.lastElementChild?.hasAttribute("data-corner-free") ?? false;
-        const next = cornerFree && overflow > 0 && overflow <= MAX_TRIM_PX ? overflow : 0;
+        // Only when that removes the scrolling: if the content itself does not
+        // fit, the page scrolls anyway and keeps the full room.
+        const next = cornerFree && overflow > 0 && overflow <= Math.min(MAX_TRIM_PX, room) ? overflow : 0;
         if (next !== trim) {
           trim = next;
           main.style.setProperty("--bottom-trim", `${next}px`);
