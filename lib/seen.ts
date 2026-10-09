@@ -1,6 +1,6 @@
 import type { SubstitutionEntry } from "@/lib/types";
 
-type KeyedEntry = Pick<
+export type KeyedEntry = Pick<
   SubstitutionEntry,
   "date" | "className" | "lesson" | "type" | "substitute" | "teacher" | "room" | "subject" | "text"
 >;
@@ -51,4 +51,22 @@ export function mergeSeenKeys(
     return date !== "" && date >= today;
   });
   return Array.from(new Set([...stillRelevant, ...current]));
+}
+
+const KEY_FIELDS = [
+  "date",
+  "className",
+  "lesson",
+  "type",
+  "substitute",
+  "teacher",
+  "room",
+  "subject",
+] as const;
+
+/** Reverses `entryKey`; the text is last, so it may itself contain "|". */
+export function parseEntryKey(key: string): KeyedEntry {
+  const parts = key.split("|");
+  const entry = Object.fromEntries(KEY_FIELDS.map((field, index) => [field, parts[index] ?? ""]));
+  return { ...entry, text: parts.slice(KEY_FIELDS.length).join("|") } as KeyedEntry;
 }

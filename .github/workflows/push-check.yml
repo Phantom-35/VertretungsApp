@@ -1,0 +1,44 @@
+name: Push-Check
+
+# Asks the app every few minutes whether the plan changed; the app then sends
+# the notifications. Vercel's own cron jobs run only once a day on the free
+# plan, so GitHub Actions does the timing.
+#
+# Setup (GitHub → Settings → Secrets and variables → Actions):
+# - Variable APP_URL: e.g. https://kag-vertretungsplan.vercel.app
+# - Secret CRON_SECRET: the same value as CRON_SECRET on Vercel
+on:
+  schedule:
+    # Mon–Fri every 10 min, 04:00–19:59 UTC (06–22 h summer, 05–21 h winter).
+    # The app itself stays quiet from 21 to 6 h.
+    - cron: "*/10 4-19 * * 1-5"
+    # Weekends every 30 min, e.g. for plans uploaded on Sunday for Monday.
+    - cron: "*/30 6-19 * * 0,6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: push-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Plan prüfen und benachrichtigen
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::notice::APP_URL oder CRON_SECRET fehlt – Push-Check ist noch nicht eingerichtet."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            --retry 2 --retry-delay 20 --retry-all-errors \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "${APP_URL%/}/api/push/check"
+          echo

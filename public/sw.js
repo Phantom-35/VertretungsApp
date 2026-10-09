@@ -194,3 +194,70 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(staleWhileRevalidate(event));
   }
 });
+
+// Push notifications. Every push must show a notification: iOS cancels the
+// subscription of apps that receive pushes without showing one.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+
+  const title = data.title || "Vertretungsplan";
+  const options = {
+    body: data.body || "Der Vertretungsplan hat sich geändert.",
+    icon: "/icon/192",
+    lang: "de",
+    data: { url: data.url || "/" },
+  };
+  if (data.tag) {
+    options.tag = data.tag;
+  }
+
+  const badge =
+    typeof data.badgeCount === "number" && self.navigator.setAppBadge
+      ? self.navigator.setAppBadge(data.badgeCount).catch(() => undefined)
+      : undefined;
+  event.waitUntil(Promise.all([self.registration.showNotification(title, options), badge]));
+});
+
+// Tapping a notification opens the app on the day concerned.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const open = windows.find((client) => new URL(client.url).origin === self.location.origin);
+      if (open) {
+        await open.focus();
+        open.postMessage({ type: "open-url", url });
+        return;
+      }
+      await self.clients.openWindow(url);
+    })(),
+  );
+});
+
+// The browser renewed the push subscription: move the settings over.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      const old = event.oldSubscription;
+      const renewed =
+        event.newSubscription ||
+        (old && (await self.registration.pushManager.subscribe(old.options)));
+      if (!old || !renewed) {
+        return;
+      }
+      await fetch("/api/push/resubscribe", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ oldEndpoint: old.endpoint, subscription: renewed.toJSON() }),
+      });
+    })().catch(() => undefined),
+  );
+});

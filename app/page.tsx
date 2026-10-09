@@ -17,8 +17,17 @@ async function getInitialData() {
   return data?.success ? data : null;
 }
 
-export default async function HomePage() {
-  const initialData = await getInitialData();
+/** `?day=2026-10-09`, e.g. from a notification. */
+function parseDay(value: string | string[] | undefined) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
 
-  return <SubstitutionApp initialData={initialData} />;
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const [initialData, { day }] = await Promise.all([getInitialData(), searchParams]);
+
+  return <SubstitutionApp initialData={initialData} initialDay={parseDay(day)} />;
 }

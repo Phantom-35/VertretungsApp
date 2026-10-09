@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ClassSelector } from "@/components/ClassSelector";
 import { DAY_PANEL_ID, DaySelector, dayTabId } from "@/components/DaySelector";
 import { DaySummary } from "@/components/DaySummary";
@@ -12,6 +12,7 @@ import { PwaRegistrar } from "@/components/PwaRegistrar";
 import { RefreshButton } from "@/components/RefreshButton";
 import { RefreshStatus } from "@/components/RefreshStatus";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
+import { NotificationSettings } from "@/components/NotificationSettings";
 import { TeacherFilter } from "@/components/TeacherFilter";
 import { ThemeChoice } from "@/components/ThemeSettings";
 import { useSeenBaseline } from "@/hooks/useNewEntries";
@@ -36,7 +37,15 @@ import type { SubstitutionPayload } from "@/lib/types";
 
 type SubstitutionAppProps = {
   initialData: SubstitutionPayload | null;
+  /** Day to show first, e.g. when opened from a notification. */
+  initialDay?: string | null;
 };
+
+/** "?day=2026-10-09" in a URL opened from a notification. */
+function dayFromUrl(url: string) {
+  const day = new URL(url, "http://localhost").searchParams.get("day");
+  return day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+}
 
 /** How many other classes are kept for switching with one tap. */
 const MAX_RECENT_CLASSES = 4;
@@ -67,7 +76,7 @@ function EmptyDay({
   );
 }
 
-export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
+export function SubstitutionApp({ initialData, initialDay = null }: SubstitutionAppProps) {
   const { data, fromDevice, status, connectionError, refresh } =
     useSubstitutionData(initialData);
   const [selectedClass, setSelectedClass] = useSelectedClass();
@@ -97,7 +106,31 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
   const forceRefresh = useCallback(() => refresh(true), [refresh]);
   const isBusy = status !== "idle";
 
-  const [chosenDate, setChosenDate] = useState<string | null>(null);
+  const [chosenDate, setChosenDate] = useState<string | null>(initialDay);
+
+  // A notification tapped while the app is open: show its day. Opening the
+  // app also clears the number on its icon.
+  useEffect(() => {
+    const clearBadge = () => {
+      if (document.visibilityState === "visible") {
+        navigator.clearAppBadge?.().catch(() => undefined);
+      }
+    };
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; url?: string } | null;
+      const day = data?.type === "open-url" && data.url ? dayFromUrl(data.url) : null;
+      if (day) {
+        setChosenDate(day);
+      }
+    };
+    clearBadge();
+    document.addEventListener("visibilitychange", clearBadge);
+    navigator.serviceWorker?.addEventListener("message", onMessage);
+    return () => {
+      document.removeEventListener("visibilitychange", clearBadge);
+      navigator.serviceWorker?.removeEventListener("message", onMessage);
+    };
+  }, []);
 
   const days = data?.days ?? [];
   // Keep the user's choice while it is still part of the plan.
@@ -210,6 +243,7 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
                 }}
               />
             ) : null}
+            <NotificationSettings schoolClass={selectedClass} teachers={teachers} />
           </ClassSelector>
 
           {data ? (

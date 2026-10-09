@@ -110,14 +110,18 @@ body {
   font-family: var(--font-sans);
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+/* In the base layer, so that Tailwind's utilities (e.g. text-xs on a
+   button) take precedence. */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-button,
-select {
-  font: inherit;
+  button,
+  select {
+    font: inherit;
+  }
 }
 
 ::selection {

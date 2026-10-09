@@ -29,6 +29,7 @@ Die CI (`.github/workflows/ci.yml`) führt all das bei jedem Push aus (außer `c
 | Variable | Zweck |
 | --- | --- |
 | `SUBSTITUTION_BASE_URL` | Andere Quelle für die Untis-Seiten, z. B. für Tests. Standard: die Seite der Schule. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`, Upstash-Variablen | Benachrichtigungen, siehe unten. |
 | `ALERT_WEBHOOK_URL` | Optional. Bekommt eine Nachricht, wenn der Plan nicht mehr vollständig gelesen werden kann (z. B. weil Untis das Format geändert hat) und wenn das Problem wieder behoben ist. Geht mit einem [ntfy.sh](https://ntfy.sh)-Thema (Push aufs Handy, ohne Konto, z. B. `https://ntfy.sh/ein-geheimer-name`), einem Discord- oder einem Slack-Webhook. |
 
 ## Überwachung
@@ -43,3 +44,44 @@ den echten Plan. Schlägt das fehl (auch nach einem zweiten Versuch zehn Minuten
 später), schickt GitHub eine E-Mail. Von Hand starten: GitHub → Actions →
 Live-Check → „Run workflow“. GitHub pausiert geplante Abläufe, wenn 60 Tage lang
 nichts ins Repository gepusht wurde; dann dort wieder aktivieren.
+
+## Benachrichtigungen (Web-Push)
+
+Die App schickt eine Mitteilung aufs Handy, sobald sich der Plan für die gewählte Klasse
+(in der Oberstufe: für die gewählten Lehrkräfte) ändert, auch wenn die App geschlossen ist.
+
+**Was gemeldet wird:** neue Einträge, geänderte Einträge („Jetzt: Entfall (vorher
+Vertretung)“) und zurückgenommene Einträge, jeweils für heute (bis 16 Uhr) und die
+kommenden Tage. Mehrere Änderungen auf einmal kommen als eine Mitteilung. Lädt die Schule
+später am Tag erneut hoch, wird nur gemeldet, was sich seitdem geändert hat. Von 21 bis
+6 Uhr wird nichts gesendet; was nachts dazukommt, kommt um 6 Uhr gesammelt.
+Ein unvollständig gelesener Plan wird nie verglichen, und ein Eintrag gilt erst als
+zurückgenommen, wenn er bei zwei Prüfungen hintereinander fehlt.
+
+**iPhone/iPad:** ab iOS 16.4, nur in der App auf dem Home-Bildschirm (in Safari „Teilen“ →
+„Zum Home-Bildschirm“, dann die App von dort öffnen und unter „Meine Klasse“ →
+„Benachrichtigungen“ einschalten).
+
+### Einrichten
+
+1. **Redis:** In Vercel unter *Storage* (bzw. *Marketplace*) „Upstash for Redis“ anlegen und
+   mit dem Projekt verbinden. Die Variablen `KV_REST_API_URL`/`KV_REST_API_TOKEN`
+   (oder `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`) setzt Vercel dabei selbst.
+2. **VAPID-Schlüssel** einmalig erzeugen: `npx web-push generate-vapid-keys` und in Vercel
+   als Umgebungsvariablen eintragen:
+   - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`
+   - optional `VAPID_SUBJECT` (z. B. `mailto:name@example.com`; Standard ist die Adresse der App)
+3. **`CRON_SECRET`** in Vercel setzen: ein langes Zufallswort, z. B. `openssl rand -hex 32`.
+4. **Neu deployen**, damit die Variablen wirken.
+5. **Zeitplan:** In GitHub unter *Settings → Secrets and variables → Actions*
+   - Variable `APP_URL`, z. B. `https://<projekt>.vercel.app`
+   - Secret `CRON_SECRET`, derselbe Wert wie in Vercel
+
+   Dann ruft `.github/workflows/push-check.yml` die Prüfung `/api/push/check` werktags
+   alle 10 Minuten auf (am Wochenende alle 30). Von Hand: *Actions → Push-Check → Run workflow*.
+   GitHub startet geplante Läufe manchmal einige Minuten später; wer es pünktlicher braucht,
+   kann `/api/push/check` zusätzlich von einem Dienst wie cron-job.org aufrufen lassen
+   (Header `Authorization: Bearer <CRON_SECRET>`).
+
+Gespeichert werden nur die Push-Adresse des Geräts, die gewählte Klasse und die
+Lehrkräfte-Kürzel. Ausschalten in der App löscht den Eintrag.
