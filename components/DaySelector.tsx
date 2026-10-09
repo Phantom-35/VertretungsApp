@@ -109,7 +109,7 @@ export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySe
                       : "bg-surface-muted text-muted"
                     : selected
                       ? "bg-white text-accent"
-                      : "bg-warn-soft text-warn"
+                      : "bg-foreground/10 text-foreground/80"
                 }`}
               >
                 {count}

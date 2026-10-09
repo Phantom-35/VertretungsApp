@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { FadingStatus } from "@/components/FadingStatus";
+import { InstallGuide } from "@/components/InstallGuide";
 import type { PushControls } from "@/hooks/usePushNotifications";
 
 type NotificationSettingsProps = {
@@ -15,6 +17,7 @@ const buttonClass =
 /** Push notifications for the student's own class, part of the class card. */
 export function NotificationSettings({ push, schoolClass, teachers }: NotificationSettingsProps) {
   const { status, busy, message, enable, disable, sendTest } = push;
+  const [showInstall, setShowInstall] = useState(false);
 
   if (status === "checking" || status === "unavailable") {
     return null;
@@ -29,8 +32,19 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
 
   switch (status) {
     case "install":
-      description =
-        "Auf dem iPhone und iPad gehen Benachrichtigungen nur in der App auf dem Home-Bildschirm: unten auf „Teilen“ tippen, „Zum Home-Bildschirm“ wählen und die App von dort öffnen.";
+      // Short, the steps only on request: shown on every visit in Safari.
+      description = "Gibt es in der App auf dem Home-Bildschirm.";
+      actions = (
+        <button
+          type="button"
+          onClick={() => setShowInstall((value) => !value)}
+          aria-expanded={showInstall}
+          aria-controls="install-guide"
+          className={`${buttonClass} border border-line bg-surface text-accent-strong`}
+        >
+          {showInstall ? "Schließen" : "Wie?"}
+        </button>
+      );
       break;
     case "unsupported":
       description = "Dieser Browser kann keine Benachrichtigungen empfangen.";
@@ -125,6 +139,11 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
         </div>
         {actions ? <div className="flex shrink-0 flex-col items-end gap-2">{actions}</div> : null}
       </div>
+      {status === "install" && showInstall ? (
+        <div id="install-guide" className="mt-3 rounded-2xl border border-line bg-surface p-3">
+          <InstallGuide />
+        </div>
+      ) : null}
       <FadingStatus message={message} className="pt-2" />
     </div>
   );

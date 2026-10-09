@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ClassSelector } from "@/components/ClassSelector";
 import { DAY_PANEL_ID, DaySelector, dayTabId } from "@/components/DaySelector";
 import { DaySummary } from "@/components/DaySummary";
@@ -9,7 +9,6 @@ import { LoadingState } from "@/components/LoadingState";
 import { NoticesCard } from "@/components/NoticesCard";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { PwaRegistrar } from "@/components/PwaRegistrar";
-import { RefreshButton } from "@/components/RefreshButton";
 import { RefreshStatus } from "@/components/RefreshStatus";
 import { ShareButton } from "@/components/ShareButton";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
@@ -18,7 +17,6 @@ import { Onboarding } from "@/components/Onboarding";
 import { TeacherHint } from "@/components/TeacherFilter";
 import { SettingsSheet, type SettingsFocus } from "@/components/SettingsSheet";
 import { useSeenBaseline } from "@/hooks/useNewEntries";
-import { useFitBottomRoom } from "@/hooks/useFitBottomRoom";
 import { useNow } from "@/hooks/useNow";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -53,7 +51,9 @@ function dayFromUrl(url: string) {
   return day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
 }
 
-/** Centred cards; `data-corner-free`: nothing under the refresh button. */
+/** From this many changes on a day, the cards are shown smaller. */
+const COMPACT_FROM = 6;
+
 const cardClassName =
   "rounded-[1.75rem] border border-line bg-card p-6 text-center shadow-[0_18px_45px_rgba(18,41,39,0.07)]";
 
@@ -70,7 +70,7 @@ function EmptyDay({
   getShareText: () => string;
 }) {
   return (
-    <div className={cardClassName} data-corner-free>
+    <div className={cardClassName}>
       <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
         Keine Vertretungen
       </p>
@@ -95,7 +95,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const selectedClass = viewedClass ?? myClass;
   const courseFilterKey = `kag:teachers:${selectedClass ?? ""}`;
   const [storedTeachers, setTeachers] = useStoredList(courseFilterKey);
-  const [myStoredTeachers] = useStoredList(`kag:teachers:${myClass ?? ""}`);
+  const [myStoredTeachers, setMyTeachers] = useStoredList(`kag:teachers:${myClass ?? ""}`);
   const myTeachers = myClass && isCourseClass(myClass) ? myStoredTeachers : [];
   const [showOtherCourses, setShowOtherCourses] = useState(false);
   const now = useNow();
@@ -108,8 +108,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     eveningSummary: settings.eveningSummary,
   });
   const onboarding = useOnboarding();
-  const mainRef = useRef<HTMLElement>(null);
-  useFitBottomRoom(mainRef);
   // The sections glide in when the app opens, not when one appears later.
   const [opening, setOpening] = useState(true);
   useEffect(() => {
@@ -223,12 +221,22 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       )
     : null;
   const visibleEntries = shownEntries.filter(onSelectedDay);
+  const compactCards = visibleEntries.length >= COMPACT_FROM;
   // Added or changed since the user last opened the app.
   const newKeys = settings.showNewBadges
     ? findNewKeys(seenBaseline, visibleEntries)
     : new Set<string>();
   const otherCourseCount =
     classEntries.filter(onSelectedDay).length - ownEntries.filter(onSelectedDay).length;
+  // Teachers of the own class in the plan, for choosing courses in the introduction.
+  const myTeacherSuggestions = Array.from(
+    new Set(
+      (data?.entries ?? [])
+        .filter((entry) => myClass && entryAppliesToClass(entry.className, myClass))
+        .map((entry) => normalizeTeacher(entry.teacher))
+        .filter((teacher): teacher is string => teacher !== null),
+    ),
+  );
   const teacherSuggestions = Array.from(
     new Set(
       classEntries
@@ -260,12 +268,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     <>
       <PwaRegistrar />
       <PullToRefresh onRefresh={forceRefresh}>
-        {/* Room at the bottom for the refresh button (bottom offset + 3.5rem):
-            it can only cover the last card's inner padding. useFitBottomRoom
-            trims it when a page that fits would otherwise scroll a little. */}
         <main
-          ref={mainRef}
-          className={`${opening ? "app-enter " : ""}mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[calc(var(--bottom-room)-var(--bottom-trim,0px))] pt-[max(1rem,env(safe-area-inset-top))] [--bottom-room:calc(max(1rem,env(safe-area-inset-bottom))+2.5rem)] sm:px-5`}
+          className={`${opening ? "app-enter " : ""}mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-5`}
         >
           <Header
             selectedClass={selectedClass}
@@ -367,7 +371,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             ) : null}
 
             {data && selectedClass === null ? (
-              <div className={cardClassName} data-corner-free>
+              <div className={cardClassName}>
                 <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
                   Wähle deine Klasse
                 </p>
@@ -391,14 +395,18 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
 
             {data && selectedClass ? (
               visibleEntries.length > 0 ? (
-                visibleEntries.map((entry) => (
-                  <SubstitutionCard
-                    key={entry.id}
-                    entry={entry}
-                    isNew={newKeys.has(entryKey(entry))}
-                    showClassName={formatClassName(entry.className) !== selectedClass}
-                  />
-                ))
+                // Many changes (e.g. the upper school): smaller cards, closer together.
+                <div className={compactCards ? "space-y-2.5" : "space-y-4"}>
+                  {visibleEntries.map((entry) => (
+                    <SubstitutionCard
+                      key={entry.id}
+                      entry={entry}
+                      isNew={newKeys.has(entryKey(entry))}
+                      showClassName={formatClassName(entry.className) !== selectedClass}
+                      compact={compactCards}
+                    />
+                  ))}
+                </div>
               ) : (
                 <EmptyDay
                   selectedClass={selectedClass}
@@ -413,7 +421,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
         </main>
       </PullToRefresh>
 
-      <RefreshButton onRefresh={() => void forceRefresh()} refreshing={isBusy} />
       <SettingsSheet
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -443,6 +450,12 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
         <Onboarding
           myClass={myClass ?? null}
           onChooseClass={chooseMyClass}
+          courseTeachers={myStoredTeachers}
+          courseSuggestions={myTeacherSuggestions}
+          onChangeCourseTeachers={(value) => {
+            setShowOtherCourses(false);
+            setMyTeachers(value);
+          }}
           push={push}
           onFinish={onboarding.finish}
         />

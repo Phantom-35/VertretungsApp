@@ -44,13 +44,21 @@ type TeacherChooserProps = {
   /** Teachers appearing in the current plan for this class, as suggestions. */
   suggestions: string[];
   onChange: (teachers: string[]) => void;
+  /** Distinct ids when the chooser is on the page twice (introduction, settings). */
+  inputId?: string;
 };
 
 /**
  * Upper-school students attend courses, not one class. The plan has no subject
  * column, so courses are recognised by their teacher.
  */
-export function TeacherChooser({ schoolClass, selected, suggestions, onChange }: TeacherChooserProps) {
+export function TeacherChooser({
+  schoolClass,
+  selected,
+  suggestions,
+  onChange,
+  inputId = "teacher-input",
+}: TeacherChooserProps) {
   const [draft, setDraft] = useState("");
   const [invalid, setInvalid] = useState(false);
 
@@ -110,11 +118,11 @@ export function TeacherChooser({ schoolClass, selected, suggestions, onChange }:
       ) : null}
 
       <form onSubmit={add} className="flex gap-2">
-        <label htmlFor="teacher-input" className="sr-only">
+        <label htmlFor={inputId} className="sr-only">
           Kürzel einer Lehrkraft
         </label>
         <input
-          id="teacher-input"
+          id={inputId}
           value={draft}
           onChange={(event) => {
             setDraft(event.target.value);
@@ -125,7 +133,7 @@ export function TeacherChooser({ schoolClass, selected, suggestions, onChange }:
           autoComplete="off"
           placeholder="Kürzel, z. B. RUK"
           aria-invalid={invalid}
-          aria-describedby={invalid ? "teacher-input-error" : undefined}
+          aria-describedby={invalid ? `${inputId}-error` : undefined}
           className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 py-2 text-sm font-semibold uppercase text-foreground outline-none placeholder:font-normal placeholder:normal-case placeholder:text-muted focus:border-accent/35 focus:ring-4 focus:ring-accent/10"
         />
         <button
@@ -136,7 +144,7 @@ export function TeacherChooser({ schoolClass, selected, suggestions, onChange }:
         </button>
       </form>
       {invalid ? (
-        <p id="teacher-input-error" className="text-xs text-warn">
+        <p id={`${inputId}-error`} className="text-xs text-warn">
           Bitte ein Kürzel aus 2–4 Buchstaben eingeben.
         </p>
       ) : null}

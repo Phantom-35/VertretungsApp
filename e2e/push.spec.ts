@@ -342,7 +342,16 @@ test("explains on an iPhone that the app must be on the home screen", async ({ b
   const page = await iphone.newPage();
   await page.goto("/");
   await page.locator("#class-selector").selectOption("5A");
-  await expect(page.locator("main").getByText(/„Zum Home-Bildschirm“ wählen/)).toBeVisible();
+  // Short on the page; the steps with Safari's symbols on request.
+  const main = page.locator("main");
+  await expect(main.getByText("Gibt es in der App auf dem Home-Bildschirm.")).toBeVisible();
+  await expect(main.getByText("Zum Home-Bildschirm")).toHaveCount(0);
+  await main.getByRole("button", { name: "Wie?" }).click();
+  const guide = main.locator("#install-guide");
+  await expect(guide.getByText("Zum Home-Bildschirm")).toBeVisible();
+  await expect(guide.getByText("Teilen", { exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Schließen" }).click();
+  await expect(main.getByText("Zum Home-Bildschirm")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Einschalten" })).toHaveCount(0);
   await iphone.close();
 });

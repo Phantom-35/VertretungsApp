@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { InstallGuide } from "@/components/InstallGuide";
 import { Segmented } from "@/components/Segmented";
 import { TeacherChooser } from "@/components/TeacherFilter";
 import { ThemeChoice } from "@/components/ThemeSettings";
 import { NEXT_DAY_HOURS, useSettings, type TextSize } from "@/hooks/useSettings";
-import { isIos, isStandalone } from "@/lib/device";
+import { isStandalone } from "@/lib/device";
 import { SCHOOL_CLASSES } from "@/lib/entries";
 import { EVENING_SUMMARY_HOUR, NOTIFY_GROUP_LABELS, NOTIFY_GROUPS } from "@/lib/notify";
 import { resetDevice } from "@/lib/reset";
@@ -161,7 +162,6 @@ export function SettingsSheet({
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
   const installed = useSyncExternalStore(noSubscribe, isStandalone, () => true);
-  const onIos = useSyncExternalStore(noSubscribe, isIos, () => false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -426,11 +426,7 @@ export function SettingsSheet({
             title="Als App installieren"
             description="Als App startet der Plan schneller, funktioniert offline und kann Benachrichtigungen schicken."
           >
-            <p className="text-sm leading-6 text-foreground">
-              {onIos
-                ? "In Safari unten auf „Teilen“ tippen, dann „Zum Home-Bildschirm“ wählen und die App von dort öffnen."
-                : "Im Browser-Menü „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen."}
-            </p>
+            <InstallGuide />
           </Card>
         ) : null}
 

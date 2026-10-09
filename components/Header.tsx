@@ -37,6 +37,9 @@ const statusBadges: Record<HeaderStatus, { label: string; className: string }> =
   },
 };
 
+/** "08.10., 15:34 Uhr" (another day) rather than "15:34 Uhr" (today). */
+const isDate = (label: string) => label.includes(".,");
+
 export function Header({
   selectedClass,
   dateLabel,
@@ -87,13 +90,29 @@ export function Header({
               </>
             ) : null}
           </p>
-          {/* Wraps between the two parts, never inside one. */}
-          <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted">
+          {/* When the school last changed the plan, and when the app last
+              checked it. Wraps between the two parts, never inside one. */}
+          <p className="mt-0.5 flex flex-wrap gap-x-1.5 text-xs text-muted">
             <span className="whitespace-nowrap">
-              Stand Schule <span className="font-medium text-foreground/80">{sourceUpdatedLabel}</span>
+              {sourceUpdatedLabel === "unbekannt" ? (
+                "Plan der Schule"
+              ) : (
+                <>
+                  Plan {isDate(sourceUpdatedLabel) ? "vom" : "von"}{" "}
+                  <span className="font-medium text-foreground/80">{sourceUpdatedLabel}</span>
+                </>
+              )}
             </span>
+            <span aria-hidden>·</span>
             <span className="whitespace-nowrap">
-              Abgerufen <span className="font-medium text-foreground/80">{fetchedLabel}</span>
+              {fetchedLabel === "noch nie" ? (
+                "noch nicht geprüft"
+              ) : (
+                <>
+                  geprüft{fetchedLabel.endsWith("Uhr") ? (isDate(fetchedLabel) ? " am" : " um") : ""}{" "}
+                  <span className="font-medium text-foreground/80">{fetchedLabel}</span>
+                </>
+              )}
             </span>
           </p>
         </div>

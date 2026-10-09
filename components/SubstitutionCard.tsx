@@ -14,6 +14,8 @@ type SubstitutionCardProps = {
   showClassName: boolean;
   /** Added or changed since the user last opened the app. */
   isNew?: boolean;
+  /** Smaller, for days with many changes. */
+  compact?: boolean;
 };
 
 export const kindStyles: Record<EntryKind, string> = {
@@ -79,7 +81,7 @@ function TeacherLine({ teacher, substitute }: { teacher: string; substitute: str
   );
 }
 
-export function SubstitutionCard({ entry, showClassName, isNew = false }: SubstitutionCardProps) {
+export function SubstitutionCard({ entry, showClassName, isNew = false, compact = false }: SubstitutionCardProps) {
   const kind = getEntryKind(entry.type);
   const hint = entryKindHints[kind];
   // A cancelled lesson is what students look for first: make it stand out.
@@ -87,20 +89,22 @@ export function SubstitutionCard({ entry, showClassName, isNew = false }: Substi
 
   return (
     <article
-      className={`flex gap-4 rounded-[1.6rem] border bg-[linear-gradient(180deg,var(--entry-from),var(--entry-to))] p-4 shadow-[0_18px_40px_rgba(18,41,39,0.08)] ${
-        cancelled ? "border-warn/40" : "border-edge"
-      }`}
+      className={`flex border bg-[linear-gradient(180deg,var(--entry-from),var(--entry-to))] ${
+        compact
+          ? "gap-3 rounded-[1.3rem] p-3 shadow-[0_10px_24px_rgba(18,41,39,0.07)]"
+          : "gap-4 rounded-[1.6rem] p-4 shadow-[0_18px_40px_rgba(18,41,39,0.08)]"
+      } ${cancelled ? "border-warn/40" : "border-edge"}`}
     >
       <div
-        className={`flex w-16 shrink-0 flex-col items-center justify-center rounded-[1.15rem] py-3 ${
-          cancelled ? "bg-warn-soft text-warn" : "bg-accent-soft/70 text-accent-strong"
-        }`}
+        className={`flex shrink-0 flex-col items-center justify-center ${
+          compact ? "w-13 rounded-[0.95rem] py-2" : "w-16 rounded-[1.15rem] py-3"
+        } ${cancelled ? "bg-warn-soft text-warn" : "bg-accent-soft/70 text-accent-strong"}`}
       >
         <span className="text-[0.62rem] font-semibold uppercase tracking-[0.18em]">
           Std.
         </span>
         <span
-          className={`mt-0.5 text-2xl font-semibold tracking-[-0.04em] ${
+          className={`mt-0.5 font-semibold tracking-[-0.04em] ${compact ? "text-xl" : "text-2xl"} ${
             cancelled ? "line-through decoration-2" : ""
           }`}
         >
@@ -108,7 +112,7 @@ export function SubstitutionCard({ entry, showClassName, isNew = false }: Substi
         </span>
       </div>
 
-      <div className="min-w-0 flex-1 space-y-2">
+      <div className={`min-w-0 flex-1 ${compact ? "space-y-1" : "space-y-2"}`}>
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${kindStyles[kind]}`}

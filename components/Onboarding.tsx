@@ -1,16 +1,26 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { FadingStatus } from "@/components/FadingStatus";
+import { InstallGuide } from "@/components/InstallGuide";
+import { TeacherChooser } from "@/components/TeacherFilter";
 import type { PushControls } from "@/hooks/usePushNotifications";
+import { isStandalone } from "@/lib/device";
 import { SCHOOL_CLASSES, isCourseClass } from "@/lib/entries";
 
 type OnboardingProps = {
   myClass: string | null;
   onChooseClass: (value: string) => void;
+  /** Upper school: the teachers of the student's courses. */
+  courseTeachers: readonly string[];
+  /** Teachers of the own class in the current plan, to tap instead of typing. */
+  courseSuggestions: string[];
+  onChangeCourseTeachers: (teachers: string[]) => void;
   push: PushControls;
   onFinish: () => void;
 };
 
-type Step = "welcome" | "class" | "notifications" | "tips";
+type Step = "welcome" | "class" | "courses" | "install" | "notifications" | "tips";
+
+const noSubscribe = () => () => undefined;
 
 /** One row per grade ("5A" … "5D"), then the upper school. */
 const CLASS_ROWS = [
@@ -115,13 +125,29 @@ function NotificationStep({ push, myClass }: { push: PushControls; myClass: stri
  * Introduction on the first start: what the app does, the student's own
  * class and notifications. Shown once per device.
  */
-export function Onboarding({ myClass, onChooseClass, push, onFinish }: OnboardingProps) {
+export function Onboarding({
+  myClass,
+  onChooseClass,
+  courseTeachers,
+  courseSuggestions,
+  onChangeCourseTeachers,
+  push,
+  onFinish,
+}: OnboardingProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  // Without notifications on the server, that step is left out.
-  const steps: Step[] =
-    push.status === "unavailable"
-      ? ["welcome", "class", "tips"]
-      : ["welcome", "class", "notifications", "tips"];
+  const installed = useSyncExternalStore(noSubscribe, isStandalone, () => false);
+  const upperSchool = Boolean(myClass && isCourseClass(myClass));
+  // Only the steps that apply: courses in the upper school, installing in the
+  // browser, notifications where they can be switched on right here (on an
+  // iPhone only in the installed app, which starts with this introduction).
+  const steps: Step[] = [
+    "welcome",
+    "class",
+    ...(upperSchool ? (["courses"] as const) : []),
+    ...(installed ? [] : (["install"] as const)),
+    ...(push.status === "unavailable" || push.status === "install" ? [] : (["notifications"] as const)),
+    "tips",
+  ];
   const [step, setStep] = useState<Step>("welcome");
   const index = Math.max(0, steps.indexOf(step));
   const next = () => setStep(steps[Math.min(index + 1, steps.length - 1)]);
@@ -188,7 +214,7 @@ export function Onboarding({ myClass, onChooseClass, push, onFinish }: Onboardin
                     </svg>
                   }
                 >
-                  Der Plan kommt direkt von der Schule. Zum Aktualisieren oben nach unten ziehen.
+                  Der Plan kommt direkt von der Schule und lädt sich von selbst neu.
                 </Feature>
                 <Feature
                   title="Neues auf einen Blick"
@@ -255,12 +281,6 @@ export function Onboarding({ myClass, onChooseClass, push, onFinish }: Onboardin
                     </div>
                 ))}
               </div>
-              {myClass && isCourseClass(myClass) ? (
-                <p className="mt-4 rounded-2xl border border-line bg-card px-4 py-3 text-sm leading-6 text-foreground">
-                  Oberstufe: In den Einstellungen kannst du die Lehrkräfte deiner Kurse festlegen.
-                  Dann siehst du nur deine Kurse.
-                </p>
-              ) : null}
             </div>
             <div className="mt-8 space-y-1">
               <button type="button" onClick={next} disabled={!myClass} className={primaryButton}>
@@ -271,6 +291,75 @@ export function Onboarding({ myClass, onChooseClass, push, onFinish }: Onboardin
                   Später festlegen
                 </button>
               ) : null}
+            </div>
+          </>
+        ) : null}
+
+        {step === "courses" ? (
+          <>
+            <div className="mt-10 flex-1">
+              <h2 id="onboarding-title" className="text-3xl font-semibold tracking-[-0.04em]">
+                Deine Kurse
+              </h2>
+              <p className="mt-2 text-base leading-7 text-muted">
+                In der Oberstufe hast du Kurse statt einer Klasse. Tippe die Lehrkräfte deiner Kurse
+                an: Dann siehst du nur deren Änderungen und bekommst nur dafür Benachrichtigungen.
+              </p>
+              <div className="mt-6 rounded-[1.4rem] border border-line bg-card p-4">
+                <TeacherChooser
+                  schoolClass={myClass ?? ""}
+                  selected={courseTeachers}
+                  suggestions={courseSuggestions}
+                  onChange={onChangeCourseTeachers}
+                  inputId="onboarding-teacher-input"
+                />
+              </div>
+              <p className="mt-3 text-xs leading-5 text-muted">
+                Fehlt eine Lehrkraft, weil sie gerade nicht im Plan steht? Einfach das Kürzel
+                eingeben. Ändern kannst du das jederzeit in den Einstellungen.
+              </p>
+            </div>
+            <div className="mt-8 space-y-1">
+              <button type="button" onClick={next} className={primaryButton}>
+                {courseTeachers.length > 0 ? "Weiter" : "Alle Kurse zeigen"}
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {step === "install" ? (
+          <>
+            <div className="mt-10 flex-1">
+              <span
+                aria-hidden
+                className="flex size-16 items-center justify-center rounded-[1.4rem] bg-accent-soft text-accent-strong"
+              >
+                <svg {...iconProps} className="size-8">
+                  <rect x="6" y="2" width="12" height="20" rx="3" />
+                  <path d="M12 7v7M9 11l3 3 3-3M10.5 18h3" />
+                </svg>
+              </span>
+              <h2 id="onboarding-title" className="mt-6 text-3xl font-semibold tracking-[-0.04em]">
+                Als App installieren
+              </h2>
+              <p className="mt-2 text-base leading-7 text-muted">
+                Dann liegt der Plan wie eine App auf dem Home-Bildschirm, startet schneller, geht
+                auch ohne Internet und kann dir Benachrichtigungen schicken.
+              </p>
+              <div className="mt-6 rounded-[1.4rem] border border-line bg-card p-4">
+                <InstallGuide />
+              </div>
+              {push.status === "install" ? (
+                <p className="mt-3 text-xs leading-5 text-muted">
+                  Die installierte App startet mit dieser Einführung. Dort kannst du dann
+                  Benachrichtigungen einschalten.
+                </p>
+              ) : null}
+            </div>
+            <div className="mt-8">
+              <button type="button" onClick={next} className={secondaryButton}>
+                Später
+              </button>
             </div>
           </>
         ) : null}
@@ -319,6 +408,17 @@ export function Onboarding({ myClass, onChooseClass, push, onFinish }: Onboardin
                 Gut zu wissen
               </h2>
               <ul className="mt-8 space-y-5">
+                <Feature
+                  title="Aktualisieren"
+                  icon={
+                    <svg {...iconProps}>
+                      <path d="M12 4v13M6 11l6 6 6-6M5 21h14" />
+                    </svg>
+                  }
+                >
+                  Auf der Startseite einfach von oben nach unten wischen. Der Plan lädt sich
+                  außerdem von selbst neu.
+                </Feature>
                 <Feature
                   title="Einstellungen"
                   icon={

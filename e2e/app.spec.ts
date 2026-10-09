@@ -52,6 +52,26 @@ test("shows exactly the changes of every class on every day", async ({ page }) =
   expect(errors).toEqual([]);
 });
 
+test("compact cards on busy days, a short status line and neutral day counts", async ({ page }) => {
+  await page.goto("/");
+  // Few changes: the normal cards.
+  await chooseClass(page, "5A");
+  const padding = () => page.locator("article").first().evaluate((card) => getComputedStyle(card).paddingTop);
+  expect(await padding()).toBe("16px");
+  // Many changes (Q1 on Thursday): smaller cards.
+  await chooseClass(page, "Q1");
+  expect(await page.locator("article").count()).toBeGreaterThanOrEqual(6);
+  expect(await padding()).toBe("12px");
+
+  // When the school changed the plan and when the app checked it.
+  await expect(page.locator("header")).toContainText("Plan von 15:34 Uhr");
+  await expect(page.locator("header")).toContainText(/geprüft (gerade eben|vor \d+ Min\.)/);
+
+  // The count on the other day's tab is neutral, not orange like a warning.
+  const otherCount = page.getByRole("tab", { selected: false }).locator("span[aria-label$='Änderungen']");
+  expect(await otherCount.evaluate((badge) => badge.className)).not.toContain("warn");
+});
+
 test("opens with the own class; other classes are only looked at", async ({ page, context }) => {
   await page.goto("/");
   // The first class picked becomes the own class.
@@ -99,17 +119,34 @@ test.describe("first start", () => {
     await expect(intro.getByRole("button", { name: "Weiter" })).toBeDisabled();
     await intro.getByRole("radio", { name: "Q1" }).click();
     await expect(intro.getByRole("radio", { name: "Q1" })).toHaveAttribute("aria-checked", "true");
-    await expect(intro.getByText(/Lehrkräfte deiner Kurse/)).toBeVisible();
     await intro.getByRole("button", { name: "Weiter" }).click();
+
+    // Upper school: the courses, chosen by their teachers from the plan.
+    await expect(intro.getByRole("heading", { name: "Deine Kurse" })).toBeVisible();
+    await expect(intro.getByRole("button", { name: "Alle Kurse zeigen" })).toBeVisible();
+    await intro.getByRole("button", { name: "RUK", exact: true }).click();
+    await expect(intro.getByRole("button", { name: "RUK", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await intro.getByRole("button", { name: "Weiter" }).click();
+
+    // In the browser: how to install it as an app.
+    await expect(intro.getByRole("heading", { name: "Als App installieren" })).toBeVisible();
+    await expect(intro.getByText("App installieren", { exact: true })).toBeVisible();
+    await intro.getByRole("button", { name: "Später" }).click();
 
     await expect(intro.getByRole("heading", { name: "Nichts mehr verpassen" })).toBeVisible();
     await expect(intro.getByRole("button", { name: "Benachrichtigungen einschalten" })).toBeVisible();
     await intro.getByRole("button", { name: "Später" }).click();
 
     await expect(intro.getByRole("heading", { name: "Gut zu wissen" })).toBeVisible();
+    // No refresh button any more: the introduction explains swiping down.
+    await expect(intro.getByText(/von oben nach unten wischen/)).toBeVisible();
     await intro.getByRole("button", { name: "Fertig" }).click();
     await expect(intro).toBeHidden();
     await expect(page.locator("h1")).toHaveText("Q1");
+    await expect(page.locator("main").getByText("Meine Lehrkräfte", { exact: true }).locator("..")).toContainText(
+      "RUK",
+    );
+    await expect(page.getByRole("button", { name: "Aktualisieren" })).toHaveCount(0);
 
     // Only once.
     await page.reload();
@@ -131,6 +168,7 @@ test.describe("first start", () => {
     const intro = page.getByRole("dialog");
     await intro.getByRole("button", { name: "Los geht’s" }).click();
     await intro.getByRole("button", { name: "Später festlegen" }).click();
+    await intro.getByRole("button", { name: "Später" }).click();
     await expect(intro.getByText(/Lege zuerst deine Klasse fest/)).toBeVisible();
     await intro.getByRole("button", { name: "Weiter" }).click();
     await intro.getByRole("button", { name: "Fertig" }).click();
