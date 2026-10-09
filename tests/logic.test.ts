@@ -175,6 +175,14 @@ describe("default day", () => {
     expect(pickDefaultDate(["2026-12-01", "2026-12-02"], at("2026-12-01T15:30:00Z"))).toBe("2026-12-02");
   });
 
+  it("uses the hour chosen in the settings", () => {
+    const halfPastThree = at("2026-10-08T13:30:00Z");
+    expect(pickDefaultDate(plan, halfPastThree)).toBe("2026-10-08");
+    expect(pickDefaultDate(plan, halfPastThree, 15)).toBe("2026-10-09");
+    // "Nie": always today.
+    expect(pickDefaultDate(plan, at("2026-10-08T19:00:00Z"), 24)).toBe("2026-10-08");
+  });
+
   it("stays on the last day when no later one exists", () => {
     expect(pickDefaultDate(plan, at("2026-10-12T16:00:00Z"))).toBe("2026-10-12");
     expect(pickDefaultDate(plan, at("2026-10-20T08:00:00Z"))).toBe("2026-10-12");

@@ -1,3 +1,4 @@
+import { Segmented } from "@/components/Segmented";
 import { useTheme } from "@/hooks/useTheme";
 import type { ThemePreference } from "@/lib/theme";
 
@@ -43,39 +44,44 @@ const options: { value: ThemePreference; label: string }[] = [
   { value: "dark", label: "Dunkel" },
 ];
 
-/** Full choice incl. "follow the system", at the end of the page. */
+/** Full choice incl. "follow the system", in the settings. */
 export function ThemeChoice() {
   const { preference, setPreference } = useTheme();
-
   return (
-    <fieldset className="flex items-center justify-between gap-3 px-1">
-      <legend className="sr-only">Darstellung</legend>
-      <span aria-hidden className="text-sm text-muted">
-        Darstellung
-      </span>
-      <div className="flex rounded-full border border-line bg-card p-1">
-        {options.map((option) => {
-          const active = preference === option.value;
-          return (
-            <label
-              key={option.value}
-              className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 ${
-                active ? "bg-accent text-white" : "text-muted"
-              }`}
-            >
-              <input
-                type="radio"
-                name="theme"
-                value={option.value}
-                checked={active}
-                onChange={() => setPreference(option.value)}
-                className="sr-only"
-              />
-              {option.label}
-            </label>
-          );
-        })}
-      </div>
-    </fieldset>
+    <Segmented
+      name="theme"
+      label="Darstellung"
+      options={options}
+      value={preference}
+      onChange={setPreference}
+    />
+  );
+}
+
+/** Round gear button in the header that opens the settings. */
+export function SettingsButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Einstellungen"
+      title="Einstellungen"
+      aria-haspopup="dialog"
+      className="flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface/70 text-foreground transition active:scale-95"
+    >
+      <svg
+        aria-hidden
+        viewBox="0 0 24 24"
+        className="size-[1.15rem]"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    </button>
   );
 }

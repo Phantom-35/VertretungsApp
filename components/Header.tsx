@@ -1,4 +1,4 @@
-import { ThemeToggle } from "@/components/ThemeSettings";
+import { SettingsButton, ThemeToggle } from "@/components/ThemeSettings";
 
 export type HeaderStatus = "current" | "updating" | "offline" | "outdated" | "incomplete";
 
@@ -11,6 +11,7 @@ type HeaderProps = {
   sourceUpdatedLabel: string;
   fetchedLabel: string;
   status: HeaderStatus;
+  onOpenSettings: () => void;
 };
 
 const statusBadges: Record<HeaderStatus, { label: string; className: string }> = {
@@ -44,6 +45,7 @@ export function Header({
   sourceUpdatedLabel,
   fetchedLabel,
   status,
+  onOpenSettings,
 }: HeaderProps) {
   const badge = statusBadges[status];
 
@@ -56,7 +58,10 @@ export function Header({
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-accent-strong/70">
               KAG Vertretungsplan
             </p>
-            <ThemeToggle />
+            <div className="flex shrink-0 items-center gap-2">
+              <ThemeToggle />
+              <SettingsButton onClick={onOpenSettings} />
+            </div>
           </div>
           <div className="mt-1 flex items-center justify-between gap-4">
             <h1 className="min-h-9 text-3xl font-semibold tracking-[-0.04em] text-foreground">

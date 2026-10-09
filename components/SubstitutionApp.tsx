@@ -14,10 +14,11 @@ import { RefreshStatus } from "@/components/RefreshStatus";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { TeacherFilter } from "@/components/TeacherFilter";
-import { ThemeChoice } from "@/components/ThemeSettings";
+import { SettingsSheet } from "@/components/SettingsSheet";
 import { useSeenBaseline } from "@/hooks/useNewEntries";
 import { useNow } from "@/hooks/useNow";
 import { useSelectedClass } from "@/hooks/useSelectedClass";
+import { useSettings } from "@/hooks/useSettings";
 import { useStoredList } from "@/hooks/useStoredList";
 import { useSubstitutionData } from "@/hooks/useSubstitutionData";
 import {
@@ -86,6 +87,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const [showOtherCourses, setShowOtherCourses] = useState(false);
   const now = useNow();
   const seenBaseline = useSeenBaseline(data);
+  const [settings] = useSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const usesCourseFilter = Boolean(selectedClass && isCourseClass(selectedClass));
   const teachers = usesCourseFilter ? storedTeachers : [];
@@ -139,6 +142,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     : pickDefaultDate(
         days.map((day) => day.date),
         now,
+        settings.nextDayFromHour,
       );
   const selectedDay = days.find((day) => day.date === selectedDate) ?? null;
   const latestDate = days.at(-1)?.date ?? null;
@@ -184,7 +188,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     : null;
   const visibleEntries = shownEntries.filter(onSelectedDay);
   // Added or changed since the user last opened the app.
-  const newKeys = findNewKeys(seenBaseline, visibleEntries);
+  const newKeys = settings.showNewBadges
+    ? findNewKeys(seenBaseline, visibleEntries)
+    : new Set<string>();
   const otherCourseCount =
     classEntries.filter(onSelectedDay).length - ownEntries.filter(onSelectedDay).length;
   const teacherSuggestions = Array.from(
@@ -220,6 +226,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               data?.lastUpdated ? formatAge(data.lastUpdated, now) : "noch nie"
             }
             status={headerStatus}
+            onOpenSettings={() => setSettingsOpen(true)}
           />
 
           <ClassSelector
@@ -354,13 +361,15 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             ) : null}
           </section>
 
-          <footer className="mt-4 border-t border-line pt-4">
-            <ThemeChoice />
-          </footer>
         </main>
       </PullToRefresh>
 
       <RefreshButton onRefresh={() => void forceRefresh()} refreshing={isBusy} />
+      <SettingsSheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        sourceUrl={data?.sourceUrl}
+      />
     </>
   );
 }

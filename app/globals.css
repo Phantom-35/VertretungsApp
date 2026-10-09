@@ -127,3 +127,23 @@ body {
 ::selection {
   background: rgba(31, 107, 103, 0.18);
 }
+
+/* Settings sheet slides up from the bottom. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.settings-sheet[open] {
+  animation: sheet-up 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-sheet[open] {
+    animation: none;
+  }
+}

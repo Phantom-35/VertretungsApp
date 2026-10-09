@@ -74,9 +74,14 @@ export function schoolHour(now: number) {
 
 /**
  * The day to show by default (`dates` ascending, YYYY-MM-DD): today, or the
- * next day of the plan once school is over; the latest day if all are past.
+ * next day of the plan from `nextDayFromHour` on (24 = never); the latest day
+ * if all are past.
  */
-export function pickDefaultDate(dates: string[], now: number | null) {
+export function pickDefaultDate(
+  dates: string[],
+  now: number | null,
+  nextDayFromHour = NEXT_DAY_FROM_HOUR,
+) {
   if (dates.length === 0) {
     return null;
   }
@@ -85,7 +90,7 @@ export function pickDefaultDate(dates: string[], now: number | null) {
   }
 
   const today = schoolToday(now);
-  const afterSchool = schoolHour(now) >= NEXT_DAY_FROM_HOUR;
+  const afterSchool = schoolHour(now) >= nextDayFromHour;
   const upcoming = dates.find((date) => (afterSchool ? date > today : date >= today));
   return upcoming ?? dates[dates.length - 1];
 }

@@ -134,8 +134,11 @@ test("switches between light and dark", async ({ page }) => {
   await page.getByRole("button", { name: "Helles Design" }).click();
   await expect(html).toHaveAttribute("data-theme", "light");
 
-  // "Automatisch" follows the system setting.
-  await page.getByText("Automatisch", { exact: true }).click();
+  // "Automatisch" (in the settings) follows the system setting.
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  await page.getByRole("dialog").getByText("Automatisch", { exact: true }).click();
+  await page.getByRole("button", { name: "Fertig" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(html).toHaveAttribute("data-theme", "dark");
   await page.emulateMedia({ colorScheme: "light" });
@@ -197,4 +200,49 @@ test("shares the day's changes", async ({ page, context }) => {
   const copied = await desktop.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/^Vertretungsplan 5A – Morgen, Freitag, 09\.10\.\n/);
   expect(copied).toContain("http://localhost:3124");
+});
+
+test("settings: next day hour and new badges", async ({ page }) => {
+  // Thursday 15:30: before the default switch at 16:00 today is shown.
+  await page.clock.setFixedTime(new Date("2026-10-08T15:30:00+02:00"));
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
+
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByText("15 Uhr", { exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
+
+  // Kept after a reload; "Nie" stays on today.
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  await dialog.getByText("Nie", { exact: true }).click();
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
+
+  // "Neu" badges can be switched off.
+  const unseen = plan.entries
+    .filter((entry) => entry.date === "2026-10-08" && entryAppliesToClass(entry.className, "5A"))
+    .slice(0, 1)
+    .map(entryKey);
+  await page.evaluate((keys) => {
+    const seen = JSON.parse(localStorage.getItem("kag:seen-entries") ?? "[]") as string[];
+    localStorage.setItem("kag:seen-entries", JSON.stringify(seen.filter((key) => !keys.includes(key))));
+  }, unseen);
+  await page.reload();
+  await expect(page.getByText("Neu", { exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  const badgeSwitch = dialog.getByRole("switch", { name: "Neue Änderungen markieren" });
+  await expect(badgeSwitch).toBeChecked();
+  await dialog.getByText("Neue Änderungen markieren").click();
+  await expect(badgeSwitch).not.toBeChecked();
+  // A tap next to the sheet closes it.
+  await page.mouse.click(200, 30);
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("Neu", { exact: true })).toHaveCount(0);
 });
