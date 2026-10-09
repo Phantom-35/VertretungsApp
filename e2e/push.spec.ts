@@ -259,31 +259,48 @@ test("shows a pushed message as a notification", async ({ page, context }) => {
     .toBe("activated");
   await cdp.send("ServiceWorker.enable");
 
-  await cdp.send("ServiceWorker.deliverPushMessage", {
-    origin: new URL(page.url()).origin,
-    registrationId: await registrationId,
-    data: JSON.stringify({
-      title: "5A · Morgen 3.–4. Std.",
-      body: "Entfall · SVA · Raum 004",
-      url: "/?day=2026-10-09",
-      badgeCount: 1,
-    }),
-  });
+  const origin = new URL(page.url()).origin;
+  const id = await registrationId;
+  const deliver = () =>
+    cdp.send("ServiceWorker.deliverPushMessage", {
+      origin,
+      registrationId: id,
+      data: JSON.stringify({
+        title: "5A · Morgen 3.–4. Std.",
+        body: "Entfall · SVA · Raum 004",
+        url: "/?day=2026-10-09",
+        // With a tag, a repeated push replaces the notification instead of
+        // adding a second one.
+        tag: "e2e",
+        badgeCount: 1,
+      }),
+    });
+  const shown = () =>
+    page.evaluate(async () =>
+      (await (await navigator.serviceWorker.ready).getNotifications()).map((notification) => ({
+        title: notification.title,
+        body: notification.body,
+        url: (notification.data as { url: string }).url,
+        tag: notification.tag,
+      })),
+    );
 
   await expect
     .poll(
-      () =>
-      page.evaluate(async () =>
-        (await (await navigator.serviceWorker.ready).getNotifications()).map((notification) => ({
-          title: notification.title,
-          body: notification.body,
-          url: (notification.data as { url: string }).url,
-        })),
-      ),
-      // Generous: a busy CI machine can take a moment to show it.
-      { timeout: 15_000 },
+      async () => {
+        const notifications = await shown();
+        // DevTools sometimes drops a push sent right after the worker started
+        // (seen since Playwright 1.63). Send it again.
+        if (notifications.length === 0) {
+          await deliver();
+        }
+        return notifications;
+      },
+      { timeout: 15_000, intervals: [1_000, 2_000] },
     )
-    .toEqual([{ title: "5A · Morgen 3.–4. Std.", body: "Entfall · SVA · Raum 004", url: "/?day=2026-10-09" }]);
+    .toEqual([
+      { title: "5A · Morgen 3.–4. Std.", body: "Entfall · SVA · Raum 004", url: "/?day=2026-10-09", tag: "e2e" },
+    ]);
 });
 
 test("opens the day a notification is about", async ({ page }) => {
