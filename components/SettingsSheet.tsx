@@ -461,7 +461,7 @@ export function SettingsSheet({
         <Card
           title="Zurücksetzen"
           tone="warn"
-          description="Löscht auf diesem Gerät Klasse, gemerkte Klassen, Lehrkräfte und Einstellungen und schaltet Benachrichtigungen aus."
+          description="Löscht auf diesem Gerät Klasse, Lehrkräfte und Einstellungen und schaltet Benachrichtigungen aus."
         >
           {confirmReset ? (
             <div className="flex flex-wrap items-center gap-2">

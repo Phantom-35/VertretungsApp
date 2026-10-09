@@ -64,15 +64,11 @@ test("opens with the own class; other classes are only looked at", async ({ page
   await page.reload();
   await expect(page.locator("h1")).toHaveText("7B");
 
-  // Back with one tap, and the other class stays offered.
+  // Back with one tap; no list of recent classes.
   await page.getByRole("button", { name: "Zur 5A" }).click();
   await expect(page.locator("h1")).toHaveText("5A");
   await expect(page.getByText("Nur angesehen.")).toHaveCount(0);
-  await page.getByRole("button", { name: "7B", exact: true }).click();
-  await expect(page.locator("h1")).toHaveText("7B");
-  await page.getByRole("button", { name: "5A", exact: true }).click();
-  await page.getByRole("button", { name: "7B aus der Liste entfernen" }).click();
-  await expect(page.getByRole("button", { name: "7B", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Zuletzt:")).toHaveCount(0);
 
   // Opened anew, the app shows the own class again.
   await chooseClass(page, "7B");

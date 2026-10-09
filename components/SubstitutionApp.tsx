@@ -51,9 +51,6 @@ function dayFromUrl(url: string) {
   return day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
 }
 
-/** How many other classes are kept for switching with one tap. */
-const MAX_RECENT_CLASSES = 4;
-
 const cardClassName =
   "rounded-[1.75rem] border border-line bg-card p-6 text-center shadow-[0_18px_45px_rgba(18,41,39,0.07)]";
 
@@ -88,7 +85,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const [myClass, setMyClass] = useMyClass();
   const [viewedClass, setViewedClass] = useViewedClass();
   const selectedClass = viewedClass ?? myClass;
-  const [recentClasses, setRecentClasses] = useStoredList("kag:recent-classes");
   const courseFilterKey = `kag:teachers:${selectedClass ?? ""}`;
   const [storedTeachers, setTeachers] = useStoredList(courseFilterKey);
   const [myStoredTeachers] = useStoredList(`kag:teachers:${myClass ?? ""}`);
@@ -115,13 +111,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const teachers = usesCourseFilter ? storedTeachers : [];
 
   const chooseClass = (value: string) => {
-    // Remember the class that is being left, e.g. to switch back to a sibling's.
-    if (selectedClass && selectedClass !== value) {
-      setRecentClasses(
-        [selectedClass, ...recentClasses.filter((item) => item !== selectedClass && item !== value)]
-          .slice(0, MAX_RECENT_CLASSES),
-      );
-    }
     setShowOtherCourses(false);
     if (!myClass) {
       // Nothing chosen as own class yet: the first class picked becomes it.
@@ -136,7 +125,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     setMyClass(value);
     setViewedClass(null);
   };
-  const otherRecentClasses = recentClasses.filter((item) => item !== selectedClass);
 
   const forceRefresh = useCallback(() => refresh(true), [refresh]);
   const isBusy = status !== "idle";
@@ -265,10 +253,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             classes={SCHOOL_CLASSES}
             selectedClass={selectedClass}
             onChange={chooseClass}
-            recentClasses={otherRecentClasses}
-            onForget={(value) =>
-              setRecentClasses(recentClasses.filter((item) => item !== value))
-            }
             viewingOther={Boolean(viewedClass && myClass && viewedClass !== myClass)}
           >
             {usesCourseFilter && selectedClass ? (

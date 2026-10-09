@@ -4,9 +4,6 @@ type ClassSelectorProps = {
   classes: string[];
   selectedClass: string | null | undefined;
   onChange: (value: string) => void;
-  /** Other classes picked before (e.g. siblings), for switching with one tap. */
-  recentClasses: readonly string[];
-  onForget: (value: string) => void;
   /** Another class than the student's own is only being looked at. */
   viewingOther?: boolean;
   children?: ReactNode;
@@ -16,8 +13,6 @@ export function ClassSelector({
   classes,
   selectedClass,
   onChange,
-  recentClasses,
-  onForget,
   viewingOther = false,
   children,
 }: ClassSelectorProps) {
@@ -60,34 +55,6 @@ export function ClassSelector({
           <path d="m5 8 5 5 5-5" />
         </svg>
       </div>
-
-      {recentClasses.length > 0 ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted">Zuletzt:</span>
-          {recentClasses.map((className) => (
-            <span
-              key={className}
-              className="flex items-center rounded-full border border-line bg-surface text-sm font-semibold text-foreground"
-            >
-              <button
-                type="button"
-                onClick={() => onChange(className)}
-                className="py-2 pl-3 pr-1"
-              >
-                {className}
-              </button>
-              <button
-                type="button"
-                onClick={() => onForget(className)}
-                aria-label={`${className} aus der Liste entfernen`}
-                className="py-2 pl-1 pr-3 text-muted"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : null}
 
       {children}
     </section>
