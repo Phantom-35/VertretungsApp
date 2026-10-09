@@ -25,67 +25,89 @@ function timeout(ms) {
   return new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms));
 }
 
-// Build assets referenced by a text file, e.g. "static/chunks/abc.js" from
-// script tags, the inlined page data or url(...) in a stylesheet.
-async function collectAssetPaths(response, paths) {
-  const text = await response.text();
-  for (const match of text.matchAll(/static\/[^"'\s\\()<>,;]+/g)) {
-    try {
-      paths.add(decodeURIComponent(match[0].split(/[?#]/)[0]));
-    } catch {
-      paths.add(match[0]);
-    }
+function safeDecode(path) {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
   }
 }
 
-function assetPath(url) {
-  const { pathname } = new URL(url);
-  try {
-    return decodeURIComponent(pathname.slice("/_next/".length));
-  } catch {
-    return pathname.slice("/_next/".length);
+// Build assets referenced by a text file, e.g. "static/chunks/abc.js" from
+// script tags, the inlined page data, a chunk loading another chunk or
+// url(...) in a stylesheet.
+async function collectAssetPaths(response, paths) {
+  const text = await response.text();
+  for (const match of text.matchAll(/static\/[^"'\s\\()<>,;]+/g)) {
+    paths.add(safeDecode(match[0].split(/[?#]/)[0]));
   }
+}
+
+/** "/_next/static/chunks/abc.js" -> "static/chunks/abc.js" */
+function assetPath(url) {
+  return safeDecode(new URL(url).pathname.slice("/_next/".length));
 }
 
 // Every deploy brings new hashed build assets. Drop the ones no cached page
 // needs any more, so the app's storage does not grow with each deploy. Kept:
-// everything the cached pages and their stylesheets reference. Anything
-// removed by mistake is simply loaded again from the network.
-async function pruneStaticCache() {
+// everything the cached pages and `previousPage` reference, and whatever those
+// files reference in turn. The previous page is kept too because it may still
+// be on screen (served from the cache after a slow network answer) and load
+// its files from the cache, possibly offline.
+async function pruneStaticCache(previousPage) {
   const [pageCache, staticCache] = await Promise.all([
     caches.open(PAGE_CACHE),
     caches.open(STATIC_CACHE),
   ]);
-  const pages = await pageCache.keys();
-  if (pages.length === 0) {
-    return;
-  }
 
   const used = new Set();
-  for (const page of pages) {
+  if (previousPage) {
+    await collectAssetPaths(previousPage, used);
+  }
+  for (const page of await pageCache.keys()) {
     const response = await pageCache.match(page);
     if (response) {
       await collectAssetPaths(response, used);
     }
   }
 
-  const assets = (await staticCache.keys()).filter((request) =>
-    new URL(request.url).pathname.startsWith("/_next/static/"),
-  );
-  for (const request of assets) {
-    const path = assetPath(request.url);
-    if (used.has(path) && path.endsWith(".css")) {
-      const response = await staticCache.match(request);
-      if (response) {
-        await collectAssetPaths(response, used);
-      }
+  const assets = new Map();
+  for (const request of await staticCache.keys()) {
+    if (new URL(request.url).pathname.startsWith("/_next/static/")) {
+      assets.set(assetPath(request.url), request);
     }
   }
 
+  // Follow references from used scripts and stylesheets to further files.
+  const scanned = new Set();
+  let pending = [...used];
+  while (pending.length > 0) {
+    const next = [];
+    for (const path of pending) {
+      const request = assets.get(path);
+      if (scanned.has(path) || !request || !/\.(js|css)$/.test(path)) {
+        continue;
+      }
+      scanned.add(path);
+      const response = await staticCache.match(request);
+      if (response) {
+        const found = new Set();
+        await collectAssetPaths(response, found);
+        found.forEach((foundPath) => {
+          if (!used.has(foundPath)) {
+            used.add(foundPath);
+            next.push(foundPath);
+          }
+        });
+      }
+    }
+    pending = next;
+  }
+
   await Promise.all(
-    assets
-      .filter((request) => !used.has(assetPath(request.url)))
-      .map((request) => staticCache.delete(request)),
+    [...assets]
+      .filter(([path]) => !used.has(path))
+      .map(([, request]) => staticCache.delete(request)),
   );
 }
 
@@ -94,15 +116,20 @@ async function pruneStaticCache() {
 async function networkFirst(event) {
   const cache = await caches.open(PAGE_CACHE);
   const cacheKey = new URL(event.request.url).pathname;
-  const networkResponse = fetch(event.request).then((response) => {
+  // The page cached so far, read before the new one replaces it.
+  const previousPage = cache.match(cacheKey).catch(() => undefined);
+  const networkResponse = fetch(event.request).then(async (response) => {
     if (response.ok) {
-      return cache.put(cacheKey, response.clone()).then(() => response);
+      await previousPage;
+      await cache.put(cacheKey, response.clone());
     }
     return response;
   });
   event.waitUntil(
     networkResponse
-      .then((response) => (response.ok ? pruneStaticCache() : undefined))
+      .then(async (response) =>
+        response.ok ? pruneStaticCache(await previousPage) : undefined,
+      )
       .catch(() => undefined),
   );
 

@@ -85,34 +85,39 @@ export type EntryKind =
   | "room"
   | "substitution";
 
-// Checked in this order; "Lehrertausch" or "Statt-Vertretung" stay a
-// substitution (same lesson, other teacher).
+// Checked in this order, so that compound words land in the right group
+// ("Raumverlegung" is a room change, "Freiarbeit" is self-study).
 export function getEntryKind(type: string): EntryKind {
   const normalized = type.trim().toLowerCase();
 
-  // "Entfall", "Entf.", "Ausfall", "Freisetzung" (the class is not taught).
-  if (/entf(all|\.|\b)|fällt aus|ausfall|frei/.test(normalized)) {
+  // Same lesson, other teacher.
+  if (/lehrertausch|lehrerwechsel/.test(normalized)) {
+    return "substitution";
+  }
+  // "Entfall", "Entf.", "Ausfall", "frei(e)", "unterrichtsfrei", "Freisetzung";
+  // not "Freiarbeit".
+  if (/entf(all|\.|\b)|fällt aus|ausfall|freie?\b|freisetz/.test(normalized)) {
     return "cancelled";
   }
-  if (/^eva\b|eigenverantw|selbststudium|stillarbeit/.test(normalized)) {
+  if (/^eva\b|eigenverantw|selbststudium|stillarbeit|freiarbeit/.test(normalized)) {
     return "self-study";
   }
   if (/klausur|prüfung|nachschreib/.test(normalized)) {
     return "exam";
   }
-  if (/veranst|exkursion|ausflug|wandertag|fahrt|sonder/.test(normalized)) {
+  if (/veranst|exkursion|ausflug|wandertag|fahrt\b|sondereins/.test(normalized)) {
     return "event";
   }
-  // "Verlegung", "verlegt", "Tausch" (lessons swap their times).
-  if (/verleg|^tausch/.test(normalized)) {
+  if (/raum/.test(normalized)) {
+    return "room";
+  }
+  // "Verlegung", "verlegt", "Tausch", "Stundentausch", "Std.-Tausch".
+  if (/verleg|tausch/.test(normalized)) {
     return "moved";
   }
   // "Betreuung", "Mitbetreuung", "Aufsicht": supervised instead of taught.
   if (/betreu|aufsicht/.test(normalized)) {
     return "supervision";
-  }
-  if (/raum/.test(normalized)) {
-    return "room";
   }
 
   return "substitution";

@@ -60,3 +60,32 @@ export function schoolToday(now: number) {
 export function daysBetween(from: string, to: string) {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 }
+
+/** From this hour on, the next school day is more relevant than today. */
+export const NEXT_DAY_FROM_HOUR = 16;
+
+/** Current hour (0–23) in the school's time zone. */
+export function schoolHour(now: number) {
+  const hour = zonedPartsFormatter
+    .formatToParts(new Date(now))
+    .find((part) => part.type === "hour")?.value;
+  return Number(hour ?? 0);
+}
+
+/**
+ * The day to show by default (`dates` ascending, YYYY-MM-DD): today, or the
+ * next day of the plan once school is over; the latest day if all are past.
+ */
+export function pickDefaultDate(dates: string[], now: number | null) {
+  if (dates.length === 0) {
+    return null;
+  }
+  if (now === null) {
+    return dates[0];
+  }
+
+  const today = schoolToday(now);
+  const afterSchool = schoolHour(now) >= NEXT_DAY_FROM_HOUR;
+  const upcoming = dates.find((date) => (afterSchool ? date > today : date >= today));
+  return upcoming ?? dates[dates.length - 1];
+}

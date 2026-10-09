@@ -21,8 +21,8 @@ import {
   formatClassName,
 } from "@/lib/entries";
 import { formatAge, formatPlanDateLabel, formatTimestamp, isPastDate } from "@/lib/format";
-import { schoolToday } from "@/lib/time";
-import type { PlanDay, SubstitutionPayload } from "@/lib/types";
+import { pickDefaultDate } from "@/lib/time";
+import type { SubstitutionPayload } from "@/lib/types";
 
 type SubstitutionAppProps = {
   initialData: SubstitutionPayload | null;
@@ -30,19 +30,6 @@ type SubstitutionAppProps = {
 
 const cardClassName =
   "rounded-[1.75rem] border border-line bg-card p-6 text-center shadow-[0_18px_45px_rgba(18,41,39,0.07)]";
-
-/** Today if the plan has it, otherwise the next upcoming day, otherwise the latest. */
-function pickDefaultDay(days: PlanDay[], now: number | null) {
-  if (days.length === 0) {
-    return null;
-  }
-  if (now === null) {
-    return days[0].date;
-  }
-
-  const today = schoolToday(now);
-  return (days.find((day) => day.date >= today) ?? days[days.length - 1]).date;
-}
 
 function EmptyDay({ selectedClass, dayLabel }: { selectedClass: string; dayLabel: string }) {
   return (
@@ -72,7 +59,10 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
   // Keep the user's choice while it is still part of the plan.
   const selectedDate = days.some((day) => day.date === chosenDate)
     ? chosenDate
-    : pickDefaultDay(days, now);
+    : pickDefaultDate(
+        days.map((day) => day.date),
+        now,
+      );
   const selectedDay = days.find((day) => day.date === selectedDate) ?? null;
   const latestDate = days.at(-1)?.date ?? null;
   const planIsPast = latestDate !== null && isPastDate(latestDate, now);

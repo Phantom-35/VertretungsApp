@@ -7,7 +7,13 @@ import {
   normalizeSelectedClass,
 } from "@/lib/entries";
 import { formatPlanDateLabel, isPastDate, relativeDayLabel } from "@/lib/format";
-import { daysBetween, schoolLocalToIso, schoolToday } from "@/lib/time";
+import {
+  daysBetween,
+  pickDefaultDate,
+  schoolHour,
+  schoolLocalToIso,
+  schoolToday,
+} from "@/lib/time";
 import type { SubstitutionPayload } from "@/lib/types";
 import { pickDisplayedPayload } from "@/hooks/useSubstitutionData";
 
@@ -75,6 +81,17 @@ describe("entry display", () => {
     ["Mitbetreuung", "supervision"],
     ["Raumtausch", "room"],
     ["Trotz Absenz", "substitution"],
+    ["frei", "cancelled"],
+    ["Unterrichtsfrei", "cancelled"],
+    ["Freie Stunde", "cancelled"],
+    ["Freiarbeit", "self-study"],
+    ["Raumverlegung", "room"],
+    ["Raum verlegt", "room"],
+    ["Sonderraum", "room"],
+    ["Fahrtzeit", "substitution"],
+    ["Stundentausch", "moved"],
+    ["Std.-Tausch", "moved"],
+    ["Lehrerwechsel", "substitution"],
     ["", "substitution"],
   ])("classifies %s as %s", (type, kind) => {
     expect(getEntryKind(type)).toBe(kind);
@@ -125,5 +142,39 @@ describe("displayed data", () => {
     expect(pickDisplayedPayload(fresh, payload("2026-10-08T10:00:00.000Z"))).toBe(fresh);
     const newerStale = payload("2026-10-08T12:00:00.000Z", true);
     expect(pickDisplayedPayload(newerStale, payload("2026-10-08T10:00:00.000Z"))).toBe(newerStale);
+  });
+});
+
+describe("default day", () => {
+  const plan = ["2026-10-08", "2026-10-09", "2026-10-12"];
+  const at = (iso: string) => Date.parse(iso);
+
+  it("uses the school's hour in summer and winter time", () => {
+    expect(schoolHour(at("2026-10-08T14:00:00Z"))).toBe(16);
+    expect(schoolHour(at("2026-12-01T14:00:00Z"))).toBe(15);
+  });
+
+  it("shows today during school", () => {
+    expect(pickDefaultDate(plan, at("2026-10-08T06:00:00Z"))).toBe("2026-10-08");
+    expect(pickDefaultDate(plan, at("2026-10-08T13:59:00Z"))).toBe("2026-10-08");
+  });
+
+  it("switches to the next plan day once school is over", () => {
+    expect(pickDefaultDate(plan, at("2026-10-08T14:00:00Z"))).toBe("2026-10-09");
+    // Friday afternoon and the weekend: Monday.
+    expect(pickDefaultDate(plan, at("2026-10-09T15:00:00Z"))).toBe("2026-10-12");
+    expect(pickDefaultDate(plan, at("2026-10-10T08:00:00Z"))).toBe("2026-10-12");
+    expect(pickDefaultDate(["2026-12-01", "2026-12-02"], at("2026-12-01T14:30:00Z"))).toBe("2026-12-01");
+    expect(pickDefaultDate(["2026-12-01", "2026-12-02"], at("2026-12-01T15:30:00Z"))).toBe("2026-12-02");
+  });
+
+  it("stays on the last day when no later one exists", () => {
+    expect(pickDefaultDate(plan, at("2026-10-12T16:00:00Z"))).toBe("2026-10-12");
+    expect(pickDefaultDate(plan, at("2026-10-20T08:00:00Z"))).toBe("2026-10-12");
+  });
+
+  it("handles missing time and empty plans", () => {
+    expect(pickDefaultDate(plan, null)).toBe("2026-10-08");
+    expect(pickDefaultDate([], at("2026-10-08T06:00:00Z"))).toBeNull();
   });
 });
