@@ -53,6 +53,7 @@ function dayFromUrl(url: string) {
   return day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
 }
 
+/** Centred cards; `data-corner-free`: nothing under the refresh button. */
 const cardClassName =
   "rounded-[1.75rem] border border-line bg-card p-6 text-center shadow-[0_18px_45px_rgba(18,41,39,0.07)]";
 
@@ -69,7 +70,7 @@ function EmptyDay({
   getShareText: () => string;
 }) {
   return (
-    <div className={cardClassName}>
+    <div className={cardClassName} data-corner-free>
       <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
         Keine Vertretungen
       </p>
@@ -109,6 +110,12 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const onboarding = useOnboarding();
   const mainRef = useRef<HTMLElement>(null);
   useFitBottomRoom(mainRef);
+  // The sections glide in when the app opens, not when one appears later.
+  const [opening, setOpening] = useState(true);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setOpening(false), 1_200);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsFocus, setSettingsFocus] = useState<SettingsFocus>(null);
   const openSettings = (focus: SettingsFocus = null) => {
@@ -258,7 +265,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             trims it when a page that fits would otherwise scroll a little. */}
         <main
           ref={mainRef}
-          className="app-enter mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[calc(var(--bottom-room)-var(--bottom-trim,0px))] pt-[max(1rem,env(safe-area-inset-top))] [--bottom-room:calc(max(1rem,env(safe-area-inset-bottom))+2.5rem)] sm:px-5"
+          className={`${opening ? "app-enter " : ""}mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[calc(var(--bottom-room)-var(--bottom-trim,0px))] pt-[max(1rem,env(safe-area-inset-top))] [--bottom-room:calc(max(1rem,env(safe-area-inset-bottom))+2.5rem)] sm:px-5`}
         >
           <Header
             selectedClass={selectedClass}
@@ -360,7 +367,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             ) : null}
 
             {data && selectedClass === null ? (
-              <div className={cardClassName}>
+              <div className={cardClassName} data-corner-free>
                 <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
                   Wähle deine Klasse
                 </p>
