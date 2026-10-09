@@ -35,17 +35,20 @@ export function findNewKeys(baseline: readonly string[] | null, entries: KeyedEn
   return new Set(entries.map(entryKey).filter((key) => !seen.has(key)));
 }
 
-/** Seen keys to store: the current plan plus earlier ones not yet in the past. */
+/**
+ * Seen keys to store: the current plan plus earlier ones not yet in the past.
+ * Earlier keys without a date are dropped, so the list cannot grow forever.
+ */
 export function mergeSeenKeys(
   previous: readonly string[],
   entries: KeyedEntry[],
   today: string,
 ) {
   const current = entries.map(entryKey);
-  // Keys start with the date (YYYY-MM-DD); entries without a date are kept.
+  // Keys start with the date (YYYY-MM-DD).
   const stillRelevant = previous.filter((key) => {
     const date = key.slice(0, key.indexOf("|"));
-    return !date || date >= today;
+    return date !== "" && date >= today;
   });
   return Array.from(new Set([...stillRelevant, ...current]));
 }

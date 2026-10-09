@@ -266,6 +266,12 @@ describe("new entries", () => {
     expect(findNewKeys(null, [entry("2026-10-08", "1")]).size).toBe(0);
   });
 
+  it("does not keep old entries without a date forever", () => {
+    const dateless = entryKey(entry("", "1"));
+    expect(mergeSeenKeys([dateless], [], "2026-10-08")).toEqual([]);
+    expect(mergeSeenKeys([], [entry("", "1")], "2026-10-08")).toEqual([dateless]);
+  });
+
   it("forgets past days but keeps the rest", () => {
     const previous = [entryKey(entry("2026-10-07", "1")), entryKey(entry("2026-10-09", "3"))];
     expect(mergeSeenKeys(previous, [entry("2026-10-08", "2")], "2026-10-08")).toEqual([

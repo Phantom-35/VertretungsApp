@@ -24,8 +24,11 @@ async function send(url: string, message: string) {
     headers: isNtfy
       ? { "content-type": "text/plain; charset=utf-8", title: TITLE }
       : { "content-type": "application/json" },
-    // Slack reads "text", Discord "content".
-    body: isNtfy ? message : JSON.stringify({ text: message, content: message }),
+    // Slack reads "text", Discord "content". Text from the plan must not
+    // trigger mentions such as @everyone on Discord.
+    body: isNtfy
+      ? message
+      : JSON.stringify({ text: message, content: message, allowed_mentions: { parse: [] } }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
