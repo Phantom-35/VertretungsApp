@@ -178,7 +178,7 @@ describe("notification text", () => {
       entry({ lesson, date: lesson < "4" ? TODAY : "2026-10-12" }),
     );
     const notification = buildNotification("5A", changesFor({ added, removed: [] }, audience, MORNING), MORNING);
-    expect(notification.title).toBe("5A: 6 Änderungen im Vertretungsplan");
+    expect(notification.title).toBe("5A: 6 Änderungen");
     expect(notification.body.split("\n")).toEqual([
       "Heute 1. Std.: Entfall · ABC · Raum 101",
       "Heute 2. Std.: Entfall · ABC · Raum 101",

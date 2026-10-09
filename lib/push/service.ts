@@ -38,7 +38,7 @@ export async function subscribe(
       request.subscription,
       {
         title: "Benachrichtigungen sind an",
-        body: `Du bekommst eine Mitteilung, sobald sich der Vertretungsplan für die ${request.schoolClass} ändert.`,
+        body: `Du bekommst eine Mitteilung, sobald sich der Plan für die ${request.schoolClass} ändert.`,
         url: "/",
         tag: "kag-welcome",
       },
@@ -111,7 +111,7 @@ export async function sendTest({ store, send }: PushService, endpoint: string, n
   await store.saveSubscriber({ ...subscriber, lastTestAt: now });
   const result = await send(subscriber.subscription, {
     title: "Testnachricht",
-    body: `So sehen Mitteilungen zum Vertretungsplan der ${subscriber.schoolClass} aus.`,
+    body: `So sehen Mitteilungen für die ${subscriber.schoolClass} aus.`,
     url: "/",
     tag: "kag-test",
   });

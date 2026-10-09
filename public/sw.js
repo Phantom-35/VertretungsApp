@@ -205,9 +205,10 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "" };
   }
 
-  const title = data.title || "Vertretungsplan";
+  // iOS adds the app name ("from Vertretungsplan") itself: no name here.
+  const title = data.title || "Neue Änderungen";
   const options = {
-    body: data.body || "Der Vertretungsplan hat sich geändert.",
+    body: data.body || "Der Plan hat sich geändert.",
     icon: "/icon/192",
     lang: "de",
     data: { url: data.url || "/" },

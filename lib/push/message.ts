@@ -119,7 +119,7 @@ export function buildNotification(
     );
   const rest = changes.length - MAX_LINES;
   return {
-    title: `${schoolClass}: ${changes.length} Änderungen im Vertretungsplan`,
+    title: `${schoolClass}: ${changes.length} Änderungen`,
     body: [...lines, ...(rest > 0 ? [`… und ${rest} weitere`] : [])].join("\n"),
     url,
     badgeCount: changes.length,
