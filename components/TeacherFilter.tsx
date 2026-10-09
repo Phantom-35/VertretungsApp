@@ -16,7 +16,7 @@ type TeacherHintProps = {
  */
 export function TeacherHint({ schoolClass, selected, onOpenSettings }: TeacherHintProps) {
   return (
-    <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
+    <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
           Meine Lehrkräfte

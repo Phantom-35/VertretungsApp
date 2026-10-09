@@ -50,66 +50,52 @@ export function Header({
   const badge = statusBadges[status];
 
   return (
-    <header className="relative overflow-hidden rounded-[2rem] border border-edge bg-[linear-gradient(145deg,var(--header-from),var(--header-to))] p-5 shadow-[0_24px_60px_rgba(18,41,39,0.10)]">
+    <header className="relative overflow-hidden rounded-[2rem] border border-edge bg-[linear-gradient(145deg,var(--header-from),var(--header-to))] px-5 py-4 shadow-[0_24px_60px_rgba(18,41,39,0.10)]">
       <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(31,107,103,0.16),transparent_65%)]" />
-      <div className="relative space-y-4">
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-accent-strong/70">
-              KAG Vertretungsplan
-            </p>
-            <div className="flex shrink-0 items-center gap-2">
-              <ThemeToggle />
-              <SettingsButton onClick={onOpenSettings} />
-            </div>
-          </div>
-          <div className="mt-1 flex items-center justify-between gap-4">
-            <h1 className="min-h-9 text-3xl font-semibold tracking-[-0.04em] text-foreground">
-              {selectedClass === undefined ? "" : (selectedClass ?? "Klasse wählen")}
-            </h1>
-            <div
-              className={`shrink-0 rounded-full border px-3 py-1 text-sm font-semibold ${badge.className}`}
-            >
-              {badge.label}
-            </div>
+      <div className="relative">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-accent-strong/70">
+            KAG Vertretungsplan
+          </p>
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle />
+            <SettingsButton onClick={onOpenSettings} />
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-[1.4rem] border border-line bg-surface/70 p-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
-              Plan für
-            </p>
-            <p
-              className={`mt-1 text-base font-medium ${dateIsPast ? "text-warn" : "text-foreground"}`}
-            >
-              {dateLabel}
-              {weekLabel ? (
-                <>
-                  {" "}
-                  <span className="whitespace-nowrap">· {weekLabel}</span>
-                </>
-              ) : null}
-            </p>
+        <div className="mt-1 flex items-center justify-between gap-4">
+          <h1 className="min-h-10 text-[2.5rem] font-semibold leading-none tracking-[-0.05em] text-foreground">
+            {selectedClass === undefined ? "" : (selectedClass ?? "Klasse wählen")}
+          </h1>
+          <div
+            className={`shrink-0 rounded-full border px-3 py-1 text-sm font-semibold ${badge.className}`}
+          >
+            {badge.label}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
-                Stand Schule
-              </p>
-              <p className="mt-1 text-sm font-medium text-foreground">
-                {sourceUpdatedLabel}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
-                Abgerufen
-              </p>
-              <p className="mt-1 text-sm font-medium text-foreground">
-                {fetchedLabel}
-              </p>
-            </div>
-          </div>
+        </div>
+
+        <div className="mt-3 border-t border-line pt-3">
+          <p
+            className={`text-base font-semibold ${dateIsPast ? "text-warn" : "text-foreground"}`}
+          >
+            <span className="sr-only">Plan für </span>
+            {dateLabel}
+            {weekLabel ? (
+              <>
+                {" "}
+                <span className="whitespace-nowrap font-medium text-muted">· {weekLabel}</span>
+              </>
+            ) : null}
+          </p>
+          {/* Wraps between the two parts, never inside one. */}
+          <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted">
+            <span className="whitespace-nowrap">
+              Stand Schule <span className="font-medium text-foreground/80">{sourceUpdatedLabel}</span>
+            </span>
+            <span className="whitespace-nowrap">
+              Abgerufen <span className="font-medium text-foreground/80">{fetchedLabel}</span>
+            </span>
+          </p>
         </div>
       </div>
     </header>

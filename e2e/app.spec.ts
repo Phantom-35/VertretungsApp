@@ -58,7 +58,7 @@ test("opens with the own class; other classes are only looked at", async ({ page
   await chooseClass(page, "5A");
   await expect(page.locator("main").getByText("Meine Klasse", { exact: true })).toBeVisible();
   await chooseClass(page, "7B");
-  await expect(page.locator("main").getByText("Angesehene Klasse", { exact: true })).toBeVisible();
+  await expect(page.locator("main").getByText("Andere Klasse", { exact: true })).toBeVisible();
   await expect(page.getByText("Nur angesehen. Deine Klasse bleibt die 5A")).toBeVisible();
   // Kept while the app stays open.
   await page.reload();

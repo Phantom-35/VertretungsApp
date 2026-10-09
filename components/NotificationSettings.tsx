@@ -39,7 +39,7 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
         "Benachrichtigungen sind blockiert. Erlaube sie in den Einstellungen des Geräts (iPhone: Einstellungen → Mitteilungen → Vertretungsplan).";
       break;
     case "on":
-      description = `An: Du bekommst eine Mitteilung, wenn sich der Plan für ${audience ?? "deine Klasse"} ändert.`;
+      description = "";
       actions = (
         <>
           <button
@@ -54,9 +54,10 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
             type="button"
             onClick={() => void disable()}
             disabled={busy}
+            aria-label="Ausschalten"
             className={`${buttonClass} border border-line bg-surface text-foreground`}
           >
-            Ausschalten
+            Aus
           </button>
         </>
       );
@@ -78,8 +79,40 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
       break;
   }
 
+  // Switched on: one compact line, the details are in the settings.
+  if (status === "on") {
+    return (
+      <div role="group" aria-label="Benachrichtigungen" className="mt-3 border-t border-line pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <p className="flex min-w-0 items-center gap-2 text-sm text-foreground">
+            <svg
+              aria-hidden
+              viewBox="0 0 24 24"
+              className="size-[1.1rem] shrink-0 text-accent-strong"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
+            <span>
+              <span className="font-semibold">Mitteilungen an</span>{" "}
+              <span className="text-muted">für {audience ?? "deine Klasse"}</span>
+            </span>
+          </p>
+          <div className="flex shrink-0 gap-2">{actions}</div>
+        </div>
+        <p role="status" className="mt-2 text-xs text-muted empty:hidden">
+          {message}
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div role="group" aria-labelledby="notifications-heading" className="mt-4 border-t border-line pt-3">
+    <div role="group" aria-labelledby="notifications-heading" className="mt-3 border-t border-line pt-3">
       {/* With large text the buttons move below instead of overlapping the label. */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-[12rem] flex-1">

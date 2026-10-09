@@ -114,7 +114,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     await chooseClass(page, "5A");
     const settings = page.getByRole("group", { name: "Benachrichtigungen" });
     await settings.getByRole("button", { name: "Einschalten" }).click();
-    await expect(settings).toContainText("An: Du bekommst eine Mitteilung, wenn sich der Plan für 5A ändert.");
+    await expect(settings).toContainText("Mitteilungen an für 5A");
 
     // A confirmation reaches the device right away.
     const [welcome] = await waitForPushes(service.received, "/phone", 1);
@@ -152,7 +152,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     // Only looking at another class does not move the notifications.
     await chooseClass(page, "7B");
     await expect(page.getByText("Nur angesehen. Deine Klasse bleibt die 5A")).toBeVisible();
-    await expect(settings).toContainText("für 5A ändert");
+    await expect(settings).toContainText("Mitteilungen an für 5A");
     await changePlan(
       request,
       4,
@@ -172,7 +172,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     await sheet.getByLabel("Meine Klasse").selectOption("7B");
     await sheet.getByRole("button", { name: "Fertig" }).click();
     await synced;
-    await expect(settings).toContainText("für 7B ändert");
+    await expect(settings).toContainText("Mitteilungen an für 7B");
     await expect(page.getByText("Nur angesehen.")).toHaveCount(0);
     await changePlan(
       request,

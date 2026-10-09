@@ -263,7 +263,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               />
             ) : null}
             {viewedClass && myClass && viewedClass !== myClass ? (
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
                 <p className="min-w-0 text-sm leading-5 text-muted">
                   Nur angesehen. Deine Klasse bleibt die{" "}
                   <span className="font-semibold text-foreground">{myClass}</span>, auch für
