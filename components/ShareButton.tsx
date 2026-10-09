@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 type ShareButtonProps = {
   /** Built only when tapped. */
   getText: () => string;
+  /** "large": the main action of a card, e.g. on a day without changes. */
+  size?: "small" | "large";
 };
 
 type Feedback = "copied" | "failed" | null;
@@ -11,7 +13,7 @@ type Feedback = "copied" | "failed" | null;
  * Opens the phone's share menu (e.g. to send the day's changes to the class
  * chat). Where that is not available, the text is copied instead.
  */
-export function ShareButton({ getText }: ShareButtonProps) {
+export function ShareButton({ getText, size = "small" }: ShareButtonProps) {
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   useEffect(() => {
@@ -47,20 +49,24 @@ export function ShareButton({ getText }: ShareButtonProps) {
     }
   };
 
+  const large = size === "large";
+
   return (
-    <div className="flex shrink-0 items-center gap-2">
-      <span role="status" className="text-xs font-medium text-muted">
+    <div className={`flex shrink-0 items-center gap-2 ${large ? "flex-col-reverse" : ""}`}>
+      <span role="status" className="text-xs font-medium text-muted empty:hidden">
         {feedback === "copied" ? "Kopiert" : feedback === "failed" ? "Teilen nicht möglich" : ""}
       </span>
       <button
         type="button"
         onClick={() => void share()}
-        className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-accent-strong transition active:scale-95"
+        className={`flex items-center rounded-full border border-line bg-surface font-semibold text-accent-strong transition active:scale-95 ${
+          large ? "gap-2 px-5 py-2.5 text-sm" : "gap-1.5 px-3 py-1.5 text-xs"
+        }`}
       >
         <svg
           aria-hidden
           viewBox="0 0 24 24"
-          className="size-4"
+          className={large ? "size-[1.1rem]" : "size-4"}
           fill="none"
           stroke="currentColor"
           strokeWidth={2}

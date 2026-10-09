@@ -4,7 +4,7 @@ import webpush from "web-push";
 import { runPushCheck } from "@/lib/push/check";
 import type { PushPayload } from "@/lib/push/message";
 import { createSender, isAllowedEndpoint, subscriberId, type SendResult } from "@/lib/push/sender";
-import { sendTest, subscribe, type PushService } from "@/lib/push/service";
+import { prepareTest, sendTest, subscribe, type PushService } from "@/lib/push/service";
 import { MemoryStore, type PushSubscriptionData } from "@/lib/push/store";
 import { parseSubscribeRequest, parseSubscription } from "@/lib/push/validate";
 import { NOTIFY_GROUPS } from "@/lib/notify";
@@ -106,7 +106,7 @@ describe("runPushCheck", () => {
       entry({ className: "Q1", lesson: "2", type: "EVA", teacher: "RUK", room: "" }),
     ];
     const result = await runPushCheck({ store, send, loadPlan: async () => plan(noon), now: NOW + 3 * 3600_000 });
-    expect(result).toMatchObject({ status: "checked", added: 2, removed: 0, notified: 2, failed: 0 });
+    expect(result).toMatchObject({ status: "checked", added: 2, removed: 0, notified: 2, failed: 0, devices: 4 });
     expect(sent.map((item) => item.endpoint).sort()).toEqual([fiveA.endpoint, q1Own.endpoint].sort());
     expect(sent.find((item) => item.endpoint === fiveA.endpoint)!.payload).toMatchObject({
       title: "5A · Morgen 5. Std.",
@@ -280,6 +280,21 @@ describe("subscriptions", () => {
     expect(await sendTest(push, sub.endpoint, NOW + 61_000)).toBe("sent");
     expect(await sendTest(push, subscription("other").endpoint, NOW)).toBe("unknown");
     expect(sent.at(-1)!.payload.title).toBe("Testnachricht");
+  });
+
+  it("can send the test notification later, e.g. after the app was closed", async () => {
+    const { sent, send } = fakeSender();
+    const push = service(send);
+    const sub = subscription("phone");
+    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false });
+    const before = sent.length;
+    const prepared = await prepareTest(push, sub.endpoint, NOW);
+    expect(prepared.result).toBe("scheduled");
+    // Counted at once, sent only when asked.
+    expect((await prepareTest(push, sub.endpoint, NOW + 1_000)).result).toBe("too-soon");
+    expect(sent).toHaveLength(before);
+    expect(prepared.result === "scheduled" && (await prepared.deliver())).toBe("sent");
+    expect(sent).toHaveLength(before + 1);
   });
 });
 

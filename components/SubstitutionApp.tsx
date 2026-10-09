@@ -11,6 +11,7 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { PwaRegistrar } from "@/components/PwaRegistrar";
 import { RefreshButton } from "@/components/RefreshButton";
 import { RefreshStatus } from "@/components/RefreshStatus";
+import { ShareButton } from "@/components/ShareButton";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { Onboarding } from "@/components/Onboarding";
@@ -58,11 +59,13 @@ function EmptyDay({
   selectedClass,
   dayLabel,
   filtered,
+  getShareText,
 }: {
   selectedClass: string;
   dayLabel: string;
   /** Only the student's own courses are shown. */
   filtered: boolean;
+  getShareText: () => string;
 }) {
   return (
     <div className={cardClassName}>
@@ -73,6 +76,9 @@ function EmptyDay({
         {dayLabel} sind {filtered ? `für deine Kurse in der ${selectedClass}` : `für die ${selectedClass}`}{" "}
         keine Änderungen eingetragen.
       </p>
+      <div className="mt-4 flex justify-center">
+        <ShareButton getText={getShareText} size="large" />
+      </div>
     </div>
   );
 }
@@ -227,6 +233,15 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
         .map((notice) => notice.text),
     ),
   );
+  // The day's changes as text for messengers (also "no changes").
+  const getShareText = () =>
+    buildShareText({
+      schoolClass: selectedClass ?? "",
+      dayLabel: selectedDay ? dateLabel : "aktueller Plan",
+      entries: visibleEntries,
+      ownCoursesOnly: teachers.length > 0 && !showOtherCourses,
+      sourceUpdated: data?.sourceUpdatedAt ? formatTimestamp(data.sourceUpdatedAt, now) : null,
+    });
   const emptyDayLabel = selectedDay
     ? `Am ${selectedDay.dayLabel ?? formatPlanDateLabel(selectedDay.date, null)}`
     : "Heute";
@@ -235,7 +250,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     <>
       <PwaRegistrar />
       <PullToRefresh onRefresh={forceRefresh}>
-        <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top))] sm:px-5">
+        <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top))] sm:px-5">
           <Header
             selectedClass={selectedClass}
             dateLabel={dateLabel}
@@ -354,17 +369,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                 otherCourses={otherCourseCount}
                 showingOtherCourses={showOtherCourses}
                 onToggleOtherCourses={() => setShowOtherCourses((value) => !value)}
-                getShareText={() =>
-                  buildShareText({
-                    schoolClass: selectedClass,
-                    dayLabel: selectedDay ? dateLabel : "aktueller Plan",
-                    entries: visibleEntries,
-                    ownCoursesOnly: teachers.length > 0 && !showOtherCourses,
-                    sourceUpdated: data.sourceUpdatedAt
-                      ? formatTimestamp(data.sourceUpdatedAt, now)
-                      : null,
-                  })
-                }
+                getShareText={getShareText}
               />
             ) : null}
 
@@ -383,6 +388,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                   selectedClass={selectedClass}
                   dayLabel={emptyDayLabel}
                   filtered={teachers.length > 0 && !showOtherCourses}
+                  getShareText={getShareText}
                 />
               )
             ) : null}

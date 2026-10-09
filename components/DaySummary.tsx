@@ -25,6 +25,11 @@ export function DaySummary({
   getShareText,
 }: DaySummaryProps) {
   const items = summarizeEntries(entries);
+  // Without changes, the card below offers sharing instead.
+  const empty = entries.length === 0;
+  if (empty && newCount === 0 && otherCourses === 0) {
+    return null;
+  }
 
   return (
     <div className="space-y-2 px-1">
@@ -49,7 +54,7 @@ export function DaySummary({
             </span>
           ))}
         </div>
-        <ShareButton getText={getShareText} />
+        {!empty ? <ShareButton getText={getShareText} /> : null}
       </div>
       {otherCourses > 0 ? (
         <p className="text-sm text-muted">

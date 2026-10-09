@@ -1,3 +1,4 @@
+import { FadingStatus } from "@/components/FadingStatus";
 import type { PushControls } from "@/hooks/usePushNotifications";
 
 type NotificationSettingsProps = {
@@ -104,9 +105,7 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
           </p>
           <div className="flex shrink-0 gap-2">{actions}</div>
         </div>
-        <p role="status" className="mt-2 text-xs text-muted empty:hidden">
-          {message}
-        </p>
+        <FadingStatus message={message} className="pt-2" />
       </div>
     );
   }
@@ -126,9 +125,7 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
         </div>
         {actions ? <div className="flex shrink-0 flex-col items-end gap-2">{actions}</div> : null}
       </div>
-      <p role="status" className="mt-2 text-xs text-muted empty:hidden">
-        {message}
-      </p>
+      <FadingStatus message={message} className="pt-2" />
     </div>
   );
 }

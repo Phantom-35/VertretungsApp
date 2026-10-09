@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { FadingStatus } from "@/components/FadingStatus";
 import type { PushControls } from "@/hooks/usePushNotifications";
 import { SCHOOL_CLASSES, isCourseClass } from "@/lib/entries";
 
@@ -105,9 +106,7 @@ function NotificationStep({ push, myClass }: { push: PushControls; myClass: stri
   return (
     <div className="space-y-3">
       {content}
-      <p role="status" className="text-center text-xs text-muted empty:hidden">
-        {message}
-      </p>
+      <FadingStatus message={message} className="text-center" />
     </div>
   );
 }

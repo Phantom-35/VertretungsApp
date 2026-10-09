@@ -102,23 +102,41 @@ export async function resubscribe(
 
 export type TestResult = "sent" | "unknown" | "too-soon" | "gone" | "failed";
 
-export async function sendTest({ store, send }: PushService, endpoint: string, now = Date.now()): Promise<TestResult> {
+export type PreparedTest =
+  | { result: "unknown" | "too-soon" }
+  | { result: "scheduled"; deliver: () => Promise<TestResult> };
+
+/**
+ * Checks whether this device may get a test notification now; `deliver`
+ * sends it. Split so the route can send it a few seconds later, after the
+ * app was closed.
+ */
+export async function prepareTest({ store, send }: PushService, endpoint: string, now = Date.now()): Promise<PreparedTest> {
   const subscriber = await store.getSubscriber(subscriberId(endpoint));
   if (!subscriber) {
-    return "unknown";
+    return { result: "unknown" };
   }
   if (subscriber.lastTestAt && now - subscriber.lastTestAt < TEST_INTERVAL_MS) {
-    return "too-soon";
+    return { result: "too-soon" };
   }
   await store.saveSubscriber({ ...subscriber, lastTestAt: now });
-  const result = await send(subscriber.subscription, {
-    title: "Testnachricht",
-    body: `So sehen Mitteilungen für die ${subscriber.schoolClass} aus.`,
-    url: "/",
-    tag: "kag-test",
-  });
-  if (result === "gone") {
-    await store.deleteSubscriber(subscriber.id);
-  }
-  return result;
+  const deliver = async () => {
+    const result = await send(subscriber.subscription, {
+      title: "Testnachricht",
+      body: `So sehen Mitteilungen für die ${subscriber.schoolClass} aus.`,
+      url: "/",
+      tag: "kag-test",
+    });
+    if (result === "gone") {
+      await store.deleteSubscriber(subscriber.id);
+    }
+    return result;
+  };
+  return { result: "scheduled", deliver };
+}
+
+/** Sends a test notification right away. */
+export async function sendTest(service: PushService, endpoint: string, now = Date.now()): Promise<TestResult> {
+  const prepared = await prepareTest(service, endpoint, now);
+  return prepared.result === "scheduled" ? prepared.deliver() : prepared.result;
 }

@@ -53,6 +53,8 @@ export default defineConfig({
         VAPID_PRIVATE_KEY: VAPID.privateKey,
         VAPID_SUBJECT: "https://kag.example",
         CRON_SECRET,
+        // The test notification comes almost at once instead of after 10 s.
+        PUSH_TEST_DELAY_MS: "300",
         // The fake push service uses a self-signed certificate.
         NODE_TLS_REJECT_UNAUTHORIZED: "0",
       },

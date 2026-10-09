@@ -42,7 +42,11 @@ async function post(path: string, body: unknown) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = (await response.json().catch(() => ({}))) as { error?: string; result?: string };
+  const data = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    result?: string;
+    delaySeconds?: number;
+  };
   return { status: response.status, ok: response.ok, data };
 }
 
@@ -218,11 +222,13 @@ export function usePushNotifications({ schoolClass, teachers, notifyGroups, even
       }
       const { data } = await post("/api/push/test", { endpoint: subscription.endpoint });
       setMessage(
-        data.result === "sent"
-          ? "Testnachricht gesendet."
-          : data.result === "too-soon"
-            ? "Bitte eine Minute bis zur nächsten Testnachricht warten."
-            : "Testnachricht konnte nicht gesendet werden. Bitte Benachrichtigungen aus- und wieder einschalten.",
+        data.result === "scheduled"
+          ? `Testnachricht kommt in ${data.delaySeconds ?? 10} Sekunden. Schließ ruhig die App – sie kommt trotzdem an.`
+          : data.result === "sent"
+            ? "Testnachricht gesendet."
+            : data.result === "too-soon"
+              ? "Bitte eine Minute bis zur nächsten Testnachricht warten."
+              : "Testnachricht konnte nicht gesendet werden. Bitte Benachrichtigungen aus- und wieder einschalten.",
       );
     } catch {
       setMessage("Testnachricht konnte nicht gesendet werden.");

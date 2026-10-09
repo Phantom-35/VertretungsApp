@@ -186,9 +186,15 @@ test("notifies the right devices about changes, also a second upload", async ({ 
 
     // Test button.
     await settings.getByRole("button", { name: "Test" }).click();
-    await expect(settings).toContainText("Testnachricht gesendet.");
+    await expect(settings.getByText(/^Testnachricht kommt in/)).toBeVisible();
     const [, , , testPush] = await waitForPushes(service.received, "/phone", 4);
     expect(read(phone, testPush).title).toBe("Testnachricht");
+    // The hint fades out by itself after a few seconds and gives its space back.
+    const hint = settings.getByRole("status");
+    await expect
+      .poll(() => hint.evaluate((element) => element.getBoundingClientRect().height), { timeout: 10_000 })
+      .toBe(0);
+    expect(await hint.evaluate((element) => getComputedStyle(element.parentElement!).opacity)).toBe("0");
 
     // Switched off: no more notifications.
     await settings.getByRole("button", { name: "Ausschalten" }).click();

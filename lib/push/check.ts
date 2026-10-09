@@ -26,6 +26,9 @@ export type CheckResult =
       status: "checked";
       added: number;
       removed: number;
+      /** Registered devices. */
+      devices: number;
+      /** Devices looked at in this run (none without changes or summary). */
       subscribers: number;
       notified: number;
       failed: number;
@@ -119,6 +122,7 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
       status: "checked",
       added: diff.added.length,
       removed: diff.removed.length,
+      devices: await store.countSubscribers(),
       subscribers: subscribers.length,
       ...stats,
     };

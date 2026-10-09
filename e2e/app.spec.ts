@@ -290,6 +290,16 @@ test("shares the day's changes", async ({ page, context }) => {
   expect(shared[0].title).toBeUndefined();
   expect(shared[0].url).toBeUndefined();
 
+  // A day without changes: one larger button in the card, saying so.
+  await chooseClass(page, "9B");
+  await page.getByRole("tab").nth(1).click();
+  await expect(page.getByText("Keine Vertretungen")).toBeVisible();
+  const share = page.getByRole("button", { name: "Teilen" });
+  await expect(share).toHaveCount(1);
+  await share.click();
+  const empty = await page.evaluate(() => (window as unknown as { shared: ShareData[] }).shared.at(-1)!.text!);
+  expect(empty).toMatch(/^Vertretungsplan 9B\nMorgen, Freitag, 09\.10\.\n\nKeine Änderungen eingetragen\./);
+
   // Without a share menu (desktop): copied to the clipboard instead.
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const desktop = await context.newPage();
