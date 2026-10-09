@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isIos, isStandalone } from "@/lib/device";
 
 export type PushStatus =
   /** Still finding out. */
@@ -14,21 +15,6 @@ export type PushStatus =
   | "on";
 
 const SERVICE_WORKER_TIMEOUT_MS = 8_000;
-
-function isIos() {
-  return (
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    // iPadOS reports itself as a Mac.
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  );
-}
-
-function isStandalone() {
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
-}
 
 function supportsPush() {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;

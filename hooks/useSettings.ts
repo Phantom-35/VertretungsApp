@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from "react";
+import { SETTINGS_STORAGE_KEY } from "@/lib/theme";
 import { NEXT_DAY_FROM_HOUR } from "@/lib/time";
 
 export type Settings = {
@@ -6,12 +7,22 @@ export type Settings = {
   nextDayFromHour: number;
   /** "Neu" badges for changes since the last visit. */
   showNewBadges: boolean;
+  textSize: TextSize;
 };
+
+export type TextSize = "normal" | "large";
+
+/** Root font size per text size; everything is sized in rem. */
+export const TEXT_SIZES: Record<TextSize, string> = { normal: "", large: "112.5%" };
 
 export const NEXT_DAY_HOURS = [0, 14, 15, 16, 17, 24] as const;
 
-const DEFAULTS: Settings = { nextDayFromHour: NEXT_DAY_FROM_HOUR, showNewBadges: true };
-const STORAGE_KEY = "kag:settings";
+const DEFAULTS: Settings = {
+  nextDayFromHour: NEXT_DAY_FROM_HOUR,
+  showNewBadges: true,
+  textSize: "normal",
+};
+const STORAGE_KEY = SETTINGS_STORAGE_KEY;
 
 const listeners = new Set<() => void>();
 // Fallback when localStorage is unavailable (e.g. private mode).
@@ -28,6 +39,7 @@ function parse(raw: string | null): Settings {
         : DEFAULTS.nextDayFromHour,
       showNewBadges:
         typeof stored.showNewBadges === "boolean" ? stored.showNewBadges : DEFAULTS.showNewBadges,
+      textSize: stored.textSize === "large" ? "large" : "normal",
     };
   } catch {
     return DEFAULTS;
@@ -61,7 +73,9 @@ export function useSettings() {
   const settings = useSyncExternalStore(subscribe, getSnapshot, () => DEFAULTS);
 
   const update = useCallback((changes: Partial<Settings>) => {
-    const raw = JSON.stringify({ ...getSnapshot(), ...changes });
+    const next = { ...getSnapshot(), ...changes };
+    const raw = JSON.stringify(next);
+    document.documentElement.style.fontSize = TEXT_SIZES[next.textSize];
     memoryValue = raw;
     try {
       window.localStorage.setItem(STORAGE_KEY, raw);

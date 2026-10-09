@@ -13,8 +13,8 @@ import { RefreshButton } from "@/components/RefreshButton";
 import { RefreshStatus } from "@/components/RefreshStatus";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
 import { NotificationSettings } from "@/components/NotificationSettings";
-import { TeacherFilter } from "@/components/TeacherFilter";
-import { SettingsSheet } from "@/components/SettingsSheet";
+import { TeacherHint } from "@/components/TeacherFilter";
+import { SettingsSheet, type SettingsFocus } from "@/components/SettingsSheet";
 import { useSeenBaseline } from "@/hooks/useNewEntries";
 import { useNow } from "@/hooks/useNow";
 import { useSelectedClass } from "@/hooks/useSelectedClass";
@@ -89,6 +89,11 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const seenBaseline = useSeenBaseline(data);
   const [settings] = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsFocus, setSettingsFocus] = useState<SettingsFocus>(null);
+  const openSettings = (focus: SettingsFocus = null) => {
+    setSettingsFocus(focus);
+    setSettingsOpen(true);
+  };
 
   const usesCourseFilter = Boolean(selectedClass && isCourseClass(selectedClass));
   const teachers = usesCourseFilter ? storedTeachers : [];
@@ -226,7 +231,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               data?.lastUpdated ? formatAge(data.lastUpdated, now) : "noch nie"
             }
             status={headerStatus}
-            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenSettings={() => openSettings()}
           />
 
           <ClassSelector
@@ -239,15 +244,10 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             }
           >
             {usesCourseFilter && selectedClass ? (
-              <TeacherFilter
-                key={selectedClass}
+              <TeacherHint
                 schoolClass={selectedClass}
                 selected={storedTeachers}
-                suggestions={teacherSuggestions}
-                onChange={(value) => {
-                  setShowOtherCourses(false);
-                  setTeachers(value);
-                }}
+                onOpenSettings={() => openSettings("teachers")}
               />
             ) : null}
             <NotificationSettings schoolClass={selectedClass} teachers={teachers} />
@@ -368,6 +368,20 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       <SettingsSheet
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        focus={settingsFocus}
+        courseFilter={
+          usesCourseFilter && selectedClass
+            ? {
+                schoolClass: selectedClass,
+                selected: storedTeachers,
+                suggestions: teacherSuggestions,
+                onChange: (value) => {
+                  setShowOtherCourses(false);
+                  setTeachers(value);
+                },
+              }
+            : null
+        }
         sourceUrl={data?.sourceUrl}
       />
     </>

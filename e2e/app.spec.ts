@@ -64,12 +64,24 @@ test("filters the upper school by the student's teachers", async ({ page }) => {
   await chooseClass(page, "Q1");
   const all = await page.locator("article").count();
 
-  await page.getByRole("button", { name: /Meine Lehrkräfte/ }).click();
-  await page.locator("#teacher-input").fill("k1");
-  await page.getByRole("button", { name: "Hinzufügen" }).click();
-  await expect(page.getByText("Bitte ein Kürzel")).toBeVisible();
-  await page.locator("#teacher-input").fill("ruk");
-  await page.getByRole("button", { name: "Hinzufügen" }).click();
+  // The main page only shows the choice and links to the settings.
+  await expect(page.locator("main").getByText("Alle Kurse der Q1")).toBeVisible();
+  await expect(page.locator("main #teacher-input")).toHaveCount(0);
+  await page.getByRole("button", { name: "Festlegen" }).click();
+  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  await expect(dialog).toBeVisible();
+  const teachers = dialog.locator("#settings-teachers");
+  await expect(teachers).toBeInViewport();
+  await expect(teachers).toContainText("Oberstufe: Meine Lehrkräfte (Q1)");
+
+  await teachers.locator("#teacher-input").fill("k1");
+  await teachers.getByRole("button", { name: "Hinzufügen" }).click();
+  await expect(teachers.getByText("Bitte ein Kürzel")).toBeVisible();
+  await teachers.locator("#teacher-input").fill("ruk");
+  await teachers.getByRole("button", { name: "Hinzufügen" }).click();
+  await expect(teachers).toContainText("Gezeigt werden die Kurse von RUK.");
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await expect(dialog).toBeHidden();
 
   const own = plan.entries.filter(
     (entry) =>
@@ -79,6 +91,7 @@ test("filters the upper school by the student's teachers", async ({ page }) => {
   ).length;
   expect(own).toBeGreaterThan(0);
   await expect(page.locator("article")).toHaveCount(own);
+  await expect(page.getByRole("button", { name: "Ändern" })).toBeVisible();
   await expect(page.getByText(/anderer Kurse\s+ausgeblendet/)).toBeVisible();
 
   await page.getByRole("button", { name: "Anzeigen" }).click();
@@ -89,9 +102,12 @@ test("filters the upper school by the student's teachers", async ({ page }) => {
   await page.reload();
   await expect(page.locator("article")).toHaveCount(own);
   await chooseClass(page, "Q2");
-  await expect(page.getByRole("button", { name: /Meine Lehrkräfte/ })).toContainText("Alle Kurse der Q2");
+  await expect(page.locator("main").getByText("Alle Kurse der Q2")).toBeVisible();
   await chooseClass(page, "9A");
-  await expect(page.getByRole("button", { name: /Meine Lehrkräfte/ })).toHaveCount(0);
+  await expect(page.locator("main").getByText("Meine Lehrkräfte")).toHaveCount(0);
+  // Not an upper-school class: no teacher card in the settings either.
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  await expect(dialog.locator("#settings-teachers")).toHaveCount(0);
 });
 
 test("marks changes that are new since the last visit", async ({ page }) => {
@@ -264,6 +280,10 @@ test("settings: swipe down closes the sheet without refreshing", async ({ browse
   page.on("request", (request) => {
     if (request.url().includes("force=1")) forced.push(request.url());
   });
+  // Choosing "Immer" may have scrolled the sheet's content; swipes start at its top.
+  await dialog.evaluate((element) => {
+    element.scrollTop = 0;
+  });
   const cdp = await context.newCDPSession(page);
   const box = (await dialog.boundingBox())!;
   const x = box.x + box.width / 2;
@@ -293,5 +313,92 @@ test("settings: swipe down closes the sheet without refreshing", async ({ browse
   await expect(dialog).toBeVisible();
   await page.waitForTimeout(300);
   expect((await dialog.boundingBox())!.y).toBeCloseTo(box.y, 0);
+  await context.close();
+});
+
+test("settings: page stays still, text size, install hint and reset", async ({ browser }) => {
+  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.clock.setFixedTime(new Date("2026-10-08T08:00:00+02:00"));
+  await page.goto("/");
+  await chooseClass(page, "9A");
+  await expect(page.locator("article")).toHaveCount(6);
+  await page.evaluate(() => window.scrollTo({ top: 400, behavior: "instant" }));
+  const scrolled = await page.evaluate(() => window.scrollY);
+  expect(scrolled).toBeGreaterThan(0);
+
+  // Without Playwright scrolling the button into view first.
+  await page.getByRole("button", { name: "Einstellungen" }).dispatchEvent("click");
+  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  await expect(dialog).toBeVisible();
+  expect(await page.evaluate(() => document.body.style.top)).toBe(`-${400}px`);
+
+  // Wheel and touch scrolling over the sheet do not move the page behind it.
+  const box = (await dialog.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + 200);
+  await page.mouse.wheel(0, -600);
+  const cdp = await context.newCDPSession(page);
+  const x = box.x + box.width / 2;
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y: box.y + 300 }] });
+  for (let step = 1; step <= 6; step += 1) {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: box.y + 300 - step * 40 }] });
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => document.body.style.position)).toBe("fixed");
+
+  // Larger text, kept after a reload and applied before the first paint.
+  await dialog.getByText("Groß", { exact: true }).click();
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe("18px");
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await expect(dialog).toBeHidden();
+  // The page is back where it was.
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+  expect(await page.evaluate(() => document.body.style.position)).toBe("");
+  await page.reload();
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe("18px");
+
+  // In the browser (not installed): how to install.
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  await expect(dialog.getByText("Als App installieren")).toBeVisible();
+  await expect(dialog.getByRole("link", { name: "Original-Plan der Schule öffnen" })).toBeVisible();
+
+  // Reset asks first, then forgets everything.
+  await dialog.getByRole("button", { name: "App zurücksetzen …" }).click();
+  await dialog.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(page.locator("h1")).toHaveText("9A");
+  await dialog.getByRole("button", { name: "App zurücksetzen …" }).click();
+  await dialog.getByRole("button", { name: "Zurücksetzen", exact: true }).click();
+  await expect(page.locator("h1")).toHaveText("Klasse wählen");
+  // Choices are gone (the app stores a fresh offline copy right away).
+  const kept = await page.evaluate(() => Object.keys(localStorage));
+  for (const key of ["kag:selected-class", "kag:settings", "kag:theme", "kag:recent-classes"]) {
+    expect(kept).not.toContain(key);
+  }
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe("16px");
+  await context.close();
+});
+
+test("settings: the header can be swiped even when scrolled down", async ({ browser }) => {
+  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.goto("/");
+  await chooseClass(page, "Q1");
+  await page.getByRole("button", { name: "Festlegen" }).click();
+  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  await expect(dialog.locator("#settings-teachers")).toBeInViewport();
+  expect(await dialog.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  // "Fertig" stays visible.
+  await expect(dialog.getByRole("button", { name: "Fertig" })).toBeInViewport();
+
+  const header = (await dialog.locator("[data-sheet-header]").boundingBox())!;
+  const x = header.x + header.width / 2;
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y: header.y + 10 }] });
+  for (let step = 1; step <= 8; step += 1) {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: header.y + 10 + step * 40 }] });
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect(dialog).toBeHidden();
   await context.close();
 });

@@ -81,8 +81,9 @@ export function NotificationSettings({ schoolClass, teachers }: NotificationSett
 
   return (
     <div role="group" aria-labelledby="notifications-heading" className="mt-4 border-t border-line pt-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      {/* With large text the buttons move below instead of overlapping the label. */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-[12rem] flex-1">
           <p
             id="notifications-heading"
             className="text-xs font-semibold uppercase tracking-[0.22em] text-muted"

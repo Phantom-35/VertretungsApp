@@ -1,11 +1,27 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Segmented } from "@/components/Segmented";
+import { TeacherChooser } from "@/components/TeacherFilter";
 import { ThemeChoice } from "@/components/ThemeSettings";
-import { NEXT_DAY_HOURS, useSettings } from "@/hooks/useSettings";
+import { NEXT_DAY_HOURS, useSettings, type TextSize } from "@/hooks/useSettings";
+import { isIos, isStandalone } from "@/lib/device";
+import { resetDevice } from "@/lib/reset";
+
+export type SettingsFocus = "teachers" | null;
+
+type CourseFilter = {
+  schoolClass: string;
+  selected: readonly string[];
+  suggestions: string[];
+  onChange: (teachers: string[]) => void;
+};
 
 type SettingsSheetProps = {
   open: boolean;
   onClose: () => void;
+  /** Section to scroll to when the sheet opens. */
+  focus?: SettingsFocus;
+  /** Upper school only: the course filter by teachers. */
+  courseFilter: CourseFilter | null;
   /** Original plan on the school website. */
   sourceUrl: string | undefined;
 };
@@ -14,6 +30,14 @@ const nextDayOptions = NEXT_DAY_HOURS.map((hour) => ({
   value: hour,
   label: hour === 0 ? "Immer" : hour === 24 ? "Nie" : `${hour} Uhr`,
 }));
+
+const textSizeOptions: { value: TextSize; label: string }[] = [
+  { value: "normal", label: "Normal" },
+  { value: "large", label: "Groß" },
+];
+
+/** Short commit of the deployed version (set by Vercel). */
+const VERSION = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null;
 
 /** Dragged this far down (px) or flicked this fast (px/ms), the sheet closes. */
 const CLOSE_DISTANCE = 90;
@@ -32,8 +56,58 @@ function Setting({ title, description, children }: { title: string; description?
   );
 }
 
+/** A separate card further down the sheet. */
+function Card({ id, title, description, tone = "normal", children }: {
+  id?: string;
+  title: string;
+  description?: string;
+  tone?: "normal" | "warn";
+  children: ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      className={`mt-3 scroll-mt-4 space-y-3 rounded-[1.4rem] border p-4 ${
+        tone === "warn" ? "border-warn/20 bg-warn-soft/50" : "border-line bg-card"
+      }`}
+    >
+      <div>
+        <h3 className={`text-sm font-semibold ${tone === "warn" ? "text-warn" : "text-foreground"}`}>{title}</h3>
+        {description ? <p className="mt-0.5 text-xs leading-5 text-muted">{description}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const noSubscribe = () => () => undefined;
+
+/** Keeps the page behind the sheet from scrolling (also on iOS). */
+function lockPageScroll() {
+  const { body, documentElement } = document;
+  const scrollY = window.scrollY;
+  const previous = {
+    position: body.style.position,
+    top: body.style.top,
+    width: body.style.width,
+    overflow: documentElement.style.overflow,
+  };
+  body.style.position = "fixed";
+  body.style.top = `-${scrollY}px`;
+  body.style.width = "100%";
+  documentElement.style.overflow = "hidden";
+  return () => {
+    body.style.position = previous.position;
+    body.style.top = previous.top;
+    body.style.width = previous.width;
+    documentElement.style.overflow = previous.overflow;
+    // At once, not with the page's smooth scrolling.
+    window.scrollTo({ top: scrollY, behavior: "instant" });
+  };
+}
+
 /** Settings as a sheet from the bottom of the screen. */
-export function SettingsSheet({ open, onClose, sourceUrl }: SettingsSheetProps) {
+export function SettingsSheet({ open, onClose, focus = null, courseFilter, sourceUrl }: SettingsSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Latest onClose without re-attaching the swipe listeners on every render.
   const onCloseRef = useRef(onClose);
@@ -41,6 +115,10 @@ export function SettingsSheet({ open, onClose, sourceUrl }: SettingsSheetProps) 
     onCloseRef.current = onClose;
   }, [onClose]);
   const [settings, updateSettings] = useSettings();
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const installed = useSyncExternalStore(noSubscribe, isStandalone, () => true);
+  const onIos = useSyncExternalStore(noSubscribe, isIos, () => false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -51,10 +129,17 @@ export function SettingsSheet({ open, onClose, sourceUrl }: SettingsSheetProps) 
       dialog.style.transform = "";
       dialog.style.transition = "";
       dialog.showModal();
+      if (focus === "teachers") {
+        document.getElementById("settings-teachers")?.scrollIntoView({ block: "start" });
+      } else {
+        dialog.scrollTop = 0;
+      }
     } else if (!open && dialog.open) {
       dialog.close();
     }
-  }, [open]);
+  }, [open, focus]);
+
+  useEffect(() => (open ? lockPageScroll() : undefined), [open]);
 
   // Swipe down to close, like a native sheet. Native listeners, because the
   // page must not scroll or bounce while the sheet follows the finger.
@@ -64,23 +149,37 @@ export function SettingsSheet({ open, onClose, sourceUrl }: SettingsSheetProps) 
       return;
     }
     let startY: number | null = null;
+    let lastY = 0;
     let startTime = 0;
     let offset = 0;
 
     const onStart = (event: TouchEvent) => {
-      // Only when the sheet's content is scrolled to the top.
-      startY = dialog.scrollTop <= 0 && event.touches.length === 1 ? event.touches[0].clientY : null;
+      lastY = event.touches[0]?.clientY ?? 0;
+      // When the content is scrolled to the top, or on the header.
+      const onHeader = (event.target as Element | null)?.closest?.("[data-sheet-header]") != null;
+      startY = (dialog.scrollTop <= 0 || onHeader) && event.touches.length === 1 ? lastY : null;
       startTime = event.timeStamp;
       offset = 0;
     };
     const onMove = (event: TouchEvent) => {
+      const y = event.touches[0].clientY;
+      const movingUp = y < lastY;
+      lastY = y;
       if (startY === null) {
+        // Scrolling inside the sheet: never let it carry over to the page.
+        const atBottom = dialog.scrollTop + dialog.clientHeight >= dialog.scrollHeight - 1;
+        if (event.cancelable && (dialog.scrollHeight <= dialog.clientHeight || (atBottom && movingUp))) {
+          event.preventDefault();
+        }
         return;
       }
-      const delta = event.touches[0].clientY - startY;
+      const delta = y - startY;
       if (delta <= 0 && offset === 0) {
         // Scrolling the content up: not a swipe.
         startY = null;
+        if (event.cancelable && dialog.scrollHeight <= dialog.clientHeight) {
+          event.preventDefault();
+        }
         return;
       }
       if (event.cancelable) {
@@ -123,32 +222,48 @@ export function SettingsSheet({ open, onClose, sourceUrl }: SettingsSheetProps) 
     <dialog
       ref={dialogRef}
       aria-labelledby="settings-title"
-      onClose={onClose}
+      onClose={() => {
+        setConfirmReset(false);
+        onClose();
+      }}
       // A tap on the dimmed area closes the sheet.
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
       }}
-      className="settings-sheet fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-[1.75rem] border border-b-0 border-line bg-background p-0 text-foreground shadow-[0_-18px_45px_rgba(18,41,39,0.18)] backdrop:bg-black/40"
+      className="settings-sheet fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[85dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-b-0 border-line bg-background p-0 text-foreground shadow-[0_-18px_45px_rgba(18,41,39,0.18)] backdrop:bg-black/40"
     >
-      <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
-        <div aria-hidden className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line" />
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 id="settings-title" className="text-xl font-semibold tracking-[-0.03em]">
-            Einstellungen
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-white"
-          >
-            Fertig
-          </button>
+      <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        {/* Stays visible while scrolling; swiping it down always closes the sheet. */}
+        <div data-sheet-header className="sticky top-0 z-10 -mx-5 mb-1 bg-background px-5 pb-3 pt-3">
+          <div aria-hidden className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line" />
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="settings-title" className="text-xl font-semibold tracking-[-0.03em]">
+              Einstellungen
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-white"
+            >
+              Fertig
+            </button>
+          </div>
         </div>
 
         <Setting title="Darstellung" description="„Automatisch“ richtet sich nach der Einstellung des Geräts.">
           <ThemeChoice />
+        </Setting>
+
+        <Setting title="Textgröße" description="Größere Schrift in der ganzen App.">
+          <Segmented
+            name="text-size"
+            label="Textgröße"
+            options={textSizeOptions}
+            value={settings.textSize}
+            onChange={(textSize) => updateSettings({ textSize })}
+          />
         </Setting>
 
         <Setting
@@ -184,10 +299,39 @@ export function SettingsSheet({ open, onClose, sourceUrl }: SettingsSheetProps) 
           </label>
         </Setting>
 
-        <Setting title="Über die App">
+        {courseFilter ? (
+          <Card
+            id="settings-teachers"
+            title={`Oberstufe: Meine Lehrkräfte (${courseFilter.schoolClass})`}
+            description="Wähle die Lehrkräfte deiner Kurse. Dann siehst du nur deren Änderungen und bekommst nur dafür Benachrichtigungen. Einträge ohne Lehrkraft werden immer angezeigt."
+          >
+            <TeacherChooser
+              key={courseFilter.schoolClass}
+              schoolClass={courseFilter.schoolClass}
+              selected={courseFilter.selected}
+              suggestions={courseFilter.suggestions}
+              onChange={courseFilter.onChange}
+            />
+          </Card>
+        ) : null}
+
+        {!installed ? (
+          <Card
+            title="Als App installieren"
+            description="Als App startet der Plan schneller, funktioniert offline und kann Benachrichtigungen schicken."
+          >
+            <p className="text-sm leading-6 text-foreground">
+              {onIos
+                ? "In Safari unten auf „Teilen“ tippen, dann „Zum Home-Bildschirm“ wählen und die App von dort öffnen."
+                : "Im Browser-Menü „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen."}
+            </p>
+          </Card>
+        ) : null}
+
+        <Card title="Über die App">
           <p className="text-xs leading-5 text-muted">
             Die Daten stammen vom Vertretungsplan der Schule. Deine Einstellungen werden nur auf
-            diesem Gerät gespeichert.
+            diesem Gerät gespeichert.{VERSION ? ` Version ${VERSION}.` : ""}
           </p>
           {sourceUrl ? (
             <a
@@ -199,7 +343,45 @@ export function SettingsSheet({ open, onClose, sourceUrl }: SettingsSheetProps) 
               Original-Plan der Schule öffnen
             </a>
           ) : null}
-        </Setting>
+        </Card>
+
+        <Card
+          title="Zurücksetzen"
+          tone="warn"
+          description="Löscht auf diesem Gerät Klasse, gemerkte Klassen, Lehrkräfte und Einstellungen und schaltet Benachrichtigungen aus."
+        >
+          {confirmReset ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-warn">Wirklich alles zurücksetzen?</span>
+              <button
+                type="button"
+                disabled={resetting}
+                onClick={() => {
+                  setResetting(true);
+                  void resetDevice();
+                }}
+                className="rounded-full bg-warn px-4 py-1.5 text-sm font-semibold text-on-warn disabled:opacity-60"
+              >
+                Zurücksetzen
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmReset(false)}
+                className="rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold"
+              >
+                Abbrechen
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmReset(true)}
+              className="rounded-full border border-warn/30 bg-surface px-4 py-1.5 text-sm font-semibold text-warn"
+            >
+              App zurücksetzen …
+            </button>
+          )}
+        </Card>
       </div>
     </dialog>
   );

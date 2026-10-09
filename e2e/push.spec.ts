@@ -242,7 +242,7 @@ test("explains on an iPhone that the app must be on the home screen", async ({ b
   const page = await iphone.newPage();
   await page.goto("/");
   await page.locator("#class-selector").selectOption("5A");
-  await expect(page.getByText(/„Zum Home-Bildschirm“ wählen/)).toBeVisible();
+  await expect(page.locator("main").getByText(/„Zum Home-Bildschirm“ wählen/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Einschalten" })).toHaveCount(0);
   await iphone.close();
 });
