@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { ClassSelector } from "@/components/ClassSelector";
-import { DaySelector } from "@/components/DaySelector";
+import { DAY_PANEL_ID, DaySelector, dayTabId } from "@/components/DaySelector";
 import { DaySummary } from "@/components/DaySummary";
 import { Header, type HeaderStatus } from "@/components/Header";
 import { LoadingState } from "@/components/LoadingState";
@@ -13,6 +13,8 @@ import { RefreshButton } from "@/components/RefreshButton";
 import { RefreshStatus } from "@/components/RefreshStatus";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
 import { TeacherFilter } from "@/components/TeacherFilter";
+import { ThemeChoice } from "@/components/ThemeSettings";
+import { useSeenBaseline } from "@/hooks/useNewEntries";
 import { useNow } from "@/hooks/useNow";
 import { useSelectedClass } from "@/hooks/useSelectedClass";
 import { useStoredList } from "@/hooks/useStoredList";
@@ -27,6 +29,7 @@ import {
   normalizeTeacher,
 } from "@/lib/entries";
 import { formatAge, formatPlanDateLabel, formatTimestamp, isPastDate } from "@/lib/format";
+import { entryKey, findNewKeys } from "@/lib/seen";
 import { pickDefaultDate } from "@/lib/time";
 import type { SubstitutionPayload } from "@/lib/types";
 
@@ -72,6 +75,7 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
   const [storedTeachers, setTeachers] = useStoredList(courseFilterKey);
   const [showOtherCourses, setShowOtherCourses] = useState(false);
   const now = useNow();
+  const seenBaseline = useSeenBaseline(data);
 
   const usesCourseFilter = Boolean(selectedClass && isCourseClass(selectedClass));
   const teachers = usesCourseFilter ? storedTeachers : [];
@@ -132,18 +136,21 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
   // Upper school: only the courses of the student's teachers, unless asked.
   const ownEntries = classEntries.filter((entry) => entryMatchesTeachers(entry, teachers));
   const shownEntries = showOtherCourses ? classEntries : ownEntries;
+  // Entries without a readable date are shown (and counted) on every day.
+  const isOnDay = (entry: { date: string }, date: string | null) =>
+    !date || !entry.date || entry.date === date;
+  const onSelectedDay = (entry: { date: string }) => isOnDay(entry, selectedDate);
   const countsByDate = selectedClass
     ? new Map(
         days.map((day) => [
           day.date,
-          shownEntries.filter((entry) => entry.date === day.date).length,
+          shownEntries.filter((entry) => isOnDay(entry, day.date)).length,
         ]),
       )
     : null;
-  // Entries without a readable date are shown on every day.
-  const onSelectedDay = (entry: { date: string }) =>
-    !selectedDate || !entry.date || entry.date === selectedDate;
   const visibleEntries = shownEntries.filter(onSelectedDay);
+  // Added or changed since the user last opened the app.
+  const newKeys = findNewKeys(seenBaseline, visibleEntries);
   const otherCourseCount =
     classEntries.filter(onSelectedDay).length - ownEntries.filter(onSelectedDay).length;
   const teacherSuggestions = Array.from(
@@ -231,7 +238,13 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
 
           <NoticesCard notices={visibleNotices} />
 
-          <section className="space-y-4" aria-live="polite">
+          <section
+            className="space-y-4"
+            aria-live="polite"
+            {...(days.length > 1 && selectedDate
+              ? { id: DAY_PANEL_ID, role: "tabpanel", "aria-labelledby": dayTabId(selectedDate) }
+              : {})}
+          >
             {!data && isBusy ? <LoadingState /> : null}
 
             {!data && !isBusy ? (
@@ -267,6 +280,7 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
             {data && selectedClass ? (
               <DaySummary
                 entries={visibleEntries}
+                newCount={newKeys.size}
                 otherCourses={otherCourseCount}
                 showingOtherCourses={showOtherCourses}
                 onToggleOtherCourses={() => setShowOtherCourses((value) => !value)}
@@ -279,6 +293,7 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
                   <SubstitutionCard
                     key={entry.id}
                     entry={entry}
+                    isNew={newKeys.has(entryKey(entry))}
                     showClassName={formatClassName(entry.className) !== selectedClass}
                   />
                 ))
@@ -291,6 +306,10 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
               )
             ) : null}
           </section>
+
+          <footer className="mt-4 border-t border-line pt-4">
+            <ThemeChoice />
+          </footer>
         </main>
       </PullToRefresh>
 

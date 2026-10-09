@@ -4,6 +4,8 @@ import type { SubstitutionEntry } from "@/lib/types";
 
 type DaySummaryProps = {
   entries: SubstitutionEntry[];
+  /** Entries added or changed since the user last opened the app. */
+  newCount: number;
   /** Changes of other courses, filtered out by the teacher filter. */
   otherCourses: number;
   /** Whether those are currently shown anyway. */
@@ -14,22 +16,28 @@ type DaySummaryProps = {
 /** "4 Änderungen" with one chip per kind, e.g. "1 Ausfall". */
 export function DaySummary({
   entries,
+  newCount,
   otherCourses,
   showingOtherCourses,
   onToggleOtherCourses,
 }: DaySummaryProps) {
   const items = summarizeEntries(entries);
-  if (entries.length < 2 && otherCourses === 0) {
+  if (entries.length < 2 && otherCourses === 0 && newCount === 0) {
     return null;
   }
 
   return (
     <div className="space-y-2 px-1">
-      {entries.length >= 2 ? (
+      {entries.length >= 2 || newCount > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-foreground">
-            {entries.length} Änderungen
+            {entries.length === 1 ? "1 Änderung" : `${entries.length} Änderungen`}
           </span>
+          {newCount > 0 ? (
+            <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-white">
+              {newCount} neu
+            </span>
+          ) : null}
           {items.map((item) => (
             <span
               key={item.kind}

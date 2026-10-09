@@ -1,3 +1,5 @@
+import { ThemeToggle } from "@/components/ThemeSettings";
+
 export type HeaderStatus = "current" | "updating" | "offline" | "outdated" | "incomplete";
 
 type HeaderProps = {
@@ -49,19 +51,22 @@ export function Header({
     <header className="relative overflow-hidden rounded-[2rem] border border-edge bg-[linear-gradient(145deg,var(--header-from),var(--header-to))] p-5 shadow-[0_24px_60px_rgba(18,41,39,0.10)] backdrop-blur">
       <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(31,107,103,0.16),transparent_65%)]" />
       <div className="relative space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div>
+          <div className="flex items-center justify-between gap-3">
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-accent-strong/70">
               KAG Vertretungsplan
             </p>
-            <h1 className="mt-2 min-h-9 text-3xl font-semibold tracking-[-0.04em] text-foreground">
+            <ThemeToggle />
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-4">
+            <h1 className="min-h-9 text-3xl font-semibold tracking-[-0.04em] text-foreground">
               {selectedClass === undefined ? "" : (selectedClass ?? "Klasse wählen")}
             </h1>
-          </div>
-          <div
-            className={`shrink-0 rounded-full border px-3 py-1 text-sm font-semibold ${badge.className}`}
-          >
-            {badge.label}
+            <div
+              className={`shrink-0 rounded-full border px-3 py-1 text-sm font-semibold ${badge.className}`}
+            >
+              {badge.label}
+            </div>
           </div>
         </div>
 

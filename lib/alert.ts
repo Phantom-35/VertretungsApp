@@ -1,0 +1,78 @@
+/**
+ * Optional alert to the maintainer when the plan cannot be read correctly,
+ * typically because the school's Untis export changed. Set ALERT_WEBHOOK_URL
+ * to e.g. an ntfy.sh topic (push to the phone, no account needed), a Discord
+ * or a Slack webhook.
+ */
+
+/** The same problem is reported again after this long at the earliest. */
+const REPEAT_AFTER_MS = 6 * 60 * 60_000;
+const REQUEST_TIMEOUT_MS = 5_000;
+const TITLE = "KAG Vertretungsplan";
+
+type AlertState = { signature: string | null; sentAt: number };
+
+const globalAlert = globalThis as typeof globalThis & { __substitutionAlert?: AlertState };
+const state =
+  globalAlert.__substitutionAlert ??
+  (globalAlert.__substitutionAlert = { signature: null, sentAt: 0 });
+
+async function send(url: string, message: string) {
+  const isNtfy = /(^|\.)ntfy\./i.test(new URL(url).hostname);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: isNtfy
+      ? { "content-type": "text/plain; charset=utf-8", title: TITLE }
+      : { "content-type": "application/json" },
+    // Slack reads "text", Discord "content".
+    body: isNtfy ? message : JSON.stringify({ text: message, content: message }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+}
+
+/**
+ * Reports the self-check's findings once, again after some hours if they
+ * persist, and once more when they are gone. Never throws.
+ */
+export async function reportPlanProblems(problems: string[], now = Date.now()) {
+  const url = process.env.ALERT_WEBHOOK_URL;
+  if (!url) {
+    return "disabled" as const;
+  }
+
+  // Page numbers shift between uploads; they do not make a new problem.
+  const signature =
+    problems.length > 0
+      ? Array.from(new Set(problems.map((problem) => problem.replace(/^Seite \d+: /, ""))))
+          .sort()
+          .join("\n")
+      : null;
+
+  if (signature === null && state.signature === null) {
+    return "skipped" as const;
+  }
+  if (signature !== null && signature === state.signature && now - state.sentAt < REPEAT_AFTER_MS) {
+    return "skipped" as const;
+  }
+
+  const message =
+    signature === null
+      ? `${TITLE}: Der Plan wird wieder vollständig gelesen.`
+      : `${TITLE}: Der Plan wird möglicherweise unvollständig angezeigt.\n${problems.join("\n")}`;
+
+  const previous = { ...state };
+  // Claimed before sending, so that parallel refreshes do not send twice.
+  state.signature = signature;
+  state.sentAt = now;
+  try {
+    await send(url, message);
+    return "sent" as const;
+  } catch (error) {
+    Object.assign(state, previous);
+    console.warn("[substitution] Warnung konnte nicht gesendet werden:", error);
+    return "failed" as const;
+  }
+}

@@ -1,3 +1,5 @@
+import { reportPlanProblems } from "@/lib/alert";
+import { lessonStart } from "@/lib/entries";
 import { normalizeWhitespace, parseSubstitutionPage } from "@/lib/parser";
 import type {
   DayNotice,
@@ -131,10 +133,6 @@ async function mapWithConcurrency<T, R>(
   );
 
   return results;
-}
-
-function lessonStart(lesson: string) {
-  return Number(lesson.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
 }
 
 function sortEntries(entries: SubstitutionEntry[]) {
@@ -365,6 +363,7 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
   if (diagnostics.length > 0) {
     console.warn("[substitution] Selbstkontrolle:", diagnostics.join(" "));
   }
+  await reportPlanProblems(diagnostics);
 
   const allEntries = sortEntries(
     fetchedPages.flatMap((page) => page.entries).filter((entry) => entry.className),

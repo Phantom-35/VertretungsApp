@@ -53,7 +53,8 @@ export function entryAppliesToClass(entryClassName: string, selectedClass: strin
     });
 }
 
-function lessonStart(lesson: string) {
+/** "3 - 4" -> 3; lessons without a number sort last. */
+export function lessonStart(lesson: string) {
   return Number(lesson.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
 }
 

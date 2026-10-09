@@ -19,6 +19,7 @@ import {
   schoolLocalToIso,
   schoolToday,
 } from "@/lib/time";
+import { entryKey, findNewKeys, mergeSeenKeys } from "@/lib/seen";
 import type { SubstitutionPayload } from "@/lib/types";
 import { pickDisplayedPayload } from "@/hooks/useSubstitutionData";
 
@@ -232,5 +233,44 @@ describe("day summary", () => {
       "2 Vertretungen",
     ]);
     expect(summarizeEntries([])).toEqual([]);
+  });
+});
+
+describe("new entries", () => {
+  const entry = (date: string, lesson: string, type = "Entfall") => ({
+    date,
+    className: "05A",
+    lesson,
+    type,
+    substitute: "",
+    teacher: "ABC",
+    room: "101",
+    subject: "",
+    text: "",
+  });
+
+  it("ignores the page number, so a re-uploaded plan is not all new", () => {
+    expect(entryKey(entry("2026-10-08", "1"))).toBe(entryKey({ ...entry("2026-10-08", "1") }));
+    expect(entryKey(entry("2026-10-08", "1"))).not.toBe(entryKey(entry("2026-10-08", "2")));
+  });
+
+  it("marks entries missing from the baseline as new", () => {
+    const old = [entry("2026-10-08", "1")];
+    const now = [...old, entry("2026-10-08", "2"), entry("2026-10-08", "1", "Vertretung")];
+    expect(findNewKeys(old.map(entryKey), now)).toEqual(
+      new Set([entryKey(now[1]), entryKey(now[2])]),
+    );
+  });
+
+  it("marks nothing as new on first use", () => {
+    expect(findNewKeys(null, [entry("2026-10-08", "1")]).size).toBe(0);
+  });
+
+  it("forgets past days but keeps the rest", () => {
+    const previous = [entryKey(entry("2026-10-07", "1")), entryKey(entry("2026-10-09", "3"))];
+    expect(mergeSeenKeys(previous, [entry("2026-10-08", "2")], "2026-10-08")).toEqual([
+      entryKey(entry("2026-10-09", "3")),
+      entryKey(entry("2026-10-08", "2")),
+    ]);
   });
 });

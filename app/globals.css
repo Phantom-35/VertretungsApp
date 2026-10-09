@@ -32,32 +32,39 @@
   --font-mono: "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #12191b;
-    --background-soft: #1a2326;
-    --foreground: #e6ecec;
-    --muted: #9cabb0;
-    --line: rgba(255, 255, 255, 0.09);
-    --card: rgba(28, 37, 40, 0.88);
-    --surface: #1f292c;
-    --surface-muted: #2a3538;
-    --edge: rgba(255, 255, 255, 0.07);
-    --header-from: #1f2a2d;
-    --header-to: #172023;
-    --entry-from: #1f292c;
-    --entry-to: #1b2427;
-    --page-from: #131b1d;
-    --page-mid: #11181a;
-    --page-to: #101618;
-    --accent-strong: #8fd3cb;
-    --accent-soft: #183c3a;
-    --warn: #f0a46b;
-    --warn-soft: #3a2a1e;
-    --on-warn: #1d140d;
-    --danger: #f08f78;
-  }
+/* Set by THEME_SCRIPT (app/layout.tsx) from the saved choice or the system. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #12191b;
+  --background-soft: #1a2326;
+  --foreground: #e6ecec;
+  --muted: #9cabb0;
+  --line: rgba(255, 255, 255, 0.09);
+  --card: rgba(28, 37, 40, 0.88);
+  --surface: #1f292c;
+  --surface-muted: #2a3538;
+  --edge: rgba(255, 255, 255, 0.07);
+  --header-from: #1f2a2d;
+  --header-to: #172023;
+  --entry-from: #1f292c;
+  --entry-to: #1b2427;
+  --page-from: #131b1d;
+  --page-mid: #11181a;
+  --page-to: #101618;
+  --accent-strong: #8fd3cb;
+  --accent-soft: #183c3a;
+  --warn: #f0a46b;
+  --warn-soft: #3a2a1e;
+  --on-warn: #1d140d;
+  --danger: #f08f78;
 }
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Tailwind's dark: variant follows the chosen theme, not only the system. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
   --color-background: var(--background);

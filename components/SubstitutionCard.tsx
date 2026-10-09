@@ -11,6 +11,8 @@ type SubstitutionCardProps = {
   entry: SubstitutionEntry;
   /** Shown when the entry targets a group like "6ABCD" instead of just the class. */
   showClassName: boolean;
+  /** Added or changed since the user last opened the app. */
+  isNew?: boolean;
 };
 
 export const kindStyles: Record<EntryKind, string> = {
@@ -58,7 +60,7 @@ function TeacherLine({ teacher, substitute }: { teacher: string; substitute: str
   );
 }
 
-export function SubstitutionCard({ entry, showClassName }: SubstitutionCardProps) {
+export function SubstitutionCard({ entry, showClassName, isNew = false }: SubstitutionCardProps) {
   const kind = getEntryKind(entry.type);
   const hint = entryKindHints[kind];
   // A cancelled lesson is what students look for first: make it stand out.
@@ -94,6 +96,11 @@ export function SubstitutionCard({ entry, showClassName }: SubstitutionCardProps
           >
             {entry.type || "Änderung"}
           </span>
+          {isNew ? (
+            <span className="rounded-full bg-accent px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-white">
+              Neu
+            </span>
+          ) : null}
           {showClassName ? (
             <span className="text-xs font-medium text-muted">
               {formatClassName(entry.className)}

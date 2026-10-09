@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KAG Vertretungsplan
 
-## Getting Started
+Mobile Web-App für den Vertretungsplan des Konrad-Adenauer-Gymnasiums Meckenheim.
+Sie liest die Untis-Seiten der Schule (`subst_001.htm`, …), filtert sie nach Klasse
+bzw. Kursen und funktioniert als installierte Home-Bildschirm-App auch offline.
 
-First, run the development server:
+## Entwickeln
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Prüfen
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm test             # Unit-Tests (Parser, Abruf, Logik)
+npm run lint
+npx tsc --noEmit
+npm run build
+npm run test:e2e     # Browser-Tests gegen den Build, mit gespeicherten Untis-Seiten
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Die CI (`.github/workflows/ci.yml`) führt all das bei jedem Push aus.
 
-## Learn More
+## Einstellungen (Umgebungsvariablen)
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Zweck |
+| --- | --- |
+| `SUBSTITUTION_BASE_URL` | Andere Quelle für die Untis-Seiten, z. B. für Tests. Standard: die Seite der Schule. |
+| `ALERT_WEBHOOK_URL` | Optional. Bekommt eine Nachricht, wenn der Plan nicht mehr vollständig gelesen werden kann (z. B. weil Untis das Format geändert hat) und wenn das Problem wieder behoben ist. Geht mit einem [ntfy.sh](https://ntfy.sh)-Thema (Push aufs Handy, ohne Konto, z. B. `https://ntfy.sh/ein-geheimer-name`), einem Discord- oder einem Slack-Webhook. |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Überwachung
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`GET /api/health` antwortet mit **200**, solange der Plan vollständig gelesen wird, und
+sonst mit **503** und den Gründen (`problems`). Ein kostenloser Uptime-Dienst
+(z. B. UptimeRobot) kann diese Adresse alle paar Minuten abfragen und meldet sich,
+wenn etwas nicht stimmt, auch wenn die Schulseite ganz ausfällt.
