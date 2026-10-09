@@ -230,6 +230,16 @@ test("switches between light and dark", async ({ page }) => {
   await expect(html).toHaveAttribute("data-theme", "dark");
   await expect(page.locator('meta[name="theme-color"]').first()).toHaveAttribute("content", "#12191b");
 
+  // Even if the page is rebuilt and the attribute reset (as React does after a
+  // hydration mismatch), the chosen theme comes back at once.
+  await page.evaluate(() => {
+    document.documentElement.removeAttribute("style");
+    document.documentElement.setAttribute("data-theme", "light");
+  });
+  await expect(html).toHaveAttribute("data-theme", "dark");
+  await page.evaluate(() => document.documentElement.removeAttribute("data-theme"));
+  await expect(html).toHaveAttribute("data-theme", "dark");
+
   await page.getByRole("button", { name: "Helles Design" }).click();
   await expect(html).toHaveAttribute("data-theme", "light");
 
@@ -456,6 +466,11 @@ test("settings: page stays still, text size, install hint and reset", async ({ b
   expect(await page.evaluate(() => document.body.style.position)).toBe("");
   await page.reload();
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe("18px");
+  // Also restored if the page is rebuilt.
+  await page.evaluate(() => document.documentElement.removeAttribute("style"));
+  await expect
+    .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).fontSize))
+    .toBe("18px");
 
   // In the browser (not installed): how to install.
   await page.getByRole("button", { name: "Einstellungen" }).click();

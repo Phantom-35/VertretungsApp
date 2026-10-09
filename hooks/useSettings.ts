@@ -84,6 +84,7 @@ export function useSettings() {
   const update = useCallback((changes: Partial<Settings>) => {
     const next = { ...getSnapshot(), ...changes };
     const raw = JSON.stringify(next);
+    window.__kagFontSize = TEXT_SIZES[next.textSize];
     document.documentElement.style.fontSize = TEXT_SIZES[next.textSize];
     memoryValue = raw;
     try {

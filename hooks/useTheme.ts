@@ -47,6 +47,7 @@ export function useTheme() {
 
   const setPreference = useCallback((value: ThemePreference) => {
     memoryValue = value;
+    window.__kagThemePreference = value;
     try {
       if (value === "system") {
         window.localStorage.removeItem(THEME_STORAGE_KEY);
@@ -57,11 +58,6 @@ export function useTheme() {
       // Keep the in-memory value; the page still switches below.
     }
     window.__kagApplyTheme?.();
-    // Without storage the script cannot see the choice: set it directly.
-    if (value !== "system") {
-      document.documentElement.dataset.theme = value;
-      document.documentElement.style.colorScheme = value;
-    }
     listeners.forEach((listener) => listener());
   }, []);
 

@@ -34,6 +34,8 @@ export function Segmented<T extends string | number>({
                 value={String(option.value)}
                 checked={active}
                 onChange={() => onChange(option.value)}
+                // Safari must not restore an old choice when the app starts.
+                autoComplete="off"
                 className="sr-only"
               />
               {option.label}
