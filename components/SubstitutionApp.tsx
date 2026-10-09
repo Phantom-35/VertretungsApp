@@ -250,7 +250,10 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     <>
       <PwaRegistrar />
       <PullToRefresh onRefresh={forceRefresh}>
-        <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top))] sm:px-5">
+        {/* Room at the bottom so the refresh button (bottom offset + 3.5rem) can
+            only cover the last card's inner padding, not its text; no more,
+            so a page that fits does not scroll. */}
+        <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[calc(max(1rem,env(safe-area-inset-bottom))+2.5rem)] pt-[max(1rem,env(safe-area-inset-top))] sm:px-5">
           <Header
             selectedClass={selectedClass}
             dateLabel={dateLabel}
