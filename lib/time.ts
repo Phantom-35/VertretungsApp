@@ -74,7 +74,7 @@ export function schoolHour(now: number) {
 
 /**
  * The day to show by default (`dates` ascending, YYYY-MM-DD): today, or the
- * next day of the plan from `nextDayFromHour` on (24 = never); the latest day
+ * next day of the plan from `nextDayFromHour` on (0 = always, 24 = never); the latest day
  * if all are past.
  */
 export function pickDefaultDate(

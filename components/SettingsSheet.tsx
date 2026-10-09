@@ -12,8 +12,13 @@ type SettingsSheetProps = {
 
 const nextDayOptions = NEXT_DAY_HOURS.map((hour) => ({
   value: hour,
-  label: hour === 24 ? "Nie" : `${hour} Uhr`,
+  label: hour === 0 ? "Immer" : hour === 24 ? "Nie" : `${hour} Uhr`,
 }));
+
+/** Dragged this far down (px) or flicked this fast (px/ms), the sheet closes. */
+const CLOSE_DISTANCE = 90;
+const CLOSE_VELOCITY = 0.5;
+const SLIDE_MS = 180;
 
 function Setting({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -30,6 +35,11 @@ function Setting({ title, description, children }: { title: string; description?
 /** Settings as a sheet from the bottom of the screen. */
 export function SettingsSheet({ open, onClose, sourceUrl }: SettingsSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // Latest onClose without re-attaching the swipe listeners on every render.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
   const [settings, updateSettings] = useSettings();
 
   useEffect(() => {
@@ -38,11 +48,76 @@ export function SettingsSheet({ open, onClose, sourceUrl }: SettingsSheetProps) 
       return;
     }
     if (open && !dialog.open) {
+      dialog.style.transform = "";
+      dialog.style.transition = "";
       dialog.showModal();
     } else if (!open && dialog.open) {
       dialog.close();
     }
   }, [open]);
+
+  // Swipe down to close, like a native sheet. Native listeners, because the
+  // page must not scroll or bounce while the sheet follows the finger.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) {
+      return;
+    }
+    let startY: number | null = null;
+    let startTime = 0;
+    let offset = 0;
+
+    const onStart = (event: TouchEvent) => {
+      // Only when the sheet's content is scrolled to the top.
+      startY = dialog.scrollTop <= 0 && event.touches.length === 1 ? event.touches[0].clientY : null;
+      startTime = event.timeStamp;
+      offset = 0;
+    };
+    const onMove = (event: TouchEvent) => {
+      if (startY === null) {
+        return;
+      }
+      const delta = event.touches[0].clientY - startY;
+      if (delta <= 0 && offset === 0) {
+        // Scrolling the content up: not a swipe.
+        startY = null;
+        return;
+      }
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      offset = Math.max(0, delta);
+      dialog.style.transition = "none";
+      dialog.style.transform = `translateY(${offset}px)`;
+    };
+    const onEnd = (event: TouchEvent) => {
+      if (startY === null || offset === 0) {
+        startY = null;
+        return;
+      }
+      const velocity = offset / Math.max(1, event.timeStamp - startTime);
+      dialog.style.transition = `transform ${SLIDE_MS}ms ease-out`;
+      if (offset > CLOSE_DISTANCE || velocity > CLOSE_VELOCITY) {
+        dialog.style.transform = "translateY(100%)";
+        window.setTimeout(() => onCloseRef.current(), SLIDE_MS);
+      } else {
+        dialog.style.transform = "";
+      }
+      startY = null;
+      offset = 0;
+    };
+
+    dialog.addEventListener("touchstart", onStart, { passive: true });
+    dialog.addEventListener("touchmove", onMove, { passive: false });
+    dialog.addEventListener("touchend", onEnd);
+    dialog.addEventListener("touchcancel", onEnd);
+    return () => {
+      dialog.removeEventListener("touchstart", onStart);
+      dialog.removeEventListener("touchmove", onMove);
+      dialog.removeEventListener("touchend", onEnd);
+      dialog.removeEventListener("touchcancel", onEnd);
+    };
+  }, []);
 
   return (
     <dialog
@@ -78,7 +153,7 @@ export function SettingsSheet({ open, onClose, sourceUrl }: SettingsSheetProps) 
 
         <Setting
           title="Nächsten Tag anzeigen ab"
-          description="Ab dieser Uhrzeit zeigt die App beim Öffnen den nächsten Schultag statt heute."
+          description="Ab dieser Uhrzeit zeigt die App beim Öffnen den nächsten Schultag statt heute. Bei „Immer“ gleich den nächsten Schultag."
         >
           <Segmented
             name="next-day"

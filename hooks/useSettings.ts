@@ -2,13 +2,13 @@ import { useCallback, useSyncExternalStore } from "react";
 import { NEXT_DAY_FROM_HOUR } from "@/lib/time";
 
 export type Settings = {
-  /** From this hour on the next day is shown by default; 24 = never. */
+  /** From this hour on the next day is shown by default; 0 = always, 24 = never. */
   nextDayFromHour: number;
   /** "Neu" badges for changes since the last visit. */
   showNewBadges: boolean;
 };
 
-export const NEXT_DAY_HOURS = [14, 15, 16, 17, 24] as const;
+export const NEXT_DAY_HOURS = [0, 14, 15, 16, 17, 24] as const;
 
 const DEFAULTS: Settings = { nextDayFromHour: NEXT_DAY_FROM_HOUR, showNewBadges: true };
 const STORAGE_KEY = "kag:settings";

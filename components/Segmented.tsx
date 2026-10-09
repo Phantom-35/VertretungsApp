@@ -24,7 +24,7 @@ export function Segmented<T extends string | number>({
           return (
             <label
               key={String(option.value)}
-              className={`flex-1 cursor-pointer rounded-full px-2 py-1.5 text-center text-xs font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 ${
+              className={`min-w-0 flex-1 cursor-pointer whitespace-nowrap rounded-full px-1 py-1.5 text-center text-xs font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 ${
                 active ? "bg-accent text-white" : "text-muted"
               }`}
             >

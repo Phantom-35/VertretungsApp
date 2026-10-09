@@ -246,3 +246,52 @@ test("settings: next day hour and new badges", async ({ page }) => {
   await expect(dialog).toBeHidden();
   await expect(page.getByText("Neu", { exact: true })).toHaveCount(0);
 });
+
+test("settings: swipe down closes the sheet without refreshing", async ({ browser }) => {
+  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.clock.setFixedTime(new Date("2026-10-08T08:00:00+02:00"));
+  await page.goto("/");
+  await chooseClass(page, "5A");
+
+  // "Immer" shows the next school day right away.
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  await dialog.getByText("Immer", { exact: true }).click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
+
+  const forced: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("force=1")) forced.push(request.url());
+  });
+  const cdp = await context.newCDPSession(page);
+  const box = (await dialog.boundingBox())!;
+  const x = box.x + box.width / 2;
+  const swipe = async (from: number, to: number) => {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y: from }] });
+    for (let step = 1; step <= 8; step += 1) {
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x, y: from + ((to - from) * step) / 8 }],
+      });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  };
+
+  // A short pull springs back.
+  await swipe(box.y + 30, box.y + 60);
+  await page.waitForTimeout(300);
+  await expect(dialog).toBeVisible();
+  expect((await dialog.boundingBox())!.y).toBeCloseTo(box.y, 0);
+  // A real swipe closes it.
+  await swipe(box.y + 30, box.y + 330);
+  await expect(dialog).toBeHidden();
+  expect(forced).toEqual([]);
+
+  // It opens normally again.
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  await expect(dialog).toBeVisible();
+  await page.waitForTimeout(300);
+  expect((await dialog.boundingBox())!.y).toBeCloseTo(box.y, 0);
+  await context.close();
+});

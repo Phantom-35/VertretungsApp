@@ -33,8 +33,10 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
 
     const onTouchStart = (event: TouchEvent) => {
       startXRef.current = event.touches[0]?.clientX ?? 0;
+      // An open sheet (e.g. the settings) handles its own swipes.
+      const sheetOpen = document.querySelector("dialog[open]") !== null;
       startYRef.current =
-        window.scrollY <= 0 && event.touches.length === 1
+        window.scrollY <= 0 && event.touches.length === 1 && !sheetOpen
           ? event.touches[0].clientY
           : null;
     };
