@@ -161,3 +161,40 @@ test("starts offline from the cache", async ({ page, context }) => {
   await chooseClass(page, "7B");
   await expect(page.locator("article").first()).toBeVisible();
 });
+
+test("shares the day's changes", async ({ page, context }) => {
+  // Phones: the system share menu receives the text.
+  await page.addInitScript(() => {
+    (window as unknown as { shared: ShareData[] }).shared = [];
+    navigator.share = async (data?: ShareData) => {
+      (window as unknown as { shared: ShareData[] }).shared.push(data ?? {});
+    };
+  });
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  await page.getByRole("button", { name: "Teilen" }).click();
+  const shared = await page.evaluate(() => (window as unknown as { shared: ShareData[] }).shared);
+  expect(shared).toHaveLength(1);
+  const lines = shared[0].text!.split("\n");
+  const fiveA = plan.entries.filter(
+    (entry) => entry.date === "2026-10-08" && entryAppliesToClass(entry.className, "5A"),
+  );
+  expect(lines[0]).toBe("Vertretungsplan 5A – Heute, Donnerstag, 08.10.");
+  expect(lines.filter((line) => line.startsWith("• "))).toHaveLength(fiveA.length);
+  expect(lines.at(-1)).toMatch(/^Stand: /);
+
+  // Without a share menu (desktop): copied to the clipboard instead.
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const desktop = await context.newPage();
+  await desktop.clock.setFixedTime(TODAY);
+  await desktop.addInitScript(() => {
+    Object.defineProperty(navigator, "share", { value: undefined });
+  });
+  await desktop.goto("/");
+  await desktop.getByRole("tab").nth(1).click();
+  await desktop.getByRole("button", { name: "Teilen" }).click();
+  await expect(desktop.getByText("Kopiert")).toBeVisible();
+  const copied = await desktop.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toMatch(/^Vertretungsplan 5A – Morgen, Freitag, 09\.10\.\n/);
+  expect(copied).toContain("http://localhost:3124");
+});

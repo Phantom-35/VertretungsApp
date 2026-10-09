@@ -1,0 +1,36 @@
+name: Live-Check
+
+# Reads the school's real plan every school morning. If the Untis format
+# changes or the plan cannot be read, the run fails and GitHub sends an e-mail
+# (to whoever last changed this schedule), even when nobody uses the app.
+on:
+  schedule:
+    # Mon–Fri 05:17 UTC = 07:17 summer time / 06:17 winter time.
+    - cron: "17 5 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Plan der Schule lesen
+        # One retry after ten minutes, so that a short outage of the school
+        # website does not cause an alarm.
+        run: |
+          npm run check:live && exit 0
+          echo "Erster Versuch fehlgeschlagen, neuer Versuch in 10 Minuten …"
+          sleep 600
+          npm run check:live

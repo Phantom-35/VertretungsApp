@@ -1,3 +1,4 @@
+import { ShareButton } from "@/components/ShareButton";
 import { kindStyles } from "@/components/SubstitutionCard";
 import { summarizeEntries } from "@/lib/entries";
 import type { SubstitutionEntry } from "@/lib/types";
@@ -11,6 +12,8 @@ type DaySummaryProps = {
   /** Whether those are currently shown anyway. */
   showingOtherCourses: boolean;
   onToggleOtherCourses: () => void;
+  shareTitle: string;
+  getShareText: () => string;
 };
 
 /** "4 Änderungen" with one chip per kind, e.g. "1 Ausfall". */
@@ -20,19 +23,20 @@ export function DaySummary({
   otherCourses,
   showingOtherCourses,
   onToggleOtherCourses,
+  shareTitle,
+  getShareText,
 }: DaySummaryProps) {
   const items = summarizeEntries(entries);
-  if (entries.length < 2 && otherCourses === 0 && newCount === 0) {
-    return null;
-  }
 
   return (
     <div className="space-y-2 px-1">
-      {entries.length >= 2 || newCount > 0 ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-semibold text-foreground">
-            {entries.length === 1 ? "1 Änderung" : `${entries.length} Änderungen`}
-          </span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {entries.length > 0 ? (
+            <span className="text-sm font-semibold text-foreground">
+              {entries.length === 1 ? "1 Änderung" : `${entries.length} Änderungen`}
+            </span>
+          ) : null}
           {newCount > 0 ? (
             <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-white">
               {newCount} neu
@@ -47,7 +51,8 @@ export function DaySummary({
             </span>
           ))}
         </div>
-      ) : null}
+        <ShareButton title={shareTitle} getText={getShareText} />
+      </div>
       {otherCourses > 0 ? (
         <p className="text-sm text-muted">
           {otherCourses === 1 ? "1 Änderung" : `${otherCourses} Änderungen`} anderer Kurse{" "}

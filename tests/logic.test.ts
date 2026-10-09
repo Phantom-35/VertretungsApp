@@ -20,6 +20,7 @@ import {
   schoolToday,
 } from "@/lib/time";
 import { entryKey, findNewKeys, mergeSeenKeys } from "@/lib/seen";
+import { buildShareText, formatShareLine } from "@/lib/share";
 import type { SubstitutionPayload } from "@/lib/types";
 import { pickDisplayedPayload } from "@/hooks/useSubstitutionData";
 
@@ -278,5 +279,51 @@ describe("new entries", () => {
       entryKey(entry("2026-10-09", "3")),
       entryKey(entry("2026-10-08", "2")),
     ]);
+  });
+});
+
+describe("share text", () => {
+  const base = {
+    id: "x",
+    className: "05A",
+    lesson: "1",
+    type: "Vertretung",
+    substitute: "",
+    teacher: "",
+    room: "",
+    subject: "",
+    text: "",
+    date: "2026-10-08",
+    page: 1,
+  };
+
+  it("describes each change on one line", () => {
+    expect(
+      formatShareLine({ ...base, lesson: "3 - 4", type: "Entfall", teacher: "ABC" }, "5A"),
+    ).toBe("• 3.–4. Std.: Entfall · ABC");
+    expect(
+      formatShareLine(
+        { ...base, className: "06ABCD", teacher: "ABC", substitute: "DEF", room: "204", text: "Aufgaben" },
+        "6B",
+      ),
+    ).toBe("• 1. Std.: Vertretung · 6ABCD · ABC → DEF · Raum 204 · „Aufgaben“");
+    expect(formatShareLine({ ...base, lesson: "", type: "" }, "5A")).toBe("• Std. ?: Änderung");
+  });
+
+  it("builds the whole message", () => {
+    expect(
+      buildShareText({
+        schoolClass: "Q1",
+        dayLabel: "Heute, Donnerstag, 08.10.",
+        entries: [{ ...base, className: "Q1", lesson: "2", type: "Klausur", substitute: "RUK", room: "217" }],
+        ownCoursesOnly: true,
+        sourceUpdated: "15:34 Uhr",
+      }),
+    ).toBe(
+      "Vertretungsplan Q1 (meine Kurse) – Heute, Donnerstag, 08.10.\n• 2. Std.: Klausur · RUK · Raum 217\nStand: 15:34 Uhr",
+    );
+    expect(
+      buildShareText({ schoolClass: "5A", dayLabel: "Freitag, 09.10.", entries: [], ownCoursesOnly: false, sourceUpdated: null }),
+    ).toBe("Vertretungsplan 5A – Freitag, 09.10.\nKeine Änderungen eingetragen.");
   });
 });

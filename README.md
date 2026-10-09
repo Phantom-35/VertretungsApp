@@ -19,9 +19,10 @@ npm run lint
 npx tsc --noEmit
 npm run build
 npm run test:e2e     # Browser-Tests gegen den Build, mit gespeicherten Untis-Seiten
+npm run check:live   # Liest den echten Plan der Schule und prüft ihn
 ```
 
-Die CI (`.github/workflows/ci.yml`) führt all das bei jedem Push aus.
+Die CI (`.github/workflows/ci.yml`) führt all das bei jedem Push aus (außer `check:live`).
 
 ## Einstellungen (Umgebungsvariablen)
 
@@ -36,3 +37,9 @@ Die CI (`.github/workflows/ci.yml`) führt all das bei jedem Push aus.
 sonst mit **503** und den Gründen (`problems`). Ein kostenloser Uptime-Dienst
 (z. B. UptimeRobot) kann diese Adresse alle paar Minuten abfragen und meldet sich,
 wenn etwas nicht stimmt, auch wenn die Schulseite ganz ausfällt.
+
+Zusätzlich liest `.github/workflows/live-check.yml` montags bis freitags früh
+den echten Plan. Schlägt das fehl (auch nach einem zweiten Versuch zehn Minuten
+später), schickt GitHub eine E-Mail. Von Hand starten: GitHub → Actions →
+Live-Check → „Run workflow“. GitHub pausiert geplante Abläufe, wenn 60 Tage lang
+nichts ins Repository gepusht wurde; dann dort wieder aktivieren.

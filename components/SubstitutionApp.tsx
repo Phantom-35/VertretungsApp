@@ -30,6 +30,7 @@ import {
 } from "@/lib/entries";
 import { formatAge, formatPlanDateLabel, formatTimestamp, isPastDate } from "@/lib/format";
 import { entryKey, findNewKeys } from "@/lib/seen";
+import { buildShareText } from "@/lib/share";
 import { pickDefaultDate } from "@/lib/time";
 import type { SubstitutionPayload } from "@/lib/types";
 
@@ -284,6 +285,18 @@ export function SubstitutionApp({ initialData }: SubstitutionAppProps) {
                 otherCourses={otherCourseCount}
                 showingOtherCourses={showOtherCourses}
                 onToggleOtherCourses={() => setShowOtherCourses((value) => !value)}
+                shareTitle={`Vertretungsplan ${selectedClass}`}
+                getShareText={() =>
+                  buildShareText({
+                    schoolClass: selectedClass,
+                    dayLabel: selectedDay ? dateLabel : "aktueller Plan",
+                    entries: visibleEntries,
+                    ownCoursesOnly: teachers.length > 0 && !showOtherCourses,
+                    sourceUpdated: data.sourceUpdatedAt
+                      ? formatTimestamp(data.sourceUpdatedAt, now)
+                      : null,
+                  })
+                }
               />
             ) : null}
 
