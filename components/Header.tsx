@@ -50,7 +50,7 @@ export function Header({
   const badge = statusBadges[status];
 
   return (
-    <header className="relative overflow-hidden rounded-[2rem] border border-edge bg-[linear-gradient(145deg,var(--header-from),var(--header-to))] p-5 shadow-[0_24px_60px_rgba(18,41,39,0.10)] backdrop-blur">
+    <header className="relative overflow-hidden rounded-[2rem] border border-edge bg-[linear-gradient(145deg,var(--header-from),var(--header-to))] p-5 shadow-[0_24px_60px_rgba(18,41,39,0.10)]">
       <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(31,107,103,0.16),transparent_65%)]" />
       <div className="relative space-y-4">
         <div>

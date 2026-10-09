@@ -253,7 +253,10 @@ test("shows a pushed message as a notification", async ({ page, context }) => {
     });
   });
   await page.goto("/");
-  await page.evaluate(() => navigator.serviceWorker.ready);
+  // Fully activated, not just installing: otherwise the push can get lost.
+  await expect
+    .poll(() => page.evaluate(async () => (await navigator.serviceWorker.ready).active?.state))
+    .toBe("activated");
   await cdp.send("ServiceWorker.enable");
 
   await cdp.send("ServiceWorker.deliverPushMessage", {
@@ -268,7 +271,8 @@ test("shows a pushed message as a notification", async ({ page, context }) => {
   });
 
   await expect
-    .poll(() =>
+    .poll(
+      () =>
       page.evaluate(async () =>
         (await (await navigator.serviceWorker.ready).getNotifications()).map((notification) => ({
           title: notification.title,
@@ -276,6 +280,8 @@ test("shows a pushed message as a notification", async ({ page, context }) => {
           url: (notification.data as { url: string }).url,
         })),
       ),
+      // Generous: a busy CI machine can take a moment to show it.
+      { timeout: 15_000 },
     )
     .toEqual([{ title: "5A · Morgen 3.–4. Std.", body: "Entfall · SVA · Raum 004", url: "/?day=2026-10-09" }]);
 });

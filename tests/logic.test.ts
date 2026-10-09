@@ -20,7 +20,7 @@ import {
   schoolToday,
 } from "@/lib/time";
 import { entryKey, findNewKeys, mergeSeenKeys } from "@/lib/seen";
-import { buildShareText, formatShareLine } from "@/lib/share";
+import { buildShareText, formatShareBlock, formatShareLine } from "@/lib/share";
 import type { SubstitutionPayload } from "@/lib/types";
 import { pickDisplayedPayload } from "@/hooks/useSubstitutionData";
 
@@ -330,10 +330,21 @@ describe("share text", () => {
         sourceUpdated: "15:34 Uhr",
       }),
     ).toBe(
-      "Vertretungsplan Q1 (meine Kurse) – Heute, Donnerstag, 08.10.\n• 2. Std.: Klausur · RUK · Raum 217\nStand: 15:34 Uhr",
+      "Vertretungsplan Q1 (meine Kurse)\nHeute, Donnerstag, 08.10.\n\n2. Std. · Klausur\nLehrer RUK · Raum 217\n\nStand der Schule: 15:34 Uhr",
     );
     expect(
       buildShareText({ schoolClass: "5A", dayLabel: "Freitag, 09.10.", entries: [], ownCoursesOnly: false, sourceUpdated: null }),
-    ).toBe("Vertretungsplan 5A – Freitag, 09.10.\nKeine Änderungen eingetragen.");
+    ).toBe("Vertretungsplan 5A\nFreitag, 09.10.\n\nKeine Änderungen eingetragen.");
+  });
+
+  it("puts each change in a short block", () => {
+    expect(
+      formatShareBlock(
+        { ...base, className: "06ABCD", lesson: "3 - 4", teacher: "ABC", substitute: "DEF", room: "204", text: "Aufgaben" },
+        "6B",
+      ),
+    ).toBe("3.–4. Std. · Vertretung (6ABCD)\nLehrer ABC → DEF · Raum 204\n„Aufgaben“");
+    expect(formatShareBlock({ ...base, type: "Entfall", teacher: "ABC" }, "5A")).toBe("1. Std. · Entfall\nLehrer ABC");
+    expect(formatShareBlock({ ...base, lesson: "", type: "" }, "5A")).toBe("Std. ? · Änderung");
   });
 });

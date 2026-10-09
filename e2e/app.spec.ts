@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { SCHOOL_CLASSES, entryAppliesToClass } from "@/lib/entries";
 import { entryKey } from "@/lib/seen";
 import type { SubstitutionPayload } from "@/lib/types";
@@ -17,6 +17,12 @@ test.beforeAll(async ({ request }) => {
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(TODAY);
 });
+
+/** Waits until the settings sheet has finished sliding in. */
+async function settled(dialog: Locator) {
+  await expect(dialog).toBeVisible();
+  await expect.poll(() => dialog.evaluate((element) => element.getAnimations().length)).toBe(0);
+}
 
 async function chooseClass(page: Page, schoolClass: string) {
   await page.locator("#class-selector").selectOption(schoolClass);
@@ -198,9 +204,14 @@ test("shares the day's changes", async ({ page, context }) => {
   const fiveA = plan.entries.filter(
     (entry) => entry.date === "2026-10-08" && entryAppliesToClass(entry.className, "5A"),
   );
-  expect(lines[0]).toBe("Vertretungsplan 5A – Heute, Donnerstag, 08.10.");
-  expect(lines.filter((line) => line.startsWith("• "))).toHaveLength(fiveA.length);
-  expect(lines.at(-1)).toMatch(/^Stand: /);
+  expect(lines.slice(0, 2)).toEqual(["Vertretungsplan 5A", "Heute, Donnerstag, 08.10."]);
+  // One block per change, separated by blank lines.
+  expect(shared[0].text!.split("\n\n")).toHaveLength(fiveA.length + 2);
+  expect(lines.filter((line) => / Std\. · /.test(line))).toHaveLength(fiveA.length);
+  expect(lines.at(-1)).toMatch(/^Stand der Schule: /);
+  // Only the text: no separate title or link for the share menu to add.
+  expect(shared[0].title).toBeUndefined();
+  expect(shared[0].url).toBeUndefined();
 
   // Without a share menu (desktop): copied to the clipboard instead.
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -214,8 +225,8 @@ test("shares the day's changes", async ({ page, context }) => {
   await desktop.getByRole("button", { name: "Teilen" }).click();
   await expect(desktop.getByText("Kopiert")).toBeVisible();
   const copied = await desktop.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toMatch(/^Vertretungsplan 5A – Morgen, Freitag, 09\.10\.\n/);
-  expect(copied).toContain("http://localhost:3124");
+  expect(copied).toMatch(/^Vertretungsplan 5A\nMorgen, Freitag, 09\.10\.\n\n/);
+  expect(copied).not.toContain("http");
 });
 
 test("settings: next day hour and new badges", async ({ page }) => {
@@ -280,6 +291,7 @@ test("settings: swipe down closes the sheet without refreshing", async ({ browse
   page.on("request", (request) => {
     if (request.url().includes("force=1")) forced.push(request.url());
   });
+  await settled(dialog);
   // Choosing "Immer" may have scrolled the sheet's content; swipes start at its top.
   await dialog.evaluate((element) => {
     element.scrollTop = 0;
@@ -310,8 +322,7 @@ test("settings: swipe down closes the sheet without refreshing", async ({ browse
 
   // It opens normally again.
   await page.getByRole("button", { name: "Einstellungen" }).click();
-  await expect(dialog).toBeVisible();
-  await page.waitForTimeout(300);
+  await settled(dialog);
   expect((await dialog.boundingBox())!.y).toBeCloseTo(box.y, 0);
   await context.close();
 });
@@ -334,6 +345,7 @@ test("settings: page stays still, text size, install hint and reset", async ({ b
   expect(await page.evaluate(() => document.body.style.top)).toBe(`-${400}px`);
 
   // Wheel and touch scrolling over the sheet do not move the page behind it.
+  await settled(dialog);
   const box = (await dialog.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 200);
   await page.mouse.wheel(0, -600);
@@ -391,6 +403,7 @@ test("settings: the header can be swiped even when scrolled down", async ({ brow
   // "Fertig" stays visible.
   await expect(dialog.getByRole("button", { name: "Fertig" })).toBeInViewport();
 
+  await settled(dialog);
   const header = (await dialog.locator("[data-sheet-header]").boundingBox())!;
   const x = header.x + header.width / 2;
   const cdp = await context.newCDPSession(page);
@@ -400,5 +413,31 @@ test("settings: the header can be swiped even when scrolled down", async ({ brow
   }
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await expect(dialog).toBeHidden();
+  await context.close();
+});
+
+test("smooth scrolling: no blocking touch listener, pull to refresh still works", async ({ browser }) => {
+  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.goto("/");
+  await chooseClass(page, "9A");
+  const cdp = await context.newCDPSession(page);
+
+  // Touch listeners on the page must be passive, or every scroll step waits for JavaScript.
+  const { result } = await cdp.send("Runtime.evaluate", { expression: "window" });
+  const { listeners } = await cdp.send("DOMDebugger.getEventListeners", { objectId: result.objectId! });
+  // Only touchstart/touchmove can hold up scrolling.
+  const touch = listeners.filter((listener) => ["touchstart", "touchmove"].includes(listener.type));
+  expect(touch.length).toBeGreaterThan(0);
+  expect(touch.filter((listener) => !listener.passive)).toEqual([]);
+
+  // Pulling down at the top refreshes from the school website.
+  const forced = page.waitForRequest((request) => request.url().includes("force=1"));
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 200, y: 150 }] });
+  for (let step = 1; step <= 10; step += 1) {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 200, y: 150 + step * 30 }] });
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await forced;
   await context.close();
 });

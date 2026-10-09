@@ -12,7 +12,6 @@ type DaySummaryProps = {
   /** Whether those are currently shown anyway. */
   showingOtherCourses: boolean;
   onToggleOtherCourses: () => void;
-  shareTitle: string;
   getShareText: () => string;
 };
 
@@ -23,7 +22,6 @@ export function DaySummary({
   otherCourses,
   showingOtherCourses,
   onToggleOtherCourses,
-  shareTitle,
   getShareText,
 }: DaySummaryProps) {
   const items = summarizeEntries(entries);
@@ -51,7 +49,7 @@ export function DaySummary({
             </span>
           ))}
         </div>
-        <ShareButton title={shareTitle} getText={getShareText} />
+        <ShareButton getText={getShareText} />
       </div>
       {otherCourses > 0 ? (
         <p className="text-sm text-muted">

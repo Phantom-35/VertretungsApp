@@ -326,7 +326,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                 otherCourses={otherCourseCount}
                 showingOtherCourses={showOtherCourses}
                 onToggleOtherCourses={() => setShowOtherCourses((value) => !value)}
-                shareTitle={`Vertretungsplan ${selectedClass}`}
                 getShareText={() =>
                   buildShareText({
                     schoolClass: selectedClass,

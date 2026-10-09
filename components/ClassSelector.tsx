@@ -19,7 +19,7 @@ export function ClassSelector({
   children,
 }: ClassSelectorProps) {
   return (
-    <section className="rounded-[1.75rem] border border-line bg-card p-4 shadow-[0_18px_45px_rgba(18,41,39,0.08)] backdrop-blur">
+    <section className="rounded-[1.75rem] border border-line bg-card p-4 shadow-[0_18px_45px_rgba(18,41,39,0.08)]">
       <label
         htmlFor="class-selector"
         className="text-xs font-semibold uppercase tracking-[0.22em] text-muted"

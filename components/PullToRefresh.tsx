@@ -65,10 +65,8 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
         return;
       }
 
-      // Keep the page still while pulling.
-      if (event.cancelable) {
-        event.preventDefault();
-      }
+      // No preventDefault: at the top the page cannot move anyway
+      // (overscroll-behavior: none), and a passive listener keeps scrolling smooth.
       distanceRef.current = Math.min(MAX_DISTANCE, delta * RESISTANCE);
       setDistance(distanceRef.current);
     };
@@ -85,7 +83,7 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
     };
 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
     window.addEventListener("touchend", onTouchEnd);
     window.addEventListener("touchcancel", reset);
 

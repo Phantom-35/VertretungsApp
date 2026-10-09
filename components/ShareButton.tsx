@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
 type ShareButtonProps = {
-  title: string;
   /** Built only when tapped. */
   getText: () => string;
 };
@@ -12,7 +11,7 @@ type Feedback = "copied" | "failed" | null;
  * Opens the phone's share menu (e.g. to send the day's changes to the class
  * chat). Where that is not available, the text is copied instead.
  */
-export function ShareButton({ title, getText }: ShareButtonProps) {
+export function ShareButton({ getText }: ShareButtonProps) {
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   useEffect(() => {
@@ -25,11 +24,12 @@ export function ShareButton({ title, getText }: ShareButtonProps) {
 
   const share = async () => {
     const text = getText();
-    const url = window.location.origin;
 
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title, text, url });
+        // Only the text: with a title and link as well, iOS packs all three
+        // into the message.
+        await navigator.share({ text });
         return;
       } catch (error) {
         // Closing the share menu is not an error.
@@ -40,7 +40,7 @@ export function ShareButton({ title, getText }: ShareButtonProps) {
     }
 
     try {
-      await navigator.clipboard.writeText(`${text}\n${url}`);
+      await navigator.clipboard.writeText(text);
       setFeedback("copied");
     } catch {
       setFeedback("failed");

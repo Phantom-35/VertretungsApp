@@ -49,6 +49,27 @@ export function formatShareLine(entry: DescribedEntry, schoolClass: string) {
   return `• ${lessonLabel(entry.lesson)}: ${describeEntry(entry, schoolClass)}`;
 }
 
+/**
+ * One change as a short block for messengers:
+ *   3.–4. Std. · Vertretung (9AB)
+ *   Lehrer FER → GOT · Raum 109
+ *   „Aufgaben im Lernraum“
+ */
+export function formatShareBlock(entry: DescribedEntry, schoolClass: string) {
+  const className = formatClassName(entry.className);
+  const teacher = teacherLabel(entry);
+  const details = [
+    entry.subject ? `Fach ${entry.subject}` : "",
+    teacher ? `Lehrer ${teacher}` : "",
+    entry.room ? `Raum ${entry.room}` : "",
+  ].filter(Boolean);
+  return [
+    `${lessonLabel(entry.lesson)} · ${entry.type || "Änderung"}${className !== schoolClass ? ` (${className})` : ""}`,
+    ...(details.length > 0 ? [details.join(" · ")] : []),
+    ...(entry.text ? [`„${entry.text}“`] : []),
+  ].join("\n");
+}
+
 /** Plain text of one day's changes, for messengers or the clipboard. */
 export function buildShareText({
   schoolClass,
@@ -57,10 +78,11 @@ export function buildShareText({
   ownCoursesOnly,
   sourceUpdated,
 }: ShareOptions) {
-  const heading = `Vertretungsplan ${schoolClass}${ownCoursesOnly ? " (meine Kurse)" : ""} – ${dayLabel}`;
+  const heading = [`Vertretungsplan ${schoolClass}${ownCoursesOnly ? " (meine Kurse)" : ""}`, dayLabel].join("\n");
   const body =
     entries.length > 0
-      ? entries.map((entry) => formatShareLine(entry, schoolClass))
+      ? entries.map((entry) => formatShareBlock(entry, schoolClass))
       : ["Keine Änderungen eingetragen."];
-  return [heading, ...body, ...(sourceUpdated ? [`Stand: ${sourceUpdated}`] : [])].join("\n");
+  // Blank lines between the blocks keep it readable in a chat.
+  return [heading, ...body, ...(sourceUpdated ? [`Stand der Schule: ${sourceUpdated}`] : [])].join("\n\n");
 }
