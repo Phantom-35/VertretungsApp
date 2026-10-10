@@ -93,11 +93,13 @@ npm run test:e2e             # mit dem Browser, den Playwright selbst installier
 npm run test:e2e:container   # Container ohne Download (z. B. Cloud-Sessions)
 ```
 
-`playwright.container.config.ts` nimmt den Browser aus `CHROMIUM_PATH` oder den ersten
-gefundenen (`/opt/pw-browsers/chromium` …). Der vorinstallierte Chromium kann älter sein
-als der, den die Playwright-Version erwartet; das funktioniert bisher. Treten
-Protokollfehler auf, mit `npx playwright install chromium` den passenden Browser holen
-(falls das Netz es erlaubt) und `npm run test:e2e` verwenden. Keine eigenen
+`playwright.container.config.ts` nimmt den Browser aus `CHROMIUM_PATH` oder den
+vorinstallierten unter `/opt/pw-browsers/chromium`; fehlt er, bricht der Lauf mit einer
+klaren Meldung ab (kein stiller Wechsel auf einen anderen Browser). Weicht der Build von
+dem ab, den die installierte Playwright-Version erwartet, steht zu Beginn eine Warnung
+„[e2e] Chromium-Build … statt …“. Das läuft bisher fehlerfrei; treten Protokollfehler
+auf, mit `npx playwright install chromium` den passenden Browser holen (falls das Netz es
+erlaubt) und `npm run test:e2e` verwenden. Keine eigenen
 Konfigurationsdateien anlegen; Überbleibsel wie `pw.local.config.ts` oder `*.tmp.*` sind
 in `.gitignore`.
 
@@ -116,19 +118,28 @@ VAPID-Schlüssel erzeugen, sonst schlägt das Einschalten der Benachrichtigungen
 
 ```bash
 eval "$(node -e 'const k=require("web-push").generateVAPIDKeys();console.log(`export VAPID_PUBLIC_KEY=${k.publicKey} VAPID_PRIVATE_KEY=${k.privateKey}`)')"
-FIXTURE_PORT=3299 node e2e/fixture-server.mjs > /tmp/kag-fixture.log 2>&1 &
+LOGS=$(mktemp -d) && echo "Logs: $LOGS"   # eigener Ordner je Sitzung
+FIXTURE_PORT=3299 node e2e/fixture-server.mjs > "$LOGS/fixture.log" 2>&1 &
 SUBSTITUTION_BASE_URL=http://127.0.0.1:3299/subst_ PUSH_STORE=memory \
   VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY \
-  npx next start -p 3300 > /tmp/kag-next.log 2>&1 &
+  npx next start -p 3300 > "$LOGS/next.log" 2>&1 &
 ```
 
 Die Fixture-Seiten können per `POST http://127.0.0.1:3299/__override` ersetzt werden
-(siehe `e2e/fixture-server.mjs`). Danach die Server über ihre Ports beenden – das trifft
-nur diese beiden, nicht fremde Server oder einen laufenden Playwright-Lauf:
+(siehe `e2e/fixture-server.mjs`). Danach die Server über ihre Ports regulär beenden
+(SIGTERM) – das trifft nur diese beiden, nicht fremde Server oder einen laufenden
+Playwright-Lauf:
 
 ```bash
-fuser -k 3299/tcp 3300/tcp
+fuser -k -TERM 3299/tcp 3300/tcp                  # Linux (auch in Cloud-Containern)
+lsof -ti tcp:3299 -ti tcp:3300 | xargs kill       # macOS
 ```
+
+In Cloud-Containern findet `lsof` die Ports des Next-Servers teils nicht; dort `fuser`
+verwenden. Danach mit `fuser 3299/tcp 3300/tcp` prüfen, dass nichts mehr läuft.
+
+Laufen auf diesen Ports schon Server einer anderen Sitzung, andere freie Ports wählen
+(`FIXTURE_PORT` und `-p` sowie `SUBSTITUTION_BASE_URL` anpassen).
 
 Bei größeren UI-Änderungen eine Barrierefreiheits-Prüfung mit axe-core (per Playwright
 injiziert) in hell und dunkel machen; Ziel: 0 Verstöße.

@@ -46,5 +46,5 @@ next-env.d.ts
 /pw.local.config.ts
 
 # scratch files of local checks (scripts, screenshots)
-*.tmp.*
+/*.tmp.*
 /shots/

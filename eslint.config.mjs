@@ -6,6 +6,9 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    // Same files as the react-hooks plugin of the presets; elsewhere the
+    // plugin is not registered.
+    files: ["**/*.{js,jsx,mjs,ts,tsx,mts,cts}"],
     rules: {
       // Explicit, so it stays on whatever the presets do: read browser
       // storage with useSyncExternalStore instead of setState in an effect.
