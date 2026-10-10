@@ -101,7 +101,7 @@ export function InstallReminder() {
           <h2 id="install-reminder-title" className="text-sm font-semibold text-foreground">
             Als App installieren?
           </h2>
-          <p className="mt-0.5 text-sm leading-5 text-foreground/75">
+          <p className="mt-0.5 text-sm leading-5 text-muted">
             Startet schneller und kann dir Mitteilungen schicken.
           </p>
           {!open ? (

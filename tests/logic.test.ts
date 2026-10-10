@@ -273,6 +273,12 @@ describe("new entries", () => {
     );
   });
 
+  it("leaves out badges already seen in this visit", () => {
+    const old = [entry("2026-10-08", "1")];
+    const now = [...old, entry("2026-10-08", "2"), entry("2026-10-08", "3")];
+    expect(findNewKeys(old.map(entryKey), now, new Set([entryKey(now[1])]))).toEqual(new Set([entryKey(now[2])]));
+  });
+
   it("marks nothing as new on first use", () => {
     expect(findNewKeys(null, [entry("2026-10-08", "1")]).size).toBe(0);
   });

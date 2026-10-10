@@ -23,9 +23,12 @@ type SubstitutionCardProps = {
 
 /** How long a "Neu" badge stays once it is fully on screen. */
 const NEW_VISIBLE_MS = 8_000;
-const FADE_MS = 700;
 
-/** "Neu", fading out after it has been on screen for a few seconds. */
+/**
+ * "Neu", fading out once it has been fully on screen for a few seconds while
+ * the app is in front. Scrolled partly away or the app in the background,
+ * the time starts anew.
+ */
 function NewBadge({ onSeen }: { onSeen?: () => void }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [fading, setFading] = useState(false);
@@ -41,37 +44,49 @@ function NewBadge({ onSeen }: { onSeen?: () => void }) {
       return;
     }
     let timer: number | undefined;
-    // Counts only while it can be seen: scrolled away, the time starts anew.
+    let fullyOnScreen = false;
+    const done = () => {
+      // Without animations it simply goes away.
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        onSeenRef.current?.();
+      } else {
+        setFading(true);
+      }
+    };
+    const update = () => {
+      if (fullyOnScreen && document.visibilityState === "visible") {
+        timer ??= window.setTimeout(done, NEW_VISIBLE_MS);
+      } else {
+        window.clearTimeout(timer);
+        timer = undefined;
+      }
+    };
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          timer ??= window.setTimeout(() => setFading(true), NEW_VISIBLE_MS);
-        } else {
-          window.clearTimeout(timer);
-          timer = undefined;
-        }
+        fullyOnScreen = entry.intersectionRatio >= 0.99;
+        update();
       },
-      { threshold: 1 },
+      // Also told when it goes from fully to partly visible.
+      { threshold: [0, 1] },
     );
     observer.observe(badge);
+    document.addEventListener("visibilitychange", update);
     return () => {
       observer.disconnect();
+      document.removeEventListener("visibilitychange", update);
       window.clearTimeout(timer);
     };
   }, []);
 
-  useEffect(() => {
-    if (!fading) {
-      return;
-    }
-    const timer = window.setTimeout(() => onSeenRef.current?.(), FADE_MS);
-    return () => window.clearTimeout(timer);
-  }, [fading]);
-
   return (
     <span
       ref={ref}
-      className={`rounded-full bg-accent px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-white transition-opacity duration-700 ${
+      onTransitionEnd={(event) => {
+        if (fading && event.propertyName === "opacity") {
+          onSeenRef.current?.();
+        }
+      }}
+      className={`rounded-full bg-accent px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-white motion-safe:transition-opacity motion-safe:duration-700 ${
         fading ? "opacity-0" : ""
       }`}
     >

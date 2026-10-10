@@ -365,6 +365,8 @@ test("filters the upper school by the student's teachers", async ({ page }) => {
 });
 
 test("marks changes that are new since the last visit", async ({ page }) => {
+  // Tall enough that every badge is fully on screen (only then they fade).
+  await page.setViewportSize({ width: 390, height: 2000 });
   await page.goto("/");
   await chooseClass(page, "5A");
   // First visit: nothing counts as new.

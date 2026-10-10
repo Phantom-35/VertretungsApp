@@ -247,10 +247,20 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     : null;
   const visibleEntries = shownEntries.filter(onSelectedDay);
   const compactCards = visibleEntries.length >= COMPACT_FROM;
+  // Cards keyed by their content, not by the plan's page numbers (which shift
+  // with every upload): a badge keeps its state across refreshes, and an
+  // edited entry is a new card with a fresh badge.
+  const keyCounts = new Map<string, number>();
+  const cardKeys = visibleEntries.map((entry) => {
+    const key = entryKey(entry);
+    const count = keyCounts.get(key) ?? 0;
+    keyCounts.set(key, count + 1);
+    return count === 0 ? key : `${key}#${count}`;
+  });
   // Added or changed since the user last opened the app.
   // Badges seen long enough on screen are gone (and no longer counted).
   const newKeys = settings.showNewBadges
-    ? new Set([...findNewKeys(seenBaseline, visibleEntries)].filter((key) => !acknowledgedNew.has(key)))
+    ? findNewKeys(seenBaseline, visibleEntries, acknowledgedNew)
     : new Set<string>();
   const otherCourseCount =
     classEntries.filter(onSelectedDay).length - ownEntries.filter(onSelectedDay).length;
@@ -430,9 +440,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               visibleEntries.length > 0 ? (
                 // Many changes (e.g. the upper school): smaller cards, closer together.
                 <div className={compactCards ? "space-y-2.5" : "space-y-4"}>
-                  {visibleEntries.map((entry) => (
+                  {visibleEntries.map((entry, index) => (
                     <SubstitutionCard
-                      key={entry.id}
+                      key={cardKeys[index]}
                       entry={entry}
                       isNew={newKeys.has(entryKey(entry))}
                       onNewSeen={() => acknowledgeNewEntry(entryKey(entry))}

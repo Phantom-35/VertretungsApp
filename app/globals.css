@@ -5,7 +5,8 @@
   --background: #f5efe2;
   --background-soft: #fbf8f1;
   --foreground: #172126;
-  --muted: #5f6d73;
+  /* At least 5:1 on every light background, also the green accent ones. */
+  --muted: #56646a;
   --line: rgba(23, 33, 38, 0.08);
   --card: rgba(255, 255, 255, 0.82);
   /* Solid surfaces (inputs, chips) and their muted variant. */

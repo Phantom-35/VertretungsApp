@@ -24,15 +24,20 @@ export function entryKey(entry: KeyedEntry) {
 }
 
 /**
- * Keys of entries that were not in the plan when the user last looked.
- * Without a baseline (first use) nothing counts as new.
+ * Keys of entries that were not in the plan when the user last looked, and
+ * whose badge was not seen in this visit yet (`seenNow`). Without a baseline
+ * (first use) nothing counts as new.
  */
-export function findNewKeys(baseline: readonly string[] | null, entries: KeyedEntry[]) {
+export function findNewKeys(
+  baseline: readonly string[] | null,
+  entries: KeyedEntry[],
+  seenNow: ReadonlySet<string> = new Set(),
+) {
   if (!baseline) {
     return new Set<string>();
   }
   const seen = new Set(baseline);
-  return new Set(entries.map(entryKey).filter((key) => !seen.has(key)));
+  return new Set(entries.map(entryKey).filter((key) => !seen.has(key) && !seenNow.has(key)));
 }
 
 /**

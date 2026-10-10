@@ -15,6 +15,8 @@ let needsBaseline = true;
 /** "Neu" badges that were on screen long enough; they fade out. */
 let acknowledged: ReadonlySet<string> = new Set();
 const listeners = new Set<() => void>();
+const acknowledgedListeners = new Set<() => void>();
+let acknowledgedPending: string[] = [];
 
 function readStored(): string[] | null {
   try {
@@ -61,6 +63,7 @@ export function useSeenBaseline(data: SubstitutionPayload | null) {
       baseline = stored;
       needsBaseline = false;
       acknowledged = new Set();
+      acknowledgedListeners.forEach((listener) => listener());
       listeners.forEach((listener) => listener());
     }
     try {
@@ -80,18 +83,35 @@ export function useSeenBaseline(data: SubstitutionPayload | null) {
   );
 }
 
-/** Marks a "Neu" badge as seen: it stays away until the app is opened again. */
+/**
+ * Marks a "Neu" badge as seen: it stays away until the app is opened again.
+ * Badges fading at the same moment are applied together (one re-render).
+ */
 export function acknowledgeNewEntry(key: string) {
-  if (!acknowledged.has(key)) {
-    acknowledged = new Set([...acknowledged, key]);
-    listeners.forEach((listener) => listener());
+  if (acknowledged.has(key) || acknowledgedPending.includes(key)) {
+    return;
   }
+  acknowledgedPending.push(key);
+  if (acknowledgedPending.length === 1) {
+    queueMicrotask(() => {
+      acknowledged = new Set([...acknowledged, ...acknowledgedPending]);
+      acknowledgedPending = [];
+      acknowledgedListeners.forEach((listener) => listener());
+    });
+  }
+}
+
+function subscribeAcknowledged(listener: () => void) {
+  acknowledgedListeners.add(listener);
+  return () => {
+    acknowledgedListeners.delete(listener);
+  };
 }
 
 /** Keys of the "Neu" badges already seen in this visit. */
 export function useAcknowledgedEntries() {
   return useSyncExternalStore(
-    subscribe,
+    subscribeAcknowledged,
     () => acknowledged,
     () => acknowledged,
   );
