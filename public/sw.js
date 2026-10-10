@@ -3,6 +3,10 @@ const VERSION = "v2";
 const PAGE_CACHE = `kag-pages-${VERSION}`;
 const STATIC_CACHE = `kag-static-${VERSION}`;
 const NAVIGATION_TIMEOUT_MS = 6000;
+// The number on the app icon, kept in the cache storage because the worker
+// forgets its variables when it stops; the app deletes it when opened.
+const BADGE_CACHE = "kag-badge";
+const BADGE_KEY = "/__badge";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
@@ -11,7 +15,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      const keep = new Set([PAGE_CACHE, STATIC_CACHE]);
+      const keep = new Set([PAGE_CACHE, STATIC_CACHE, BADGE_CACHE]);
       const names = await caches.keys();
       await Promise.all(
         names.filter((name) => !keep.has(name)).map((name) => caches.delete(name)),
@@ -275,12 +279,34 @@ self.addEventListener("push", (event) => {
     options.tag = data.tag;
   }
 
-  const badge =
-    typeof data.badgeCount === "number" && self.navigator.setAppBadge
-      ? self.navigator.setAppBadge(data.badgeCount).catch(() => undefined)
-      : undefined;
-  event.waitUntil(Promise.all([self.registration.showNotification(title, options), badge]));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      typeof data.badgeCount === "number"
+        ? updateBadge(data.badgeCount, data.badgeMode === "set").catch(() => undefined)
+        : undefined,
+    ]),
+  );
 });
+
+// The number on the app icon: changes not seen yet.
+async function updateBadge(count, replace) {
+  if (!self.navigator.setAppBadge) {
+    return;
+  }
+  // Nothing to count while the app is open in front of the user.
+  const windows = await self.clients.matchAll({ type: "window" });
+  if (windows.some((client) => client.visibilityState === "visible")) {
+    return;
+  }
+  const cache = await caches.open(BADGE_CACHE);
+  const stored = await cache.match(BADGE_KEY);
+  const current = stored ? Number(await stored.text()) || 0 : 0;
+  // Changes add up; a summary shows at least the changes of its day.
+  const total = replace ? Math.max(current, count) : current + count;
+  await cache.put(BADGE_KEY, new Response(String(total)));
+  await self.navigator.setAppBadge(total);
+}
 
 // Tapping a notification opens the app on the day concerned.
 self.addEventListener("notificationclick", (event) => {

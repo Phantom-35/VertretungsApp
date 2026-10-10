@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import Link from "next/link";
 import { InstallGuide } from "@/components/InstallGuide";
 import { Segmented } from "@/components/Segmented";
 import { TeacherChooser } from "@/components/TeacherFilter";
@@ -6,7 +7,7 @@ import { ThemeChoice } from "@/components/ThemeSettings";
 import { NEXT_DAY_HOURS, useSettings, type TextSize } from "@/hooks/useSettings";
 import { isStandalone } from "@/lib/device";
 import { SCHOOL_CLASSES } from "@/lib/entries";
-import { EVENING_SUMMARY_HOUR, NOTIFY_GROUP_LABELS, NOTIFY_GROUPS } from "@/lib/notify";
+import { EVENING_SUMMARY_HOUR, MORNING_SUMMARY_HOUR, NOTIFY_GROUP_LABELS, NOTIFY_GROUPS } from "@/lib/notify";
 import { resetDevice } from "@/lib/reset";
 
 export type SettingsFocus = "teachers" | null;
@@ -401,12 +402,18 @@ export function SettingsSheet({
               />
             ))}
           </div>
-          <div className="rounded-2xl border border-line bg-card">
+          <div className="divide-y divide-line rounded-2xl border border-line bg-card">
             <Switch
               label="Abends Überblick für morgen"
               hint={`Um ${EVENING_SUMMARY_HOUR} Uhr vor jedem Schultag, sobald der Plan da ist – auch wenn sich nichts ändert.`}
               checked={settings.eveningSummary}
               onChange={(eveningSummary) => updateSettings({ eveningSummary })}
+            />
+            <Switch
+              label="Morgens Überblick für heute"
+              hint={`Um ${MORNING_SUMMARY_HOUR} Uhr an jedem Schultag – auch wenn sich nichts ändert.`}
+              checked={settings.morningSummary}
+              onChange={(morningSummary) => updateSettings({ morningSummary })}
             />
           </div>
         </Setting>
@@ -436,10 +443,22 @@ export function SettingsSheet({
           </Card>
         ) : null}
 
+        <Card
+          title="App weitergeben"
+          description="Ein QR-Code zur App: zum Zeigen auf dem Handy oder als Aushang zum Ausdrucken."
+        >
+          <Link
+            href="/teilen"
+            className="inline-block rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold text-accent-strong"
+          >
+            QR-Code zeigen
+          </Link>
+        </Card>
+
         <Card title="Über die App">
           <p className="text-xs leading-5 text-muted">
             Die Daten stammen vom Vertretungsplan der Schule. Deine Einstellungen werden nur auf
-            diesem Gerät gespeichert.{VERSION ? ` Version ${VERSION}.` : ""}
+            diesem Gerät gespeichert. Gezählt werden nur anonyme Aufrufe, ohne Cookies.{VERSION ? ` Version ${VERSION}.` : ""}
           </p>
           <button
             type="button"

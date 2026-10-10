@@ -96,6 +96,34 @@ test("shows the NRW holidays instead of an old plan", async ({ page }) => {
   await expect(page.locator("article").first()).toBeVisible();
 });
 
+test("shows a public holiday instead of an old plan", async ({ page }) => {
+  // Christi Himmelfahrt 2027 (Thursday); the saved plan is from 08./09.10.2026.
+  await page.clock.setFixedTime(new Date("2027-05-06T09:00:00+02:00"));
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const header = page.locator("header");
+  await expect(header).toContainText("Christi Himmelfahrt");
+  await expect(header).toContainText("Feiertag");
+  const card = page.getByRole("region", { name: "Schönen Feiertag!" });
+  await expect(card).toContainText("Heute ist Christi Himmelfahrt, schulfrei.");
+  await expect(card).toContainText("Der Plan für Fr., 07.05. erscheint hier");
+});
+
+test("offers a QR code to pass the app on", async ({ page }) => {
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  await page.getByRole("link", { name: "QR-Code zeigen" }).click();
+  await expect(page).toHaveURL(/\/teilen$/);
+  const origin = new URL(page.url()).origin;
+  await expect(page.getByRole("img", { name: `QR-Code für ${origin}/` })).toBeVisible();
+  await expect(page.getByText(origin.replace(/^https?:\/\//, ""), { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Aushang drucken" })).toBeVisible();
+
+  await page.getByRole("link", { name: "← Zurück zur App" }).click();
+  await expect(page.locator("header")).toContainText("5A");
+});
+
 test("shows the install steps of the browser in use", async ({ browser }) => {
   const cases = [
     {

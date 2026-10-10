@@ -7,7 +7,7 @@ import {
 import { formatShortDate, relativeDayLabel } from "@/lib/format";
 import type { KeyedEntry } from "@/lib/seen";
 import { describeEntry, lessonLabel } from "@/lib/share";
-import { EVENING_SUMMARY_HOUR, notifyGroupOf, type NotifyGroup } from "@/lib/notify";
+import { EVENING_SUMMARY_HOUR, MORNING_SUMMARY_HOUR, notifyGroupOf, type NotifyGroup } from "@/lib/notify";
 import { NEXT_DAY_FROM_HOUR, daysBetween, schoolHour, schoolToday } from "@/lib/time";
 import type { PlanDiff } from "@/lib/push/diff";
 
@@ -23,6 +23,11 @@ export type PushPayload = {
   url: string;
   /** Number shown on the app icon, where supported. */
   badgeCount?: number;
+  /**
+   * "add" (default): the count adds to changes not seen yet. "set": the
+   * icon shows at least this count (summaries repeat known changes).
+   */
+  badgeMode?: "add" | "set";
   tag?: string;
 };
 
@@ -160,22 +165,40 @@ export function isSummaryTime(now: number) {
   return hour >= EVENING_SUMMARY_HOUR && hour < QUIET_FROM_HOUR;
 }
 
+/** Morning summaries go out from MORNING_SUMMARY_HOUR until 8 h. */
+export const MORNING_SUMMARY_UNTIL_HOUR = 8;
+
+export function isMorningSummaryTime(now: number) {
+  const hour = schoolHour(now);
+  return hour >= MORNING_SUMMARY_HOUR && hour < MORNING_SUMMARY_UNTIL_HOUR;
+}
+
+/** The plan's day `offset` days from today, if it is a school day (Mon–Fri). */
+function schoolDayInPlan(planDates: readonly string[], now: number, offset: number) {
+  const today = schoolToday(now);
+  const date = planDates.find((planDate) => daysBetween(today, planDate) === offset);
+  if (!date) {
+    return null;
+  }
+  const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+  return weekday === 0 || weekday === 6 ? null : date;
+}
+
 /**
  * The day an evening summary is about: tomorrow, if it is a school day
  * (Mon–Fri) and the school has already published its plan. Otherwise null,
  * e.g. on Friday and Saturday evenings or in the holidays.
  */
 export function summaryDate(planDates: readonly string[], now: number) {
-  const today = schoolToday(now);
-  const tomorrow = planDates.find((date) => daysBetween(today, date) === 1);
-  if (!tomorrow) {
-    return null;
-  }
-  const weekday = new Date(`${tomorrow}T12:00:00Z`).getUTCDay();
-  return weekday === 0 || weekday === 6 ? null : tomorrow;
+  return schoolDayInPlan(planDates, now, 1);
 }
 
-/** "5A · Morgen: 2 Änderungen" with one line per change, or "keine Änderungen". */
+/** The day a morning summary is about: today, if it is a school day in the plan. */
+export function morningSummaryDate(planDates: readonly string[], now: number) {
+  return schoolDayInPlan(planDates, now, 0);
+}
+
+/** "5A · Morgen: 2 Änderungen" with one line per change, or "keine Änderungen" (also for today). */
 export function buildSummary(
   audience: Audience,
   entries: readonly KeyedEntry[],
@@ -209,5 +232,6 @@ export function buildSummary(
     url,
     tag,
     badgeCount: own.length,
+    badgeMode: "set",
   };
 }

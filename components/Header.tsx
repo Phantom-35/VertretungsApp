@@ -1,6 +1,6 @@
 import { SettingsButton, ThemeToggle } from "@/components/ThemeSettings";
 
-export type HeaderStatus = "current" | "updating" | "offline" | "outdated" | "incomplete" | "holiday";
+export type HeaderStatus = "current" | "updating" | "offline" | "outdated" | "incomplete" | "holiday" | "public-holiday";
 
 type HeaderProps = {
   selectedClass: string | null | undefined;
@@ -33,6 +33,10 @@ const statusBadges: Record<HeaderStatus, { label: string; className: string }> =
   },
   holiday: {
     label: "Ferien",
+    className: "border-accent/10 bg-accent-soft text-accent-strong",
+  },
+  "public-holiday": {
+    label: "Feiertag",
     className: "border-accent/10 bg-accent-soft text-accent-strong",
   },
   incomplete: {

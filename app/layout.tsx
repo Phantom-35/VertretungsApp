@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { UsageStats } from "@/components/UsageStats";
 import { THEME_COLORS, THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -38,7 +39,11 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {children}
+        {/* Only on Vercel, where the counting endpoint exists. */}
+        {process.env.VERCEL === "1" ? <UsageStats /> : null}
+      </body>
     </html>
   );
 }

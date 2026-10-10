@@ -69,6 +69,7 @@ export async function subscribe(
     teachers: request.teachers,
     notifyGroups: request.notifyGroups,
     eveningSummary: request.eveningSummary,
+    morningSummary: request.morningSummary,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
   });

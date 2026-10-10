@@ -43,6 +43,7 @@ export type SubscribeRequest = {
   teachers: string[];
   notifyGroups: NotifyGroup[];
   eveningSummary: boolean;
+  morningSummary: boolean;
 };
 
 export function parseSubscribeRequest(value: unknown): SubscribeRequest | string {
@@ -73,6 +74,7 @@ export function parseSubscribeRequest(value: unknown): SubscribeRequest | string
     // Older app versions send no choice: everything, no summary.
     notifyGroups: parseNotifyGroups(value.notifyGroups) ?? [...NOTIFY_GROUPS],
     eveningSummary: value.eveningSummary === true,
+    morningSummary: value.morningSummary === true,
   };
 }
 

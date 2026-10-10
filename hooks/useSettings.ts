@@ -13,6 +13,8 @@ export type Settings = {
   notifyGroups: NotifyGroup[];
   /** Summary of the next school day at 19 h. */
   eveningSummary: boolean;
+  /** Summary of the day at 6 h. */
+  morningSummary: boolean;
 };
 
 export type TextSize = "normal" | "large";
@@ -28,6 +30,7 @@ const DEFAULTS: Settings = {
   textSize: "normal",
   notifyGroups: [...NOTIFY_GROUPS],
   eveningSummary: false,
+  morningSummary: false,
 };
 const STORAGE_KEY = SETTINGS_STORAGE_KEY;
 
@@ -49,6 +52,7 @@ function parse(raw: string | null): Settings {
       textSize: stored.textSize === "large" ? "large" : "normal",
       notifyGroups: parseNotifyGroups(stored.notifyGroups) ?? DEFAULTS.notifyGroups,
       eveningSummary: stored.eveningSummary === true,
+      morningSummary: stored.morningSummary === true,
     };
   } catch {
     return DEFAULTS;

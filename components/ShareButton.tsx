@@ -5,6 +5,7 @@ type ShareButtonProps = {
   getText: () => string;
   /** "large": the main action of a card, e.g. on a day without changes. */
   size?: "small" | "large";
+  label?: string;
 };
 
 type Feedback = "copied" | "failed" | null;
@@ -13,7 +14,7 @@ type Feedback = "copied" | "failed" | null;
  * Opens the phone's share menu (e.g. to send the day's changes to the class
  * chat). Where that is not available, the text is copied instead.
  */
-export function ShareButton({ getText, size = "small" }: ShareButtonProps) {
+export function ShareButton({ getText, size = "small", label = "Teilen" }: ShareButtonProps) {
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   useEffect(() => {
@@ -76,7 +77,7 @@ export function ShareButton({ getText, size = "small" }: ShareButtonProps) {
           <path d="M12 3v12M7 8l5-5 5 5" />
           <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
         </svg>
-        Teilen
+        {label}
       </button>
     </div>
   );

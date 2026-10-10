@@ -21,6 +21,8 @@ export type Subscriber = {
   notifyGroups?: NotifyGroup[];
   /** Summary of the next school day in the evening. */
   eveningSummary?: boolean;
+  /** Summary of the day in the morning. */
+  morningSummary?: boolean;
 };
 
 export interface PushStore {

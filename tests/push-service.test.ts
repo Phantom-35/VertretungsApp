@@ -259,13 +259,70 @@ describe("evening summary in the check", () => {
   });
 });
 
+describe("morning summary in the check", () => {
+  // Friday 09.10.2026.
+  const MORNING = Date.parse("2026-10-09T06:05:00+02:00");
+  const withDays = (entries: SubstitutionEntry[], days: string[]) =>
+    ({ ...plan(entries), days: days.map((date) => ({ date, dayLabel: null, weekLabel: null })) }) as SubstitutionPayload;
+  const wantsMorning = async (store: MemoryStore, name: string) => {
+    const sub = await addSubscriber(store, name, "5A");
+    await store.saveSubscriber({ ...(await store.getSubscriber(subscriberId(sub.endpoint)))!, morningSummary: true });
+    return sub;
+  };
+
+  it("sends one summary of the day per morning to those who want it", async () => {
+    const store = new MemoryStore();
+    const wants = await wantsMorning(store, "wants");
+    await addSubscriber(store, "not", "5A");
+    const { sent, send } = fakeSender();
+    const loadPlan = async () => withDays([entry({ lesson: "1" })], ["2026-10-09", "2026-10-12"]);
+
+    expect(await runPushCheck({ store, send, loadPlan, now: MORNING })).toMatchObject({ summaries: 1 });
+    expect(sent.map((item) => item.endpoint)).toEqual([wants.endpoint]);
+    expect(sent[0].payload).toMatchObject({ title: "5A · Heute: 1 Änderung", url: "/?day=2026-10-09" });
+
+    // Later the same morning: not again.
+    await runPushCheck({ store, send, loadPlan, now: MORNING + 60 * 60_000 });
+    expect(sent).toHaveLength(1);
+  });
+
+  it("only comes on school days in the morning", async () => {
+    const store = new MemoryStore();
+    await wantsMorning(store, "wants");
+    const { sent, send } = fakeSender();
+    // After 8 h: too late.
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-09"]), now: Date.parse("2026-10-09T08:05:00+02:00") });
+    // Saturday, or a day without a plan (holidays).
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-10"]), now: Date.parse("2026-10-10T06:05:00+02:00") });
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-16"]), now: Date.parse("2026-10-13T06:05:00+02:00") });
+    expect(sent).toHaveLength(0);
+  });
+
+  it("covers the day's changes found in the same check", async () => {
+    const store = new MemoryStore();
+    const wants = await wantsMorning(store, "wants");
+    const other = await addSubscriber(store, "other", "5A");
+    const { sent, send } = fakeSender();
+    const days = ["2026-10-09", "2026-10-12"];
+    // Known since the evening before.
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], days), now: Date.parse("2026-10-08T20:30:00+02:00") });
+
+    const changed = [entry({ lesson: "1" }), entry({ lesson: "2", date: "2026-10-12" })];
+    await runPushCheck({ store, send, loadPlan: async () => withDays(changed, days), now: MORNING });
+    const titles = (endpoint: string) => sent.filter((item) => item.endpoint === endpoint).map((item) => item.payload.title);
+    // Today's change is in the summary; Monday's comes as a notification.
+    expect(titles(wants.endpoint)).toEqual(["5A · Mo., 12.10. 2. Std.", "5A · Heute: 1 Änderung"]);
+    expect(titles(other.endpoint)).toEqual(["5A: 2 Änderungen"]);
+  });
+});
+
 describe("subscriptions", () => {
   const service = (send: PushService["send"]) => ({ store: new MemoryStore(), send, publicKey: "k" });
 
   it("confirms a new device once and keeps its settings up to date", async () => {
     const { sent, send } = fakeSender();
     const push = service(send);
-    const request = { subscription: subscription("phone"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false };
+    const request = { subscription: subscription("phone"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false };
     expect(await subscribe(push, request)).toEqual({ ok: true, created: true });
     expect(sent).toHaveLength(1);
     expect(sent[0].payload.title).toBe("Benachrichtigungen sind an");
@@ -282,7 +339,7 @@ describe("subscriptions", () => {
   it("refuses a device whose push subscription does not work", async () => {
     const { send } = fakeSender({ [subscription("dead").endpoint]: "gone" });
     const push = service(send);
-    const result = await subscribe(push, { subscription: subscription("dead"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false });
+    const result = await subscribe(push, { subscription: subscription("dead"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false });
     expect(result).toMatchObject({ ok: false, status: 410 });
     expect(await push.store.countSubscribers()).toBe(0);
   });
@@ -290,7 +347,7 @@ describe("subscriptions", () => {
   it("does not store a device the confirmation could not reach", async () => {
     const { send } = fakeSender({ [subscription("flaky").endpoint]: "failed" });
     const push = service(send);
-    const result = await subscribe(push, { subscription: subscription("flaky"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false });
+    const result = await subscribe(push, { subscription: subscription("flaky"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false });
     expect(result).toMatchObject({ ok: false, status: 502 });
     expect(await push.store.countSubscribers()).toBe(0);
   });
@@ -299,7 +356,7 @@ describe("subscriptions", () => {
     const { sent, send } = fakeSender();
     const push = service(send);
     const sub = subscription("phone");
-    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false });
+    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false });
     expect(await sendTest(push, sub.endpoint, NOW)).toBe("sent");
     expect(await sendTest(push, sub.endpoint, NOW + 30_000)).toBe("too-soon");
     expect(await sendTest(push, sub.endpoint, NOW + 61_000)).toBe("sent");
@@ -311,7 +368,7 @@ describe("subscriptions", () => {
     const { sent, send } = fakeSender();
     const push = service(send);
     const sub = subscription("phone");
-    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false });
+    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false });
     const before = sent.length;
     const prepared = await prepareTest(push, sub.endpoint, NOW);
     expect(prepared.result).toBe("scheduled");
@@ -349,6 +406,7 @@ describe("request validation", () => {
       teachers: ["RUK", "KER"],
       notifyGroups: [...NOTIFY_GROUPS],
       eveningSummary: false,
+      morningSummary: false,
     });
     expect(
       parseSubscribeRequest({
@@ -356,8 +414,9 @@ describe("request validation", () => {
         schoolClass: "5A",
         notifyGroups: ["room", "cancelled", "bogus", "room"],
         eveningSummary: true,
+        morningSummary: true,
       }),
-    ).toMatchObject({ notifyGroups: ["cancelled", "room"], eveningSummary: true });
+    ).toMatchObject({ notifyGroups: ["cancelled", "room"], eveningSummary: true, morningSummary: true });
     expect(parseSubscribeRequest({ subscription: subscription("phone"), schoolClass: "11Z" })).toBe(
       "Unbekannte Klasse.",
     );

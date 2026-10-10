@@ -3,13 +3,32 @@ import type { HolidayBreak } from "@/lib/holidays";
 
 type HolidayCardProps = {
   holiday: HolidayBreak;
+  /** YYYY-MM-DD */
+  today: string | null;
   /** Whether a plan from before the holidays exists to look at. */
   hasOldPlan: boolean;
   onShowOldPlan: () => void;
 };
 
+function texts(holiday: HolidayBreak, today: string | null) {
+  if (holiday.kind === "holidays") {
+    return {
+      title: `Schöne ${holiday.name}!`,
+      text: holiday.from === holiday.to ? "Heute ist frei." : `Frei bis ${formatShortDate(holiday.to)}.`,
+    };
+  }
+  const onHoliday = today !== null && today >= holiday.from && today <= holiday.to;
+  return {
+    title: onHoliday ? "Schönen Feiertag!" : "Schönes langes Wochenende!",
+    text: onHoliday
+      ? `Heute ist ${holiday.name}, schulfrei.`
+      : `Am ${formatShortDate(holiday.from)} ist ${holiday.name}, schulfrei.`,
+  };
+}
+
 /** In the holidays, instead of an old plan that looks out of date. */
-export function HolidayCard({ holiday, hasOldPlan, onShowOldPlan }: HolidayCardProps) {
+export function HolidayCard({ holiday, today, hasOldPlan, onShowOldPlan }: HolidayCardProps) {
+  const { title, text } = texts(holiday, today);
   return (
     <section
       aria-labelledby="holiday-title"
@@ -33,10 +52,10 @@ export function HolidayCard({ holiday, hasOldPlan, onShowOldPlan }: HolidayCardP
         </svg>
       </span>
       <h2 id="holiday-title" className="mt-4 text-lg font-semibold tracking-[-0.03em] text-foreground">
-        Schöne {holiday.name}!
+        {title}
       </h2>
       <p className="mt-2 text-sm leading-6 text-muted">
-        {holiday.from === holiday.to ? "Heute ist frei." : `Frei bis ${formatShortDate(holiday.to)}.`} Der Plan
+        {text} Der Plan
         für {formatShortDate(holiday.backOn)} erscheint hier, sobald die Schule ihn hochlädt.
       </p>
       {hasOldPlan ? (

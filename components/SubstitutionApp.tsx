@@ -113,6 +113,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     teachers: myTeachers,
     notifyGroups: settings.notifyGroups,
     eveningSummary: settings.eveningSummary,
+    morningSummary: settings.morningSummary,
   });
   const onboarding = useOnboarding();
   // The sections glide in when the app opens, not when one appears later.
@@ -162,6 +163,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     const clearBadge = () => {
       if (document.visibilityState === "visible") {
         navigator.clearAppBadge?.().catch(() => undefined);
+        // The count the service worker adds new changes to (see sw.js).
+        window.caches?.delete("kag-badge").catch(() => undefined);
       }
     };
     const onMessage = (event: MessageEvent) => {
@@ -193,8 +196,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const latestDate = days.at(-1)?.date ?? null;
   const planIsPast = latestDate !== null && isPastDate(latestDate, now);
 
-  // School holidays (NRW) without a plan for the days ahead yet: a friendly
-  // card instead of an old plan that looks out of date.
+  // School holidays or a public holiday (NRW) without a plan for the days
+  // ahead yet: a friendly card instead of an old plan that looks out of date.
   const today = now !== null ? schoolToday(now) : null;
   const holiday = today !== null ? holidayBreak(today) : null;
   const planAhead = today !== null && days.some((day) => day.date >= today);
@@ -207,7 +210,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   } else if (connectionError) {
     headerStatus = "offline";
   } else if (holiday && !planAhead) {
-    headerStatus = "holiday";
+    headerStatus = holiday.kind === "holidays" ? "holiday" : "public-holiday";
   } else if (!data || data.stale || fromDevice || planIsPast) {
     headerStatus = "outdated";
   } else if (data.error) {
@@ -215,7 +218,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   }
 
   const dateLabel = holidayMode && holiday
-    ? holiday.from === holiday.to
+    ? holiday.from === holiday.to || holiday.kind === "public-holiday"
       ? holiday.name
       : `${holiday.name} bis ${formatShortDate(holiday.to)}`
     : selectedDay
@@ -392,7 +395,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             {!data && isBusy ? <LoadingState /> : null}
 
             {holidayMode && holiday && selectedClass !== null ? (
-              <HolidayCard holiday={holiday} hasOldPlan={days.length > 0} onShowOldPlan={() => setShowOldPlan(true)} />
+              <HolidayCard holiday={holiday} today={today} hasOldPlan={days.length > 0} onShowOldPlan={() => setShowOldPlan(true)} />
             ) : null}
 
             {!data && !isBusy ? (

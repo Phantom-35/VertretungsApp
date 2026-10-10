@@ -4,8 +4,10 @@ import {
   buildNotification,
   buildSummary,
   changesFor,
+  isMorningSummaryTime,
   isQuietTime,
   isSummaryTime,
+  morningSummaryDate,
   summaryDate,
   type PushPayload,
 } from "@/lib/push/message";
@@ -34,7 +36,7 @@ export type CheckResult =
       notified: number;
       failed: number;
       expired: number;
-      /** Evening summaries sent in this run. */
+      /** Evening or morning summaries sent in this run. */
       summaries: number;
     };
 
@@ -45,8 +47,27 @@ type CheckOptions = {
   now?: number;
 };
 
-/** Bookkeeping key: the day the last evening summary was about. */
+/** Bookkeeping keys: the day the last evening / morning summary was about. */
 const SUMMARY_META = "summary-day";
+const MORNING_SUMMARY_META = "morning-summary-day";
+
+type SummaryRun = { meta: string; day: string; wanted: (subscriber: Subscriber) => boolean };
+
+/** The summary due now, if any: in the evening for tomorrow, in the morning for today. */
+function summaryRun(plan: SubstitutionPayload, now: number): SummaryRun | null {
+  const planDates = () => plan.days.map((day) => day.date);
+  if (isSummaryTime(now)) {
+    const day = summaryDate(planDates(), now);
+    return day ? { meta: SUMMARY_META, day, wanted: (subscriber) => subscriber.eveningSummary === true } : null;
+  }
+  if (isMorningSummaryTime(now)) {
+    const day = morningSummaryDate(planDates(), now);
+    return day
+      ? { meta: MORNING_SUMMARY_META, day, wanted: (subscriber) => subscriber.morningSummary === true }
+      : null;
+  }
+  return null;
+}
 /** Bookkeeping key: when the scheduler last called the check (see /api/health). */
 export const LAST_CHECK_META = "last-check";
 
@@ -54,7 +75,8 @@ export const LAST_CHECK_META = "last-check";
  * Compares the current plan with the last known one and notifies every
  * subscriber about the changes that concern them; in the evening it also
  * sends the summaries of the next school day. Meant to run every few
- * minutes; runs that overlap are skipped.
+ * minutes; runs that overlap are skipped. In the morning it sends the
+ * summaries of the day.
  */
 export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: CheckOptions): Promise<CheckResult> {
   // Also at night: shows that the scheduler still runs.
@@ -80,11 +102,11 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
     await store.savePlanState(diff.state);
 
     const hasChanges = !diff.initial && diff.added.length + diff.removed.length > 0;
-    const day = isSummaryTime(now) ? summaryDate(plan.days.map((planDay) => planDay.date), now) : null;
+    const summary = summaryRun(plan, now);
     // Once per day; recorded before sending, like the plan state.
-    const summaryDue = day !== null && (await store.getMeta(SUMMARY_META)) !== day;
+    const summaryDue = summary !== null && (await store.getMeta(summary.meta)) !== summary.day;
     if (summaryDue) {
-      await store.setMeta(SUMMARY_META, day);
+      await store.setMeta(summary.meta, summary.day);
     }
 
     const subscribers = hasChanges || summaryDue ? await store.listSubscribers() : [];
@@ -102,15 +124,19 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
     };
 
     const notify = async (subscriber: Subscriber) => {
-      const changes = hasChanges ? changesFor(diff, subscriber, now) : [];
+      const getsSummary = summaryDue && summary.wanted(subscriber);
+      // The summary sent with them shows its day's changes already.
+      const changes = (hasChanges ? changesFor(diff, subscriber, now) : []).filter(
+        (change) => !getsSummary || change.entry.date !== summary.day,
+      );
       if (changes.length > 0) {
         if (!(await deliver(subscriber, buildNotification(subscriber.schoolClass, changes, now)))) {
           return;
         }
         stats.notified += 1;
       }
-      if (summaryDue && subscriber.eveningSummary) {
-        if (await deliver(subscriber, buildSummary(subscriber, plan.entries, day, now))) {
+      if (getsSummary) {
+        if (await deliver(subscriber, buildSummary(subscriber, plan.entries, summary.day, now))) {
           stats.summaries += 1;
         }
       }

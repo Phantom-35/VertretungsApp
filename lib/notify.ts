@@ -36,3 +36,5 @@ export function parseNotifyGroups(value: unknown): NotifyGroup[] | null {
 
 /** The evening summary of the next school day is sent from this hour on. */
 export const EVENING_SUMMARY_HOUR = 19;
+/** The morning summary of the day is sent from this hour on (until 8 h). */
+export const MORNING_SUMMARY_HOUR = 6;

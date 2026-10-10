@@ -275,6 +275,7 @@ describe("evening summary", () => {
       url: "/?day=2026-10-09",
       tag: "kag-summary-2026-10-09",
       badgeCount: 2,
+      badgeMode: "set",
     });
   });
 

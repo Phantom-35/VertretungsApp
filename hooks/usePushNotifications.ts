@@ -55,13 +55,20 @@ type Audience = {
   teachers: readonly string[];
   notifyGroups: readonly NotifyGroup[];
   eveningSummary: boolean;
+  morningSummary: boolean;
 };
 
 /**
  * Web push for the selected class (and courses). Keeps the server's copy of
  * class and teachers in sync while notifications are on.
  */
-export function usePushNotifications({ schoolClass, teachers, notifyGroups, eveningSummary }: Audience) {
+export function usePushNotifications({
+  schoolClass,
+  teachers,
+  notifyGroups,
+  eveningSummary,
+  morningSummary,
+}: Audience) {
   const [status, setStatus] = useState<PushStatus>("checking");
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -133,6 +140,7 @@ export function usePushNotifications({ schoolClass, teachers, notifyGroups, even
         teachers: teachersKey ? teachersKey.split(",") : [],
         notifyGroups: groupsKey ? groupsKey.split(",") : [],
         eveningSummary,
+        morningSummary,
       });
       if (result.status === 410 && !cancelled) {
         await subscription.unsubscribe().catch(() => undefined);
@@ -144,7 +152,7 @@ export function usePushNotifications({ schoolClass, teachers, notifyGroups, even
     return () => {
       cancelled = true;
     };
-  }, [status, schoolClass, teachersKey, groupsKey, eveningSummary]);
+  }, [status, schoolClass, teachersKey, groupsKey, eveningSummary, morningSummary]);
 
   const enable = useCallback(async () => {
     const registration = registrationRef.current;
@@ -178,6 +186,7 @@ export function usePushNotifications({ schoolClass, teachers, notifyGroups, even
         teachers,
         notifyGroups,
         eveningSummary,
+        morningSummary,
       });
       if (!result.ok) {
         await subscription.unsubscribe().catch(() => undefined);
@@ -191,7 +200,7 @@ export function usePushNotifications({ schoolClass, teachers, notifyGroups, even
     } finally {
       setBusy(false);
     }
-  }, [publicKey, schoolClass, teachers, notifyGroups, eveningSummary]);
+  }, [publicKey, schoolClass, teachers, notifyGroups, eveningSummary, morningSummary]);
 
   const disable = useCallback(async () => {
     setBusy(true);

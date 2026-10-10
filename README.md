@@ -47,6 +47,21 @@ später), schickt GitHub eine E-Mail. Von Hand starten: GitHub → Actions →
 Live-Check → „Run workflow“. GitHub pausiert geplante Abläufe, wenn 60 Tage lang
 nichts ins Repository gepusht wurde; dann dort wieder aktivieren.
 
+## Ferien und Feiertage
+
+`lib/holidays.ts` enthält die NRW-Ferien laut Ferienordnung bis Ostern 2030 (danach
+ergänzen) und berechnet die gesetzlichen Feiertage in NRW selbst. Liegt für die kommenden
+Tage noch kein Plan vor, zeigt die App an solchen Tagen (samt angrenzendem Wochenende)
+eine Ferien- bzw. Feiertagskarte statt des alten Plans. Bewegliche Ferientage der Schule
+sind nicht enthalten.
+
+## Weitergeben und Nutzungszahlen
+
+`/teilen` zeigt einen QR-Code zur App (auch druckbar als Aushang); erreichbar über die
+Einstellungen. Auf Vercel zählt **Web Analytics** anonyme Seitenaufrufe ohne Cookies
+(Vercel → Projekt → Analytics → Enable). Die Startseite erscheint dort als `/app`
+(vom Home-Bildschirm geöffnet) bzw. `/browser`.
+
 ## Benachrichtigungen (Web-Push)
 
 Die App schickt eine Mitteilung aufs Handy, sobald sich der Plan für die gewählte Klasse
@@ -63,7 +78,10 @@ zurückgenommen, wenn er bei zwei Prüfungen hintereinander fehlt.
 In den Einstellungen lässt sich wählen, worüber benachrichtigt wird (Ausfälle & EVA,
 Vertretungen & Betreuung, Raumänderungen & Verlegungen, Klausuren & Veranstaltungen),
 und ein **Überblick für morgen** einschalten: um 19 Uhr vor jedem Schultag (So–Do), sobald
-der Plan für den nächsten Tag veröffentlicht ist, auch wenn sich nichts ändert.
+der Plan für den nächsten Tag veröffentlicht ist, auch wenn sich nichts ändert. Ebenso ein
+**Überblick für heute** um 6 Uhr an jedem Schultag. Änderungen am Tag eines Überblicks, die
+in derselben Prüfung gefunden werden, stehen nur im Überblick (keine doppelte Mitteilung).
+Die Zahl am App-Symbol zählt die Änderungen, die seit dem letzten Öffnen gemeldet wurden.
 
 ## Abhängigkeiten aktuell halten
 

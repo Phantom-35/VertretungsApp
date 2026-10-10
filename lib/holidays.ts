@@ -43,30 +43,116 @@ function isWeekend(date: string) {
   return day === 0 || day === 6;
 }
 
+/** Easter Sunday (Gregorian calendar, anonymous algorithm), YYYY-MM-DD. */
+export function easterSunday(year: number) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+const publicHolidayCache = new Map<number, Map<string, string>>();
+
+/** Public holidays in North Rhine-Westphalia: date -> name. */
+export function publicHolidays(year: number) {
+  let holidays = publicHolidayCache.get(year);
+  if (!holidays) {
+    const easter = easterSunday(year);
+    holidays = new Map([
+      [`${year}-01-01`, "Neujahr"],
+      [addDays(easter, -2), "Karfreitag"],
+      [addDays(easter, 1), "Ostermontag"],
+      [`${year}-05-01`, "Tag der Arbeit"],
+      [addDays(easter, 39), "Christi Himmelfahrt"],
+      [addDays(easter, 50), "Pfingstmontag"],
+      [addDays(easter, 60), "Fronleichnam"],
+      [`${year}-10-03`, "Tag der Deutschen Einheit"],
+      [`${year}-11-01`, "Allerheiligen"],
+      [`${year}-12-25`, "1. Weihnachtstag"],
+      [`${year}-12-26`, "2. Weihnachtstag"],
+    ]);
+    publicHolidayCache.set(year, holidays);
+  }
+  return holidays;
+}
+
+/** Name of the public holiday on `date`, or null. */
+export function publicHolidayName(date: string) {
+  return publicHolidays(Number(date.slice(0, 4))).get(date) ?? null;
+}
+
+/** No school: weekends and public holidays. */
+function isDayOff(date: string) {
+  return isWeekend(date) || publicHolidayName(date) !== null;
+}
+
 export type HolidayBreak = Holiday & {
-  /** First school day after the holidays (and the weekend around them). */
+  /** School holidays, or a public holiday (with the weekend around it). */
+  kind: "holidays" | "public-holiday";
+  /** First school day after the holidays (and the days off around them). */
   backOn: string;
 };
 
 /**
- * The holidays `date` falls into, including the weekend right before them
- * (so the Saturday and Sunday before already count) and after them.
- * Null on school days and ordinary weekends.
+ * The days off `date` falls into: school holidays, including the weekend
+ * (and public holidays) right before and after them, or a public holiday on
+ * a weekday together with the weekend next to it, e.g. Saturday to
+ * Pfingstmontag. Null on school days and ordinary weekends.
  */
 export function holidayBreak(date: string, holidays: readonly Holiday[] = NRW_HOLIDAYS): HolidayBreak | null {
   for (const holiday of holidays) {
-    // The weekend before: Saturday/Sunday leading into the first day.
+    // The days off before: Saturday/Sunday leading into the first day.
     let start = holiday.from;
-    while (isWeekend(addDays(start, -1))) {
+    while (isDayOff(addDays(start, -1))) {
       start = addDays(start, -1);
     }
     let backOn = addDays(holiday.to, 1);
-    while (isWeekend(backOn)) {
+    while (isDayOff(backOn)) {
       backOn = addDays(backOn, 1);
     }
     if (date >= start && daysBetween(date, backOn) > 0) {
-      return { ...holiday, backOn };
+      return { ...holiday, kind: "holidays", backOn };
     }
   }
-  return null;
+
+  if (!isDayOff(date)) {
+    return null;
+  }
+  // The run of days off around `date`; it counts when a weekday in it is a
+  // public holiday (a holiday on a Saturday or Sunday changes nothing).
+  let start = date;
+  while (isDayOff(addDays(start, -1))) {
+    start = addDays(start, -1);
+  }
+  let backOn = date;
+  while (isDayOff(backOn)) {
+    backOn = addDays(backOn, 1);
+  }
+  const weekdayHolidays: string[] = [];
+  for (let day = start; day < backOn; day = addDays(day, 1)) {
+    if (!isWeekend(day)) {
+      weekdayHolidays.push(day);
+    }
+  }
+  if (weekdayHolidays.length === 0) {
+    return null;
+  }
+  return {
+    name: weekdayHolidays.map((day) => publicHolidayName(day)).join(" und "),
+    from: weekdayHolidays[0],
+    to: weekdayHolidays.at(-1)!,
+    kind: "public-holiday",
+    backOn,
+  };
 }
