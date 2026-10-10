@@ -5,6 +5,7 @@ import { ClassSelector } from "@/components/ClassSelector";
 import { DAY_PANEL_ID, DaySelector, dayTabId } from "@/components/DaySelector";
 import { DaySummary } from "@/components/DaySummary";
 import { Header, type HeaderStatus } from "@/components/Header";
+import { HolidayCard } from "@/components/HolidayCard";
 import { LoadingState } from "@/components/LoadingState";
 import { NoticesCard } from "@/components/NoticesCard";
 import { PullToRefresh } from "@/components/PullToRefresh";
@@ -34,10 +35,11 @@ import {
   isCourseClass,
   normalizeTeacher,
 } from "@/lib/entries";
-import { formatAge, formatPlanDateLabel, formatTimestamp, isPastDate } from "@/lib/format";
+import { formatAge, formatPlanDateLabel, formatShortDate, formatTimestamp, isPastDate } from "@/lib/format";
+import { holidayBreak } from "@/lib/holidays";
 import { entryKey, findNewKeys } from "@/lib/seen";
 import { buildShareText } from "@/lib/share";
-import { pickDefaultDate } from "@/lib/time";
+import { pickDefaultDate, schoolToday } from "@/lib/time";
 import type { SubstitutionPayload } from "@/lib/types";
 
 type SubstitutionAppProps = {
@@ -183,18 +185,32 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const latestDate = days.at(-1)?.date ?? null;
   const planIsPast = latestDate !== null && isPastDate(latestDate, now);
 
+  // School holidays (NRW) without a plan for the days ahead yet: a friendly
+  // card instead of an old plan that looks out of date.
+  const today = now !== null ? schoolToday(now) : null;
+  const holiday = today !== null ? holidayBreak(today) : null;
+  const planAhead = today !== null && days.some((day) => day.date >= today);
+  const [showOldPlan, setShowOldPlan] = useState(false);
+  const holidayMode = Boolean(holiday && !planAhead && !showOldPlan);
+
   let headerStatus: HeaderStatus = "current";
   if (isBusy) {
     headerStatus = "updating";
   } else if (connectionError) {
     headerStatus = "offline";
+  } else if (holiday && !planAhead) {
+    headerStatus = "holiday";
   } else if (!data || data.stale || fromDevice || planIsPast) {
     headerStatus = "outdated";
   } else if (data.error) {
     headerStatus = "incomplete";
   }
 
-  const dateLabel = selectedDay
+  const dateLabel = holidayMode && holiday
+    ? holiday.from === holiday.to
+      ? holiday.name
+      : `${holiday.name} bis ${formatShortDate(holiday.to)}`
+    : selectedDay
     ? formatPlanDateLabel(selectedDay.date, now)
     : isBusy
       ? "Wird geladen …"
@@ -275,8 +291,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
           <Header
             selectedClass={selectedClass}
             dateLabel={dateLabel}
-            weekLabel={selectedDay?.weekLabel ?? null}
-            dateIsPast={selectedDate !== null && isPastDate(selectedDate, now)}
+            weekLabel={holidayMode ? null : (selectedDay?.weekLabel ?? null)}
+            dateIsPast={!holidayMode && selectedDate !== null && isPastDate(selectedDate, now)}
             sourceUpdatedLabel={formatTimestamp(data?.sourceUpdatedAt ?? null, now)}
             fetchedLabel={
               data?.lastUpdated ? formatAge(data.lastUpdated, now) : "noch nie"
@@ -335,7 +351,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             />
           ) : null}
 
-          {days.length > 1 && selectedDate ? (
+          {!holidayMode && days.length > 1 && selectedDate ? (
             <DaySelector
               days={days}
               selectedDate={selectedDate}
@@ -345,7 +361,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             />
           ) : null}
 
-          <NoticesCard notices={visibleNotices} />
+          {!holidayMode ? <NoticesCard notices={visibleNotices} /> : null}
 
           <section
             className="space-y-4"
@@ -355,6 +371,10 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               : {})}
           >
             {!data && isBusy ? <LoadingState /> : null}
+
+            {holidayMode && holiday && selectedClass !== null ? (
+              <HolidayCard holiday={holiday} hasOldPlan={days.length > 0} onShowOldPlan={() => setShowOldPlan(true)} />
+            ) : null}
 
             {!data && !isBusy ? (
               <div className="rounded-[1.75rem] border border-warn/15 bg-warn-soft p-6 text-center">
@@ -386,7 +406,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               </div>
             ) : null}
 
-            {data && selectedClass ? (
+            {!holidayMode && data && selectedClass ? (
               <DaySummary
                 entries={visibleEntries}
                 newCount={newKeys.size}
@@ -397,7 +417,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               />
             ) : null}
 
-            {data && selectedClass ? (
+            {!holidayMode && data && selectedClass ? (
               visibleEntries.length > 0 ? (
                 // Many changes (e.g. the upper school): smaller cards, closer together.
                 <div className={compactCards ? "space-y-2.5" : "space-y-4"}>

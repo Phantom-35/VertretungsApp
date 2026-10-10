@@ -72,6 +72,27 @@ test("compact cards on busy days, a short status line and neutral day counts", a
   expect(await otherCount.evaluate((badge) => badge.className)).not.toContain("warn");
 });
 
+test("shows the NRW holidays instead of an old plan", async ({ page }) => {
+  // Tuesday in the autumn holidays 2026; the saved plan is from 08./09.10.
+  await page.clock.setFixedTime(new Date("2026-10-20T09:00:00+02:00"));
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const header = page.locator("header");
+  await expect(header).toContainText("Herbstferien bis Sa., 31.10.");
+  await expect(header).toContainText("Ferien");
+  await expect(header).not.toContainText("Veraltet");
+  const card = page.getByRole("region", { name: "Schöne Herbstferien!" });
+  await expect(card).toContainText("Der Plan für Mo., 02.11. erscheint hier");
+  await expect(page.getByRole("tab")).toHaveCount(0);
+  await expect(page.locator("article")).toHaveCount(0);
+
+  // The last plan can still be looked at.
+  await card.getByRole("button", { name: "Letzten Plan ansehen" }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  await expect(page.locator("article").first()).toBeVisible();
+});
+
 test("shows the install steps of the browser in use", async ({ browser }) => {
   const cases = [
     {
