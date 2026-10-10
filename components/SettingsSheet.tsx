@@ -47,11 +47,13 @@ const textSizeOptions: { value: TextSize; label: string }[] = [
 /** Short commit of the deployed version (set by Vercel). */
 const VERSION = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null;
 
-/** Legal pages on another website, set on Vercel; hidden until set. */
+/** Support website with the legal pages; the addresses can be changed on Vercel. */
+const SUPPORT_URL = "https://support-vertretung-kag.vercel.app";
 const LEGAL_LINKS = [
-  { label: "Impressum", url: process.env.NEXT_PUBLIC_IMPRESSUM_URL },
-  { label: "Datenschutz", url: process.env.NEXT_PUBLIC_DATENSCHUTZ_URL },
-].filter((link): link is { label: string; url: string } => Boolean(link.url?.trim()));
+  { label: "Impressum", url: process.env.NEXT_PUBLIC_IMPRESSUM_URL?.trim() || `${SUPPORT_URL}/impressum` },
+  { label: "Datenschutz", url: process.env.NEXT_PUBLIC_DATENSCHUTZ_URL?.trim() || `${SUPPORT_URL}/datenschutz` },
+  { label: "Hilfe & Kontakt", url: SUPPORT_URL },
+];
 
 /** Dragged this far down (px) or flicked this fast (px/ms), the sheet closes. */
 const CLOSE_DISTANCE = 90;
@@ -477,21 +479,19 @@ export function SettingsSheet({
               Original-Plan der Schule öffnen
             </a>
           ) : null}
-          {LEGAL_LINKS.length > 0 ? (
-            <p className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3 text-xs">
-              {LEGAL_LINKS.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-muted underline underline-offset-2"
-                >
-                  {link.label}
-                </a>
-              ))}
-            </p>
-          ) : null}
+          <p className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3 text-xs">
+            {LEGAL_LINKS.map((link) => (
+              <a
+                key={link.label}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-muted underline underline-offset-2"
+              >
+                {link.label}
+              </a>
+            ))}
+          </p>
         </Card>
 
         <Card

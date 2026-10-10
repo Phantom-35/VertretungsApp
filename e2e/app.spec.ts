@@ -109,10 +109,19 @@ test("shows a public holiday instead of an old plan", async ({ page }) => {
   await expect(card).toContainText("Der Plan für Fr., 07.05. erscheint hier");
 });
 
-test("offers a QR code to pass the app on", async ({ page }) => {
+test("links the legal pages and offers a QR code to pass the app on", async ({ page }) => {
   await page.goto("/");
   await chooseClass(page, "5A");
   await page.getByRole("button", { name: "Einstellungen" }).click();
+  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  await expect(dialog.getByRole("link", { name: "Impressum" })).toHaveAttribute(
+    "href",
+    "https://support-vertretung-kag.vercel.app/impressum",
+  );
+  await expect(dialog.getByRole("link", { name: "Datenschutz" })).toHaveAttribute(
+    "href",
+    "https://support-vertretung-kag.vercel.app/datenschutz",
+  );
   await page.getByRole("link", { name: "QR-Code zeigen" }).click();
   await expect(page).toHaveURL(/\/teilen$/);
   const origin = new URL(page.url()).origin;
