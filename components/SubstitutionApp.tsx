@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { ClassSelector } from "@/components/ClassSelector";
 import { DAY_PANEL_ID, DaySelector, dayTabId } from "@/components/DaySelector";
 import { DaySummary } from "@/components/DaySummary";
@@ -47,6 +47,9 @@ type SubstitutionAppProps = {
   /** Day to show first, e.g. when opened from a notification. */
   initialDay?: string | null;
 };
+
+const noSubscribe = () => () => undefined;
+const dayInAddress = () => dayFromUrl(window.location.href);
 
 /** "?day=2026-10-09" in a URL opened from a notification. */
 function dayFromUrl(url: string) {
@@ -147,6 +150,10 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const isBusy = status !== "idle";
 
   const [chosenDate, setChosenDate] = useState<string | null>(initialDay);
+  // A page served from the service worker cache was rendered without
+  // "?day=" (e.g. opened from a notification): the address still has it.
+  const addressDay = useSyncExternalStore(noSubscribe, dayInAddress, () => null);
+  const requestedDate = chosenDate ?? addressDay;
 
   // A notification tapped while the app is open: show its day. Opening the
   // app also clears the number on its icon.
@@ -174,8 +181,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
 
   const days = data?.days ?? [];
   // Keep the user's choice while it is still part of the plan.
-  const selectedDate = days.some((day) => day.date === chosenDate)
-    ? chosenDate
+  const selectedDate = days.some((day) => day.date === requestedDate)
+    ? requestedDate
     : pickDefaultDate(
         days.map((day) => day.date),
         now,

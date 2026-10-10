@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
  * Do not block the first paint on a slow school server: if the data is not
  * ready quickly, the client loads it itself (and joins the running request).
  */
-const INITIAL_DATA_TIMEOUT_MS = 2_500;
+const INITIAL_DATA_TIMEOUT_MS = 1_200;
 
 async function getInitialData() {
   const timeout = new Promise<null>((resolve) =>

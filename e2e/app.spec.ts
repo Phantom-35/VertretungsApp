@@ -1,7 +1,10 @@
+import { createServer, request as httpRequest } from "node:http";
+import type { AddressInfo } from "node:net";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { SCHOOL_CLASSES, entryAppliesToClass } from "@/lib/entries";
 import { entryKey } from "@/lib/seen";
 import type { SubstitutionPayload } from "@/lib/types";
+import { APP_PORT } from "./constants";
 
 // The saved plan covers Thu 08.10. and Fri 09.10.2026; "today" is the Thursday.
 const TODAY = new Date("2026-10-08T08:00:00+02:00");
@@ -426,6 +429,50 @@ test("reports a healthy plan", async ({ request }) => {
   const response = await request.get("/api/health");
   expect(response.status()).toBe(200);
   expect(await response.json()).toMatchObject({ ok: true, problems: [] });
+});
+
+test("opens at once from the cache, also on the day of a notification", async ({ page }) => {
+  // A proxy in front of the app that can answer pages slowly, like a server
+  // after a cold start (also for the service worker's own requests).
+  let slow = false;
+  const proxy = createServer((request, response) => {
+    const forward = () => {
+      const upstream = httpRequest(
+        { host: "localhost", port: APP_PORT, path: request.url, method: request.method, headers: request.headers },
+        (answer) => {
+          response.writeHead(answer.statusCode ?? 502, answer.headers);
+          answer.pipe(response);
+        },
+      );
+      upstream.on("error", () => response.destroy());
+      request.pipe(upstream);
+    };
+    if (slow && (request.headers.accept ?? "").includes("text/html")) {
+      setTimeout(forward, 5_000);
+    } else {
+      forward();
+    }
+  });
+  await new Promise<void>((resolve) => proxy.listen(0, resolve));
+  const origin = `http://localhost:${(proxy.address() as AddressInfo).port}`;
+  try {
+    await page.goto(`${origin}/`);
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+    await chooseClass(page, "5A");
+
+    slow = true;
+    const started = Date.now();
+    await page.goto(`${origin}/?day=2026-10-09`);
+    await expect(page.locator("h1")).toHaveText("5A");
+    expect(Date.now() - started).toBeLessThan(2_500);
+    // The day from the notification's address, although the cached page has none.
+    await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
+  } finally {
+    proxy.closeAllConnections();
+    proxy.close();
+  }
 });
 
 test("starts offline from the cache", async ({ page, context }) => {

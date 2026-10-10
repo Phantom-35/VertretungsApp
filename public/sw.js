@@ -111,8 +111,66 @@ async function pruneStaticCache(previousPage) {
   );
 }
 
-// Pages: always try the network first so the app shows fresh data after a
-// restart; fall back to the last cached page only when offline.
+// Downloads the build files a freshly cached page needs (and what those
+// files load in turn), so that it also works offline the next time it is
+// served from the cache without having run before.
+async function precacheAssets(page) {
+  const staticCache = await caches.open(STATIC_CACHE);
+  const seen = new Set();
+  let pending = new Set();
+  await collectAssetPaths(page, pending);
+  while (pending.size > 0) {
+    const next = new Set();
+    for (const path of pending) {
+      if (seen.has(path)) {
+        continue;
+      }
+      seen.add(path);
+      const request = new Request(`/_next/${path}`);
+      let response = await staticCache.match(request);
+      if (!response) {
+        response = await fetch(request).catch(() => undefined);
+        if (!response?.ok) {
+          continue;
+        }
+        await staticCache.put(request, response.clone());
+      }
+      if (/\.(js|css)$/.test(path)) {
+        await collectAssetPaths(response.clone(), next);
+      }
+    }
+    pending = next;
+  }
+}
+
+// Pages: the app opens at once with the page cached last time (its data is
+// replaced by the device's newer copy and refreshed right away); the newest
+// page is fetched in the background for the next start. Without a cached
+// page, the network is tried first.
+async function cachedPageFirst(event) {
+  const cache = await caches.open(PAGE_CACHE);
+  const cacheKey = new URL(event.request.url).pathname;
+  const cached = await cache.match(cacheKey);
+  if (!cached) {
+    return networkFirst(event);
+  }
+  event.waitUntil(
+    fetch(event.request)
+      .then(async (response) => {
+        if (!response.ok || response.redirected) {
+          return;
+        }
+        await cache.put(cacheKey, response.clone());
+        await precacheAssets(response);
+        await pruneStaticCache(cached);
+      })
+      .catch(() => undefined),
+  );
+  return cached;
+}
+
+// Pages without a cached copy: try the network first, fall back to the
+// start page when offline.
 async function networkFirst(event) {
   const cache = await caches.open(PAGE_CACHE);
   const cacheKey = new URL(event.request.url).pathname;
@@ -187,7 +245,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(networkFirst(event));
+    event.respondWith(cachedPageFirst(event));
   } else if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(cacheFirst(request));
   } else if (!url.pathname.startsWith("/_next/")) {
