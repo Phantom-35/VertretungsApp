@@ -178,7 +178,7 @@ export function Onboarding({
     >
       <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-accent-strong/70">
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-accent-strong/85">
             KAG Vertretungsplan
           </p>
           <div className="flex gap-1.5" aria-label={`Schritt ${index + 1} von ${steps.length}`} role="img">

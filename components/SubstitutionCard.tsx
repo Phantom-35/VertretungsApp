@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import {
   entryKindHints,
   formatClassName,
@@ -16,7 +17,68 @@ type SubstitutionCardProps = {
   isNew?: boolean;
   /** Smaller, for days with many changes. */
   compact?: boolean;
+  /** The "Neu" badge was on screen long enough and has faded out. */
+  onNewSeen?: () => void;
 };
+
+/** How long a "Neu" badge stays once it is fully on screen. */
+const NEW_VISIBLE_MS = 8_000;
+const FADE_MS = 700;
+
+/** "Neu", fading out after it has been on screen for a few seconds. */
+function NewBadge({ onSeen }: { onSeen?: () => void }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [fading, setFading] = useState(false);
+  // The latest callback, without restarting the timer on every render.
+  const onSeenRef = useRef(onSeen);
+  useEffect(() => {
+    onSeenRef.current = onSeen;
+  }, [onSeen]);
+
+  useEffect(() => {
+    const badge = ref.current;
+    if (!badge || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+    let timer: number | undefined;
+    // Counts only while it can be seen: scrolled away, the time starts anew.
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          timer ??= window.setTimeout(() => setFading(true), NEW_VISIBLE_MS);
+        } else {
+          window.clearTimeout(timer);
+          timer = undefined;
+        }
+      },
+      { threshold: 1 },
+    );
+    observer.observe(badge);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!fading) {
+      return;
+    }
+    const timer = window.setTimeout(() => onSeenRef.current?.(), FADE_MS);
+    return () => window.clearTimeout(timer);
+  }, [fading]);
+
+  return (
+    <span
+      ref={ref}
+      className={`rounded-full bg-accent px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-white transition-opacity duration-700 ${
+        fading ? "opacity-0" : ""
+      }`}
+    >
+      Neu
+    </span>
+  );
+}
 
 export const kindStyles: Record<EntryKind, string> = {
   cancelled: "bg-warn-soft text-warn border-warn/15",
@@ -59,7 +121,11 @@ function TeacherLine({ teacher, substitute }: { teacher: string; substitute: str
         {substitute ? (
           <span className="font-semibold">{substitute}</span>
         ) : (
-          <span className="font-semibold text-muted line-through">{teacher}</span>
+          <>
+            <span className="font-semibold text-muted line-through">{teacher}</span>
+            {/* Screen readers do not announce the strike-through. */}
+            <span className="sr-only"> (abwesend)</span>
+          </>
         )}
       </p>
     );
@@ -81,7 +147,13 @@ function TeacherLine({ teacher, substitute }: { teacher: string; substitute: str
   );
 }
 
-export function SubstitutionCard({ entry, showClassName, isNew = false, compact = false }: SubstitutionCardProps) {
+export function SubstitutionCard({
+  entry,
+  showClassName,
+  isNew = false,
+  compact = false,
+  onNewSeen,
+}: SubstitutionCardProps) {
   const kind = getEntryKind(entry.type);
   const hint = entryKindHints[kind];
   // A cancelled lesson is what students look for first: make it stand out.
@@ -119,11 +191,7 @@ export function SubstitutionCard({ entry, showClassName, isNew = false, compact 
           >
             {entry.type || "Änderung"}
           </span>
-          {isNew ? (
-            <span className="rounded-full bg-accent px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-white">
-              Neu
-            </span>
-          ) : null}
+          {isNew ? <NewBadge onSeen={onNewSeen} /> : null}
           {showClassName ? (
             <span className="text-xs font-medium text-muted">
               {formatClassName(entry.className)}

@@ -18,7 +18,7 @@ import { NotificationSettings } from "@/components/NotificationSettings";
 import { Onboarding } from "@/components/Onboarding";
 import { TeacherHint } from "@/components/TeacherFilter";
 import { SettingsSheet, type SettingsFocus } from "@/components/SettingsSheet";
-import { useSeenBaseline } from "@/hooks/useNewEntries";
+import { acknowledgeNewEntry, useAcknowledgedEntries, useSeenBaseline } from "@/hooks/useNewEntries";
 import { useNow } from "@/hooks/useNow";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -106,6 +106,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const [showOtherCourses, setShowOtherCourses] = useState(false);
   const now = useNow();
   const seenBaseline = useSeenBaseline(data);
+  const acknowledgedNew = useAcknowledgedEntries();
   const [settings] = useSettings();
   const push = usePushNotifications({
     schoolClass: myClass ?? null,
@@ -247,8 +248,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const visibleEntries = shownEntries.filter(onSelectedDay);
   const compactCards = visibleEntries.length >= COMPACT_FROM;
   // Added or changed since the user last opened the app.
+  // Badges seen long enough on screen are gone (and no longer counted).
   const newKeys = settings.showNewBadges
-    ? findNewKeys(seenBaseline, visibleEntries)
+    ? new Set([...findNewKeys(seenBaseline, visibleEntries)].filter((key) => !acknowledgedNew.has(key)))
     : new Set<string>();
   const otherCourseCount =
     classEntries.filter(onSelectedDay).length - ownEntries.filter(onSelectedDay).length;
@@ -433,6 +435,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                       key={entry.id}
                       entry={entry}
                       isNew={newKeys.has(entryKey(entry))}
+                      onNewSeen={() => acknowledgeNewEntry(entryKey(entry))}
                       showClassName={formatClassName(entry.className) !== selectedClass}
                       compact={compactCards}
                     />

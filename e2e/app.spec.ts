@@ -383,6 +383,14 @@ test("marks changes that are new since the last visit", async ({ page }) => {
   await page.reload();
   await expect(page.getByText("Neu", { exact: true })).toHaveCount(unseen.length);
   await expect(page.getByText(`${unseen.length} neu`)).toBeVisible();
+
+  // Once they have been on screen for a few seconds, they fade out softly,
+  // and stay away for this visit.
+  await expect(page.getByText("Neu", { exact: true })).toHaveCount(0, { timeout: 12_000 });
+  await expect(page.getByText(/\d neu$/)).toHaveCount(0);
+  await page.getByRole("tab").nth(1).click();
+  await page.getByRole("tab").nth(0).click();
+  await expect(page.getByText("Neu", { exact: true })).toHaveCount(0);
 });
 
 test("switches between light and dark", async ({ page }) => {

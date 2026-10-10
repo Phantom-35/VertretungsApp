@@ -12,6 +12,8 @@ const SEEN_STORAGE_KEY = "kag:seen-entries";
  */
 let baseline: readonly string[] | null = null;
 let needsBaseline = true;
+/** "Neu" badges that were on screen long enough; they fade out. */
+let acknowledged: ReadonlySet<string> = new Set();
 const listeners = new Set<() => void>();
 
 function readStored(): string[] | null {
@@ -58,6 +60,7 @@ export function useSeenBaseline(data: SubstitutionPayload | null) {
       // Taken before the current plan is written below.
       baseline = stored;
       needsBaseline = false;
+      acknowledged = new Set();
       listeners.forEach((listener) => listener());
     }
     try {
@@ -74,5 +77,22 @@ export function useSeenBaseline(data: SubstitutionPayload | null) {
     subscribe,
     () => baseline,
     () => null,
+  );
+}
+
+/** Marks a "Neu" badge as seen: it stays away until the app is opened again. */
+export function acknowledgeNewEntry(key: string) {
+  if (!acknowledged.has(key)) {
+    acknowledged = new Set([...acknowledged, key]);
+    listeners.forEach((listener) => listener());
+  }
+}
+
+/** Keys of the "Neu" badges already seen in this visit. */
+export function useAcknowledgedEntries() {
+  return useSyncExternalStore(
+    subscribe,
+    () => acknowledged,
+    () => acknowledged,
   );
 }
