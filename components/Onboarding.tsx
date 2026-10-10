@@ -376,7 +376,7 @@ export function Onboarding({
             </div>
             <div className="mt-8">
               <button type="button" onClick={next} className={secondaryButton}>
-                Später
+                Erst mal ohne Installieren weiter
               </button>
             </div>
           </>
@@ -398,7 +398,7 @@ export function Onboarding({
               </h2>
               <p className="mt-2 text-base leading-7 text-muted">
                 {myClass
-                  ? `Eine Mitteilung aufs Handy, sobald sich der Plan für die ${myClass} ändert – auch wenn die App geschlossen ist. Nachts bleibt es ruhig.`
+                  ? `Eine Nachricht aufs Handy, sobald sich der Plan für die ${myClass} ändert – auch wenn die App geschlossen ist. Nachts bleibt es ruhig.`
                   : "Lege zuerst deine Klasse fest, dann kannst du Benachrichtigungen einschalten."}
               </p>
               <div className="mt-8">

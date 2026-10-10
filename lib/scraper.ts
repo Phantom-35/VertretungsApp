@@ -220,8 +220,9 @@ async function collectPages(firstPage: ParsedPage, warnings: string[]) {
   let failedPages = 0;
   let highestPage = 1;
   let current: ParsedPage["meta"] | null = firstPage.meta;
+  let cutOff = false;
 
-  while (current && highestPage < MAX_PAGES) {
+  while (current) {
     const remainingOfDay =
       current.pageOfDay !== null && current.pagesOfDay !== null
         ? current.pagesOfDay - current.pageOfDay
@@ -241,7 +242,10 @@ async function collectPages(firstPage: ParsedPage, warnings: string[]) {
       candidates = [];
     }
 
-    candidates = candidates.filter((pageNumber) => pageNumber <= MAX_PAGES);
+    const allowed = candidates.filter((pageNumber) => pageNumber <= MAX_PAGES);
+    // More pages announced than the limit allows (a mere probe does not count).
+    cutOff ||= !isProbe && allowed.length < candidates.length;
+    candidates = allowed;
     if (candidates.length === 0) {
       break;
     }
@@ -262,6 +266,8 @@ async function collectPages(firstPage: ParsedPage, warnings: string[]) {
 
         if (isLeftoverPage(parsed, referenceStand)) {
           if (!isProbe) {
+            // Announced but left over from an earlier upload: pages are missing.
+            failedPages += 1;
             warnings.push(`Seite ${result.pageNumber} ist veraltet und wurde ignoriert.`);
           }
           current = null;
@@ -298,6 +304,12 @@ async function collectPages(firstPage: ParsedPage, warnings: string[]) {
     }
   }
 
+  if (cutOff) {
+    // The plan goes on beyond the limit: it is incomplete.
+    failedPages += 1;
+    warnings.push(`Der Plan hat mehr als ${MAX_PAGES} Seiten; der Rest wurde nicht gelesen.`);
+  }
+
   return { pages, failedPages, pageCount: highestPage };
 }
 
@@ -328,11 +340,14 @@ export function checkParsedPages(pages: ParsedPage[]) {
     }
 
     // A lesson without a number means the columns were mapped wrongly.
+    // A few such rows (e.g. an all-day event) are normal; most of them are not.
     const implausible = entries.filter(
       (entry) => !entry.className || !/\d/.test(entry.lesson),
     ).length;
     if (implausible > 0) {
-      problems.push(`${label}: ${implausible} Einträge ohne gültige Klasse oder Stunde.`);
+      (implausible * 2 >= entries.length ? problems : notes).push(
+        `${label}: ${implausible} Einträge ohne gültige Klasse oder Stunde.`,
+      );
     }
 
     stats.unknownColumns.forEach((column) => {

@@ -19,7 +19,7 @@ const REQUEST_TIMEOUT_MS = 15_000;
  */
 const RETRY_DELAYS_MS = [1_000, 3_000];
 
-const OFFLINE_MESSAGE = "Keine Verbindung zum Server.";
+const OFFLINE_MESSAGE = "Keine Verbindung. Ist das Internet an?";
 
 export type LoadStatus = "idle" | "loading" | "refreshing";
 

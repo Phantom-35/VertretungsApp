@@ -34,7 +34,7 @@ export function ClassSelector({
           >
             {!selectedClass ? (
               <option value="" disabled>
-                Klasse auswählen …
+                Klasse wählen …
               </option>
             ) : null}
             {classes.map((className) => (

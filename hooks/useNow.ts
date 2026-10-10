@@ -52,3 +52,51 @@ function getServerSnapshot() {
 export function useNow(): number | null {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
+
+type Opened = {
+  /** When the page was loaded. */
+  first: number;
+  /** When the app was last brought to the front (or loaded). */
+  last: number;
+};
+
+let opened: Opened | null = null;
+const openedListeners = new Set<() => void>();
+
+function onOpenedVisibility() {
+  if (document.visibilityState === "visible" && opened) {
+    opened = { ...opened, last: Date.now() };
+    openedListeners.forEach((listener) => listener());
+  }
+}
+
+function subscribeOpened(listener: () => void) {
+  openedListeners.add(listener);
+  if (openedListeners.size === 1) {
+    document.addEventListener("visibilitychange", onOpenedVisibility);
+  }
+  return () => {
+    openedListeners.delete(listener);
+    if (openedListeners.size === 0) {
+      document.removeEventListener("visibilitychange", onOpenedVisibility);
+    }
+  };
+}
+
+function getOpenedSnapshot() {
+  if (!opened) {
+    const timestamp = Date.now();
+    opened = { first: timestamp, last: timestamp };
+  }
+  return opened;
+}
+
+/**
+ * When the app was loaded and when it was last brought to the front. Things
+ * decided "on opening" (like the day shown by default) use `last`, so they do
+ * not change under the user's finger while the app is open. `null` during
+ * server rendering and hydration.
+ */
+export function useOpened(): Opened | null {
+  return useSyncExternalStore(subscribeOpened, getOpenedSnapshot, getServerSnapshot);
+}

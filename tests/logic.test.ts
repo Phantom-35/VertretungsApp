@@ -214,6 +214,8 @@ describe("course filter", () => {
   it("finds the course teachers of an entry", () => {
     expect(courseTeachers(entry("RUK"))).toEqual(["RUK"]);
     expect(courseTeachers(entry("", "Q1 S GK RUK"))).toEqual(["RUK"]);
+    // Other texts name no course: such an entry is shown to everyone.
+    expect(courseTeachers(entry("", "ABI-Info in der AULA"))).toEqual([]);
     expect(courseTeachers(entry("", "EF D GK DRE/SNE/WOR + NTA"))).toEqual([
       "DRE",
       "SNE",

@@ -1,3 +1,4 @@
+import { timetableSlot } from "@/lib/entries";
 import { entryKey, parseEntryKey, type KeyedEntry } from "@/lib/seen";
 
 /**
@@ -28,9 +29,9 @@ function dateOf(key: string) {
   return key.slice(0, key.indexOf("|"));
 }
 
-/** Date, class and lesson: the place in the timetable an entry is about. */
+/** The place in the timetable an entry is about (see `timetableSlot`). */
 function slotOf(key: string) {
-  return key.split("|").slice(0, 3).join("|");
+  return timetableSlot(parseEntryKey(key));
 }
 
 /** Entries of today and later; entries without a date cannot be placed. */
@@ -49,6 +50,12 @@ export function diffPlan(
   entries: KeyedEntry[],
   today: string,
   now = new Date(),
+  /**
+   * The days the current plan contains. Entries of a day that is missing as a
+   * whole are kept as they were: a day absent from the export (too many
+   * pages, a broken upload) does not mean its changes were withdrawn.
+   */
+  planDates?: readonly string[],
 ): PlanDiff {
   const current = Array.from(new Set(entries.map(entryKey))).filter((key) =>
     isCurrent(key, today),
@@ -69,7 +76,10 @@ export function diffPlan(
   const wasMissing = new Set(previous.missing);
 
   const added = current.filter((key) => !known.has(key));
-  const gone = [...known].filter((key) => !currentSet.has(key));
+  const shownDays = planDates ? new Set(planDates) : null;
+  const dayMissing = (key: string) => shownDays !== null && !shownDays.has(dateOf(key));
+  const kept = [...known].filter((key) => !currentSet.has(key) && dayMissing(key));
+  const gone = [...known].filter((key) => !currentSet.has(key) && !dayMissing(key));
   // An entry replaced by a new one for the same lesson was edited, not lost
   // in an incomplete upload: report it at once, as one change with the new one.
   const replacedSlots = new Set(added.map(slotOf));
@@ -78,7 +88,11 @@ export function diffPlan(
   const stillMissing = gone.filter((key) => !removed.includes(key));
 
   return {
-    state: { keys: [...current, ...stillMissing], missing: stillMissing, updatedAt },
+    state: {
+      keys: [...current, ...stillMissing, ...kept],
+      missing: [...stillMissing, ...previous.missing.filter((key) => kept.includes(key))],
+      updatedAt,
+    },
     initial: false,
     added: added.map(parseEntryKey),
     removed: removed.map(parseEntryKey),

@@ -1,5 +1,5 @@
 // Bump VERSION to drop all old caches on the next deploy.
-const VERSION = "v2";
+const VERSION = "v3";
 const PAGE_CACHE = `kag-pages-${VERSION}`;
 const STATIC_CACHE = `kag-static-${VERSION}`;
 const NAVIGATION_TIMEOUT_MS = 6000;
@@ -8,8 +8,25 @@ const NAVIGATION_TIMEOUT_MS = 6000;
 const BADGE_CACHE = "kag-badge";
 const BADGE_KEY = "/__badge";
 
+// The start page and its files are cached right away: the worker starts
+// after the first page has loaded, so that page never passed through it, and
+// the next start may already be offline.
 self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(
+    (async () => {
+      try {
+        const response = await fetch("/");
+        if (response.ok && !response.redirected) {
+          const cache = await caches.open(PAGE_CACHE);
+          await cache.put("/", response.clone());
+          await precacheAssets(response);
+        }
+      } catch {
+        // Offline: cached on the next visit instead.
+      }
+      await self.skipWaiting();
+    })(),
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -158,15 +175,19 @@ async function cachedPageFirst(event) {
   if (!cached) {
     return networkFirst(event);
   }
+  // Its body is read by the browser; pruning needs its own copy.
+  const previous = cached.clone();
   event.waitUntil(
-    fetch(event.request)
+    // The page without "?day=…": a page rendered for a notification's day
+    // must not become the page every later start opens with.
+    fetch(cacheKey)
       .then(async (response) => {
         if (!response.ok || response.redirected) {
           return;
         }
         await cache.put(cacheKey, response.clone());
         await precacheAssets(response);
-        await pruneStaticCache(cached);
+        await pruneStaticCache(previous);
       })
       .catch(() => undefined),
   );
@@ -180,8 +201,10 @@ async function networkFirst(event) {
   const cacheKey = new URL(event.request.url).pathname;
   // The page cached so far, read before the new one replaces it.
   const previousPage = cache.match(cacheKey).catch(() => undefined);
+  // Only pages without "?day=…" are cached (see cachedPageFirst).
+  const cacheable = new URL(event.request.url).search === "";
   const networkResponse = fetch(event.request).then(async (response) => {
-    if (response.ok) {
+    if (response.ok && cacheable) {
       await previousPage;
       await cache.put(cacheKey, response.clone());
     }
@@ -189,9 +212,17 @@ async function networkFirst(event) {
   });
   event.waitUntil(
     networkResponse
-      .then(async (response) =>
-        response.ok ? pruneStaticCache(await previousPage) : undefined,
-      )
+      .then(async (response) => {
+        if (!response.ok || !cacheable) {
+          return;
+        }
+        // From the cached copy: the response itself is read by the browser.
+        const stored = await cache.match(cacheKey);
+        if (stored) {
+          await precacheAssets(stored);
+        }
+        await pruneStaticCache(await previousPage);
+      })
       .catch(() => undefined),
   );
 
@@ -239,11 +270,15 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // API data is never cached here; the app keeps its own offline copy.
+  // API data is never cached here; the app keeps its own offline copy. The
+  // same goes for the page data of Next.js client navigations ("?_rsc="),
+  // which must be current.
   if (
     request.method !== "GET" ||
     url.origin !== self.location.origin ||
-    url.pathname.startsWith("/api/")
+    url.pathname.startsWith("/api/") ||
+    url.searchParams.has("_rsc") ||
+    request.headers.has("RSC")
   ) {
     return;
   }
@@ -289,8 +324,15 @@ self.addEventListener("push", (event) => {
   );
 });
 
-// The number on the app icon: changes not seen yet.
-async function updateBadge(count, replace) {
+// The number on the app icon: changes not seen yet. Updates run one after
+// another, so two pushes arriving together do not overwrite each other.
+let badgeQueue = Promise.resolve();
+function updateBadge(count, replace) {
+  badgeQueue = badgeQueue.then(() => writeBadge(count, replace)).catch(() => undefined);
+  return badgeQueue;
+}
+
+async function writeBadge(count, replace) {
   if (!self.navigator.setAppBadge) {
     return;
   }

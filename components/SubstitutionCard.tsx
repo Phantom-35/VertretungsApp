@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  displayType,
   entryKindHints,
   formatClassName,
   formatLesson,
   getEntryKind,
   isOpenSubstitute,
+  spokenLesson,
   type EntryKind,
 } from "@/lib/entries";
 import type { SubstitutionEntry } from "@/lib/types";
@@ -119,9 +121,10 @@ function TeacherLine({ teacher, substitute }: { teacher: string; substitute: str
         {teacher ? (
           <>
             <span className="text-muted line-through">{teacher}</span>
-            <span aria-label="wird vertreten durch" className="px-1 text-muted">
+            <span aria-hidden className="px-1 text-muted">
               →
             </span>
+            <span className="sr-only"> wird vertreten durch </span>
           </>
         ) : null}
         <span className="font-semibold text-warn">noch offen</span>
@@ -152,9 +155,10 @@ function TeacherLine({ teacher, substitute }: { teacher: string; substitute: str
       {teacher ? (
         <>
           <span className="text-muted line-through">{teacher}</span>
-          <span aria-label="wird vertreten durch" className="px-1 text-muted">
+          <span aria-hidden className="px-1 text-muted">
             →
           </span>
+          <span className="sr-only"> wird vertreten durch </span>
         </>
       ) : null}
       <span className="font-semibold">{substitute}</span>
@@ -187,10 +191,12 @@ export function SubstitutionCard({
           compact ? "w-13 rounded-[0.95rem] py-2" : "w-16 rounded-[1.15rem] py-3"
         } ${cancelled ? "bg-warn-soft text-warn" : "bg-accent-soft/70 text-accent-strong"}`}
       >
-        <span className="text-[0.62rem] font-semibold uppercase tracking-[0.18em]">
+        <span className="sr-only">{spokenLesson(entry.lesson)}</span>
+        <span aria-hidden className="text-[0.62rem] font-semibold uppercase tracking-[0.18em]">
           Std.
         </span>
         <span
+          aria-hidden
           className={`mt-0.5 font-semibold tracking-[-0.04em] ${compact ? "text-xl" : "text-2xl"} ${
             cancelled ? "line-through decoration-2" : ""
           }`}
@@ -204,7 +210,7 @@ export function SubstitutionCard({
           <span
             className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${kindStyles[kind]}`}
           >
-            {entry.type || "Änderung"}
+            {displayType(entry.type)}
           </span>
           {isNew ? <NewBadge onSeen={onNewSeen} /> : null}
           {showClassName ? (

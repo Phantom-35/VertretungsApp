@@ -6,10 +6,9 @@ const STORAGE_PREFIX = "kag:";
  */
 export async function resetDevice() {
   try {
-    const registration = await Promise.race([
-      navigator.serviceWorker?.ready,
-      new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 3_000)),
-    ]);
+    // The registration itself, without waiting for the worker to be ready:
+    // the subscription is there either way.
+    const registration = await navigator.serviceWorker?.getRegistration();
     const subscription = await registration?.pushManager?.getSubscription();
     if (subscription) {
       await fetch("/api/push/unsubscribe", {

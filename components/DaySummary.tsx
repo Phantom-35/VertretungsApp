@@ -58,8 +58,9 @@ export function DaySummary({
       </div>
       {otherCourses > 0 ? (
         <p className="text-sm text-muted">
-          {otherCourses === 1 ? "1 Änderung" : `${otherCourses} Änderungen`} anderer Kurse{" "}
-          {showingOtherCourses ? "werden mit angezeigt. " : "ausgeblendet. "}
+          {otherCourses === 1 ? "1 Änderung" : `${otherCourses} Änderungen`} aus anderen Kursen{" "}
+          {otherCourses === 1 ? (showingOtherCourses ? "wird" : "ist") : showingOtherCourses ? "werden" : "sind"}{" "}
+          {showingOtherCourses ? "mit angezeigt. " : "ausgeblendet. "}
           <button
             type="button"
             onClick={onToggleOtherCourses}

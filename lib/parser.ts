@@ -210,7 +210,11 @@ function countDataRows($: cheerio.CheerioAPI) {
       const cells = $(rowElement)
         .find("td")
         .toArray()
-        .map((cell) => normalizeCell($(cell).text()));
+        // "???" stays, as in the parsed entries (see OPEN_SUBSTITUTE).
+        .map((cell) => {
+          const text = normalizeWhitespace($(cell).text());
+          return text === "???" ? text : normalizeCell(text);
+        });
       const isHeader =
         normalizeHeader(cells[0] ?? "").startsWith("klasse") &&
         normalizeHeader(cells[1] ?? "") === "stunde";

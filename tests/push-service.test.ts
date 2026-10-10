@@ -129,7 +129,7 @@ describe("runPushCheck", () => {
     expect(sent).toHaveLength(0);
     await runPushCheck({ store, send, loadPlan: async () => plan([]), now: NOW + 1_200_000 });
     expect(sent).toHaveLength(1);
-    expect(sent[0].payload.body).toBe("Zurückgenommen: Entfall · ABC · Raum 101");
+    expect(sent[0].payload.body).toBe("Gilt nicht mehr: Entfall · ABC · Raum 101");
   });
 
   it("does not compare an incomplete plan", async () => {
@@ -313,6 +313,26 @@ describe("morning summary in the check", () => {
     // Today's change is in the summary; Monday's comes as a notification.
     expect(titles(wants.endpoint)).toEqual(["5A · Mo., 12.10. 2. Std.", "5A · Heute: 1 Änderung"]);
     expect(titles(other.endpoint)).toEqual(["5A: 2 Änderungen"]);
+  });
+});
+
+describe("withdrawn changes on a summary day", () => {
+  it("are still sent to those who get the summary", async () => {
+    const store = new MemoryStore();
+    const sub = await addSubscriber(store, "wants", "5A");
+    await store.saveSubscriber({ ...(await store.getSubscriber(subscriberId(sub.endpoint)))!, eveningSummary: true });
+    const { sent, send } = fakeSender();
+    const days = ["2026-10-08", "2026-10-09"];
+    const withDays = (entries: SubstitutionEntry[]) =>
+      ({ ...plan(entries), days: days.map((date) => ({ date, dayLabel: null, weekLabel: null })) }) as SubstitutionPayload;
+    const cancelled = entry({ lesson: "2" });
+    await runPushCheck({ store, send, loadPlan: async () => withDays([cancelled]), now: Date.parse("2026-10-08T18:30:00+02:00") });
+    await runPushCheck({ store, send, loadPlan: async () => withDays([]), now: Date.parse("2026-10-08T18:40:00+02:00") });
+    await runPushCheck({ store, send, loadPlan: async () => withDays([]), now: Date.parse("2026-10-08T19:05:00+02:00") });
+    expect(sent.map((item) => item.payload.body)).toEqual([
+      "Gilt nicht mehr: Entfall · ABC · Raum 101",
+      "Keine Änderungen eingetragen.",
+    ]);
   });
 });
 

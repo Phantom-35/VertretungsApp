@@ -65,6 +65,22 @@ describe("diffPlan", () => {
     expect(diff.removed).toEqual([]);
   });
 
+  it("keeps the entries of a day that is missing from the plan as a whole", () => {
+    const friday = entry({ lesson: "1" });
+    const monday = entry({ date: "2026-10-12", lesson: "2" });
+    // Monday's pages are missing (e.g. too many pages), twice in a row.
+    const first = diffPlan(state([friday, monday]), [friday], TODAY, new Date(), ["2026-10-09"]);
+    const second = diffPlan(first.state, [friday], TODAY, new Date(), ["2026-10-09"]);
+    expect([...first.removed, ...second.removed]).toEqual([]);
+    // Back again: nothing is new.
+    const back = diffPlan(second.state, [friday, monday], TODAY, new Date(), ["2026-10-09", "2026-10-12"]);
+    expect(back.added).toEqual([]);
+    expect(back.removed).toEqual([]);
+    // A single entry missing on a day that is there still counts.
+    const gone = diffPlan(back.state, [friday], TODAY, new Date(), ["2026-10-09", "2026-10-12"]);
+    expect(diffPlan(gone.state, [friday], TODAY, new Date(), ["2026-10-09", "2026-10-12"]).removed).toEqual([monday]);
+  });
+
   it("treats an entry as removed only when it is missing twice in a row", () => {
     const cancelled = entry({ lesson: "4" });
     const first = diffPlan(state([cancelled]), [], TODAY);
@@ -149,6 +165,13 @@ describe("who is told about what", () => {
       { kind: "added", entry: other },
     ]);
   });
+
+  it("does not pair different courses of the upper school", () => {
+    const eva = entry({ className: "Q1", lesson: "3 - 4", type: "EVA", teacher: "KER" });
+    const exam = entry({ className: "Q1", lesson: "3 - 4", type: "Klausur", teacher: "", text: "Q1 S GK LIT" });
+    const changes = changesFor({ added: [exam], removed: [eva] }, { schoolClass: "Q1", teachers: [] }, MORNING);
+    expect(changes.map((change) => change.kind).sort()).toEqual(["added", "removed"]);
+  });
 });
 
 describe("notification text", () => {
@@ -178,7 +201,7 @@ describe("notification text", () => {
     );
     const withdrawn = changesFor({ added: [], removed: [entry({})] }, audience, MORNING);
     expect(buildNotification("5A", withdrawn, MORNING).body).toBe(
-      "Zurückgenommen: Entfall · ABC · Raum 101",
+      "Gilt nicht mehr: Entfall · ABC · Raum 101",
     );
   });
 
@@ -273,7 +296,7 @@ describe("evening summary", () => {
       title: "5A · Morgen: 2 Änderungen",
       body: "1. Std.: Entfall · ABC · Raum 101\n5. Std.: Vertretung · ABC → DEF · Raum 101",
       url: "/?day=2026-10-09",
-      tag: "kag-summary-2026-10-09",
+      tag: "kag-summary-evening-2026-10-09",
       badgeCount: 2,
       badgeMode: "set",
     });
@@ -284,7 +307,7 @@ describe("evening summary", () => {
       title: "5A · Morgen",
       body: "Keine Änderungen eingetragen.",
       url: "/?day=2026-10-09",
-      tag: "kag-summary-2026-10-09",
+      tag: "kag-summary-evening-2026-10-09",
     });
   });
 

@@ -48,7 +48,7 @@ test("shows exactly the changes of every class on every day", async ({ page }) =
       await expect(page.locator("article"), `${schoolClass} ${day.date}`).toHaveCount(expected);
       await expect(tab).toContainText(String(expected));
       if (expected === 0) {
-        await expect(page.getByText("Keine Vertretungen")).toBeVisible();
+        await expect(page.getByText("Keine Änderungen", { exact: true })).toBeVisible();
       }
     }
   }
@@ -71,7 +71,7 @@ test("compact cards on busy days, a short status line and neutral day counts", a
   await expect(page.locator("header")).toContainText(/geprüft (gerade eben|vor \d+ Min\.)/);
 
   // The count on the other day's tab is neutral, not orange like a warning.
-  const otherCount = page.getByRole("tab", { selected: false }).locator("span[aria-label$='Änderungen']");
+  const otherCount = page.getByRole("tab", { selected: false }).locator("span.absolute");
   expect(await otherCount.evaluate((badge) => badge.className)).not.toContain("warn");
 });
 
@@ -249,13 +249,13 @@ test("opens with the own class; other classes are only looked at", async ({ page
   await expect(page.locator("main").getByText("Meine Klasse", { exact: true })).toBeVisible();
   await chooseClass(page, "7B");
   await expect(page.locator("main").getByText("Andere Klasse", { exact: true })).toBeVisible();
-  await expect(page.getByText("Nur angesehen. Deine Klasse bleibt die 5A")).toBeVisible();
+  await expect(page.getByText(/Nur angesehen\..*gilt weiter die 5A/)).toBeVisible();
   // Kept while the app stays open.
   await page.reload();
   await expect(page.locator("h1")).toHaveText("7B");
 
   // Back with one tap; no list of recent classes.
-  await page.getByRole("button", { name: "Zur 5A" }).click();
+  await page.getByRole("button", { name: "Zurück zur 5A" }).click();
   await expect(page.locator("h1")).toHaveText("5A");
   await expect(page.getByText("Nur angesehen.")).toHaveCount(0);
   await expect(page.getByText("Zuletzt:")).toHaveCount(0);
@@ -305,7 +305,7 @@ test.describe("first start", () => {
     await expect(intro.getByText(/nicht im App Store oder bei Google Play/)).toBeVisible();
     // Steps for this browser (Chrome on a computer).
     await expect(intro.getByText("Seite als App installieren", { exact: true })).toBeVisible();
-    await intro.getByRole("button", { name: "Später" }).click();
+    await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
 
     await expect(intro.getByRole("heading", { name: "Nichts mehr verpassen" })).toBeVisible();
     await expect(intro.getByRole("button", { name: "Benachrichtigungen einschalten" })).toBeVisible();
@@ -342,7 +342,7 @@ test.describe("first start", () => {
     const intro = page.getByRole("dialog");
     await intro.getByRole("button", { name: "Los geht’s" }).click();
     await intro.getByRole("button", { name: "Später festlegen" }).click();
-    await intro.getByRole("button", { name: "Später" }).click();
+    await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
     await expect(intro.getByText(/Lege zuerst deine Klasse fest/)).toBeVisible();
     await intro.getByRole("button", { name: "Weiter" }).click();
     await intro.getByRole("button", { name: "Fertig" }).click();
@@ -387,7 +387,7 @@ test("filters the upper school by the student's teachers", async ({ page }) => {
   expect(own).toBeGreaterThan(0);
   await expect(page.locator("article")).toHaveCount(own);
   await expect(page.getByRole("button", { name: "Ändern" })).toBeVisible();
-  await expect(page.getByText(/anderer Kurse\s+ausgeblendet/)).toBeVisible();
+  await expect(page.getByText(/aus anderen Kursen\s+(ist|sind)\s+ausgeblendet/)).toBeVisible();
 
   await page.getByRole("button", { name: "Anzeigen" }).click();
   await expect(page.locator("article")).toHaveCount(all);
@@ -400,9 +400,10 @@ test("filters the upper school by the student's teachers", async ({ page }) => {
   await expect(page.locator("main").getByText("Alle Kurse der Q2")).toBeVisible();
   await chooseClass(page, "9A");
   await expect(page.locator("main").getByText("Meine Lehrkräfte")).toHaveCount(0);
-  // Not an upper-school class: no teacher card in the settings either.
+  // Not an upper-school class: the settings show the own class's courses,
+  // which the notifications follow.
   await page.getByRole("button", { name: "Einstellungen" }).click();
-  await expect(dialog.locator("#settings-teachers")).toHaveCount(0);
+  await expect(dialog.locator("#settings-teachers")).toContainText("Meine Lehrkräfte (Q1)");
 });
 
 test("marks changes that are new since the last visit", async ({ page }) => {
@@ -520,6 +521,17 @@ test("opens at once from the cache, also on the day of a notification", async ({
     expect(Date.now() - started).toBeLessThan(2_500);
     // The day from the notification's address, although the cached page has none.
     await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
+
+    // Opened normally afterwards (home screen icon): the default day again,
+    // not the notification's day from a page cached in the background.
+    slow = false;
+    // The service worker's background update (delayed by the slow proxy).
+    await page.waitForTimeout(6_500);
+    await page.goto(`${origin}/`);
+    await expect(page.locator("h1")).toHaveText("5A");
+    await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
+    await page.reload();
+    await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
   } finally {
     proxy.closeAllConnections();
     proxy.close();
@@ -561,7 +573,9 @@ test("shares the day's changes", async ({ page, context }) => {
   // One block per change, separated by blank lines.
   expect(shared[0].text!.split("\n\n")).toHaveLength(fiveA.length + 2);
   expect(lines.filter((line) => / Std\. · /.test(line))).toHaveLength(fiveA.length);
-  expect(lines.at(-1)).toMatch(/^Stand der Schule: /);
+  expect(lines.at(-2)).toMatch(/^Stand der Schule: /);
+  // Whoever gets the message can find the app.
+  expect(lines.at(-1)).toBe(`Ganzer Plan in der App: ${new URL(page.url()).origin}/`);
   // Only the text: no separate title or link for the share menu to add.
   expect(shared[0].title).toBeUndefined();
   expect(shared[0].url).toBeUndefined();
@@ -569,7 +583,7 @@ test("shares the day's changes", async ({ page, context }) => {
   // A day without changes: one larger button in the card, saying so.
   await chooseClass(page, "9B");
   await page.getByRole("tab").nth(1).click();
-  await expect(page.getByText("Keine Vertretungen")).toBeVisible();
+  await expect(page.getByText("Keine Änderungen", { exact: true })).toBeVisible();
   const share = page.getByRole("button", { name: "Teilen" });
   await expect(share).toHaveCount(1);
   await share.click();
@@ -589,7 +603,8 @@ test("shares the day's changes", async ({ page, context }) => {
   await expect(desktop.getByText("Kopiert")).toBeVisible();
   const copied = await desktop.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/^Vertretungsplan 5A\nMorgen, Freitag, 09\.10\.\n\n/);
-  expect(copied).not.toContain("http");
+  // Only the app's own address, so whoever gets it can find the app.
+  expect(copied.match(/https?:\/\/\S+/g)).toEqual([`${new URL(desktop.url()).origin}/`]);
 });
 
 test("settings: next day hour and new badges", async ({ page }) => {

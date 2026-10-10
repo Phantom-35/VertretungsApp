@@ -135,4 +135,23 @@ describe("checkParsedPages (self-check)", () => {
       `Seite 1: ${page.stats.tableRows} Zeilen auf der Seite, aber ${page.entries.length} gelesen.`,
     );
   });
+  it("counts an open substitute (???) like the parser does", () => {
+    const html = loadFixture(1);
+    const row = html.match(/<tr class='list odd'>.*?<\/tr>/)![0];
+    const cells = row.match(/<td[^>]*>.*?<\/td>/g)!;
+    // Two rows that only differ in "???" versus "---" as substitute.
+    const withSubstitute = (value: string) => row.replace(cells[3], cells[3].replace(/>[^<]*</, `>${value}<`));
+    const page = parseSubstitutionPage(html.replace(row, withSubstitute("???") + withSubstitute("---")), 1);
+    expect(page.stats.tableRows).toBe(page.entries.length);
+  });
+
+  it("only notes a few rows without a lesson, e.g. an all-day event", () => {
+    const html = loadFixture(1);
+    const row = html.match(/<tr class='list odd'>.*?<\/tr>/)![0];
+    const cells = row.match(/<td[^>]*>.*?<\/td>/g)!;
+    const page = parseSubstitutionPage(html.replace(row, row.replace(cells[1], cells[1].replace(/>[^<]*</, ">ganztägig<"))), 1);
+    const result = checkParsedPages([page]);
+    expect(result.problems).toEqual([]);
+    expect(result.notes).toContain("Seite 1: 1 Einträge ohne gültige Klasse oder Stunde.");
+  });
 });

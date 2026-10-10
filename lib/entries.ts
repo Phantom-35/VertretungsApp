@@ -76,6 +76,18 @@ export function formatLesson(lesson: string) {
   return lesson.replace(/\s*-\s*/g, "–");
 }
 
+/** For screen readers: "3. Stunde", "3. bis 4. Stunde" (not "S-T-D 3 Strich 4"). */
+export function spokenLesson(lesson: string) {
+  const parts = lesson.split(/\s*-\s*/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) {
+    return "Stunde unbekannt";
+  }
+  if (parts.length === 1) {
+    return /^\d+$/.test(parts[0]) ? `${parts[0]}. Stunde` : `Stunde ${parts[0]}`;
+  }
+  return `${parts[0]}. bis ${parts.at(-1)}. Stunde`;
+}
+
 export type EntryKind =
   | "cancelled"
   | "self-study"
@@ -124,8 +136,29 @@ export function getEntryKind(type: string): EntryKind {
   return "substitution";
 }
 
+/**
+ * Untis abbreviations and internal terms, spelled out for students:
+ * "Statt-Vertretung" (a teacher's lesson replaced by another) is simply a
+ * substitution for them.
+ */
+const TYPE_NAMES: Record<string, string> = {
+  "statt-vertretung": "Vertretung",
+  "veranst.": "Veranstaltung",
+  "raum-vtr.": "Raumänderung",
+  "vtr.": "Vertretung",
+  "entf.": "Entfall",
+  "verl.": "Verlegung",
+  "betr.": "Betreuung",
+};
+
+/** The type as shown to users: "Veranst." -> "Veranstaltung"; "Änderung" if empty. */
+export function displayType(type: string) {
+  const trimmed = type.trim();
+  return TYPE_NAMES[trimmed.toLowerCase()] ?? (trimmed || "Änderung");
+}
+
 export const entryKindHints: Partial<Record<EntryKind, string>> = {
-  "self-study": "Eigenverantwortliches Arbeiten",
+  "self-study": "Eigenverantwortliches Arbeiten: Aufgaben selbst bearbeiten",
   cancelled: "Unterricht fällt aus",
   moved: "Stunde wurde verlegt",
   supervision: "Klasse wird beaufsichtigt",
@@ -182,10 +215,12 @@ export function normalizeTeacher(value: string) {
 
 /**
  * Teachers that identify the course of an entry: the "(Lehrer)" column, or
- * for exams (no teacher) the abbreviations in the text, e.g. "Q1 S GK RUK".
+ * for exams (no teacher) the abbreviations in a course label in the text,
+ * e.g. "Q1 S GK RUK". Other texts ("ABI-Info in der AULA") name no course.
  */
 export function courseTeachers(entry: Pick<SubstitutionEntry, "teacher" | "text">) {
-  const source = entry.teacher || entry.text;
+  const courseLabel = /^(EF|Q1|Q2)\s/.test(entry.text.trim()) ? entry.text : "";
+  const source = entry.teacher || courseLabel;
   return (source.match(/[A-ZÄÖÜ]+/g) ?? []).filter(
     (token) => token.length >= 3 && token.length <= 4,
   );
@@ -205,4 +240,19 @@ export function entryMatchesTeachers(
   }
   const own = courseTeachers(entry);
   return own.length === 0 || own.some((teacher) => teachers.includes(teacher));
+}
+
+/**
+ * The place in the timetable an entry is about: date, class and lesson. In
+ * the upper school one lesson holds many courses, so the course (its
+ * teachers) is part of it; otherwise unrelated courses would be paired as
+ * "now X (before Y)".
+ */
+export function timetableSlot(
+  entry: Pick<SubstitutionEntry, "date" | "className" | "lesson" | "teacher" | "text">,
+) {
+  const slot = `${entry.date}|${entry.className}|${entry.lesson}`;
+  return isCourseClass(formatClassName(entry.className))
+    ? `${slot}|${[...courseTeachers(entry)].sort().join(",")}`
+    : slot;
 }

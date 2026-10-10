@@ -12,7 +12,7 @@ type NotificationSettingsProps = {
 };
 
 const buttonClass =
-  "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 disabled:opacity-60";
+  "tap-target shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 disabled:opacity-60";
 
 /** Push notifications for the student's own class, part of the class card. */
 export function NotificationSettings({ push, schoolClass, teachers }: NotificationSettingsProps) {
@@ -61,6 +61,7 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
             type="button"
             onClick={() => void sendTest()}
             disabled={busy}
+            aria-label="Testnachricht senden"
             className={`${buttonClass} border border-line bg-surface text-accent-strong`}
           >
             Test
@@ -69,7 +70,7 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
             type="button"
             onClick={() => void disable()}
             disabled={busy}
-            aria-label="Ausschalten"
+            aria-label="Benachrichtigungen ausschalten"
             className={`${buttonClass} border border-line bg-surface text-foreground`}
           >
             Aus
@@ -79,7 +80,7 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
       break;
     case "off":
       description = audience
-        ? `Mitteilung aufs Handy, sobald sich der Plan für ${audience} ändert, auch wenn die App geschlossen ist.`
+        ? `Eine Nachricht aufs Handy, sobald sich der Plan für ${audience} ändert, auch wenn die App geschlossen ist.`
         : "Lege zuerst in den Einstellungen deine Klasse fest.";
       actions = (
         <button
@@ -113,7 +114,7 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
               <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" />
             </svg>
             <span>
-              <span className="font-semibold">Mitteilungen an</span>{" "}
+              <span className="font-semibold">Benachrichtigungen an</span>{" "}
               <span className="text-muted">für {audience ?? "deine Klasse"}</span>
             </span>
           </p>

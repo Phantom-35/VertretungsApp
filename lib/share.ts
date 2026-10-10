@@ -1,4 +1,4 @@
-import { formatClassName, formatLesson, isOpenSubstitute } from "@/lib/entries";
+import { displayType, formatClassName, formatLesson, isOpenSubstitute } from "@/lib/entries";
 import type { SubstitutionEntry } from "@/lib/types";
 
 type ShareOptions = {
@@ -10,6 +10,8 @@ type ShareOptions = {
   ownCoursesOnly: boolean;
   /** "08.10., 15:34 Uhr"; omitted when unknown. */
   sourceUpdated: string | null;
+  /** The app's address, so that whoever gets the message can find the app. */
+  appUrl?: string | null;
 };
 
 /** "3 - 4" -> "3.–4. Std.", "5" -> "5. Std." */
@@ -36,7 +38,7 @@ type DescribedEntry = Pick<
 export function describeEntry(entry: DescribedEntry, schoolClass: string) {
   const className = formatClassName(entry.className);
   return [
-    entry.type || "Änderung",
+    displayType(entry.type),
     className !== schoolClass ? className : "",
     entry.subject ? `Fach ${entry.subject}` : "",
     teacherLabel(entry),
@@ -67,7 +69,7 @@ export function formatShareBlock(entry: DescribedEntry, schoolClass: string) {
     entry.room ? `Raum ${entry.room}` : "",
   ].filter(Boolean);
   return [
-    `${lessonLabel(entry.lesson)} · ${entry.type || "Änderung"}${className !== schoolClass ? ` (${className})` : ""}`,
+    `${lessonLabel(entry.lesson)} · ${displayType(entry.type)}${className !== schoolClass ? ` (${className})` : ""}`,
     ...(details.length > 0 ? [details.join(" · ")] : []),
     ...(entry.text ? [`„${entry.text}“`] : []),
   ].join("\n");
@@ -80,6 +82,7 @@ export function buildShareText({
   entries,
   ownCoursesOnly,
   sourceUpdated,
+  appUrl = null,
 }: ShareOptions) {
   const heading = [`Vertretungsplan ${schoolClass}${ownCoursesOnly ? " (meine Kurse)" : ""}`, dayLabel].join("\n");
   const body =
@@ -87,5 +90,9 @@ export function buildShareText({
       ? entries.map((entry) => formatShareBlock(entry, schoolClass))
       : ["Keine Änderungen eingetragen."];
   // Blank lines between the blocks keep it readable in a chat.
-  return [heading, ...body, ...(sourceUpdated ? [`Stand der Schule: ${sourceUpdated}`] : [])].join("\n\n");
+  const footer = [
+    ...(sourceUpdated ? [`Stand der Schule: ${sourceUpdated}`] : []),
+    ...(appUrl ? [`Ganzer Plan in der App: ${appUrl}`] : []),
+  ].join("\n");
+  return [heading, ...body, ...(footer ? [footer] : [])].join("\n\n");
 }

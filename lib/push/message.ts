@@ -1,8 +1,10 @@
 import {
+  displayType,
   entryAppliesToClass,
   entryMatchesTeachers,
   isCourseClass,
   lessonStart,
+  timetableSlot,
 } from "@/lib/entries";
 import { formatShortDate, relativeDayLabel } from "@/lib/format";
 import type { KeyedEntry } from "@/lib/seen";
@@ -57,7 +59,7 @@ export function isRelevant(entry: KeyedEntry, audience: Audience, now: number) {
   );
 }
 
-const slotOf = (entry: KeyedEntry) => `${entry.date}|${entry.className}|${entry.lesson}`;
+const slotOf = (entry: KeyedEntry) => timetableSlot(entry);
 
 /**
  * The changes one subscriber is told about. An entry replaced by another one
@@ -111,9 +113,9 @@ function describeChange(change: Change, schoolClass: string) {
     case "added":
       return describeEntry(change.entry, schoolClass);
     case "changed":
-      return `Jetzt: ${describeEntry(change.entry, schoolClass)} (vorher ${change.previous.type || "Änderung"})`;
+      return `Jetzt: ${describeEntry(change.entry, schoolClass)} (vorher ${displayType(change.previous.type)})`;
     case "removed":
-      return `Zurückgenommen: ${describeEntry(change.entry, schoolClass)}`;
+      return `Gilt nicht mehr: ${describeEntry(change.entry, schoolClass)}`;
   }
 }
 
@@ -216,7 +218,9 @@ export function buildSummary(
     .sort((left, right) => lessonStart(left.lesson) - lessonStart(right.lesson));
   const day = dayLabel(date, now);
   const url = `/?day=${date}`;
-  const tag = `kag-summary-${date}`;
+  // Morning and evening apart: the morning one must not silently replace
+  // last evening's (a replaced notification makes no sound on Android).
+  const tag = `kag-summary-${schoolHour(now) < 12 ? "morning" : "evening"}-${date}`;
 
   if (own.length === 0) {
     return { title: `${audience.schoolClass} · ${day}`, body: "Keine Änderungen eingetragen.", url, tag };

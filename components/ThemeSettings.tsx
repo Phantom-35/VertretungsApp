@@ -13,7 +13,7 @@ export function ThemeToggle() {
       onClick={() => setPreference(next)}
       aria-label={next === "dark" ? "Dunkles Design" : "Helles Design"}
       title={next === "dark" ? "Dunkles Design" : "Helles Design"}
-      className="flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface/70 text-foreground transition active:scale-95"
+      className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface/70 text-foreground transition active:scale-95"
     >
       <svg
         aria-hidden
@@ -67,7 +67,7 @@ export function SettingsButton({ onClick }: { onClick: () => void }) {
       aria-label="Einstellungen"
       title="Einstellungen"
       aria-haspopup="dialog"
-      className="flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface/70 text-foreground transition active:scale-95"
+      className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface/70 text-foreground transition active:scale-95"
     >
       <svg
         aria-hidden

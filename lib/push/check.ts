@@ -18,7 +18,9 @@ import type { SubstitutionPayload } from "@/lib/types";
 
 const LOCK_NAME = "check";
 const LOCK_SECONDS = 120;
-const PARALLEL_SENDS = 5;
+// Push services answer quickly; enough in parallel to stay well within the
+// function time limit with many devices.
+const PARALLEL_SENDS = 20;
 
 export type CheckResult =
   | { status: "quiet" }
@@ -97,7 +99,13 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
       return { status: "incomplete", reason: plan.error ?? "Plan nicht verfügbar" };
     }
 
-    const diff = diffPlan(await store.getPlanState(), plan.entries, schoolToday(now), new Date(now));
+    const diff = diffPlan(
+      await store.getPlanState(),
+      plan.entries,
+      schoolToday(now),
+      new Date(now),
+      plan.days?.map((day) => day.date),
+    );
     // Saved before sending: a failed run must not notify twice.
     await store.savePlanState(diff.state);
 
@@ -125,9 +133,10 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
 
     const notify = async (subscriber: Subscriber) => {
       const getsSummary = summaryDue && summary.wanted(subscriber);
-      // The summary sent with them shows its day's changes already.
+      // The summary sent with them shows its day's changes already; a
+      // withdrawn change is not in it, so that one is still sent.
       const changes = (hasChanges ? changesFor(diff, subscriber, now) : []).filter(
-        (change) => !getsSummary || change.entry.date !== summary.day,
+        (change) => !getsSummary || change.kind === "removed" || change.entry.date !== summary.day,
       );
       if (changes.length > 0) {
         if (!(await deliver(subscriber, buildNotification(subscriber.schoolClass, changes, now)))) {

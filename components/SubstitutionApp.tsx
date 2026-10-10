@@ -19,7 +19,7 @@ import { Onboarding } from "@/components/Onboarding";
 import { TeacherHint } from "@/components/TeacherFilter";
 import { SettingsSheet, type SettingsFocus } from "@/components/SettingsSheet";
 import { acknowledgeNewEntry, useAcknowledgedEntries, useSeenBaseline } from "@/hooks/useNewEntries";
-import { useNow } from "@/hooks/useNow";
+import { useNow, useOpened } from "@/hooks/useNow";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useMyClass, useViewedClass } from "@/hooks/useSelectedClass";
@@ -78,7 +78,7 @@ function EmptyDay({
   return (
     <div className={cardClassName}>
       <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
-        Keine Vertretungen
+        Keine Änderungen
       </p>
       <p className="mt-2 text-sm leading-6 text-muted">
         {dayLabel} sind {filtered ? `für deine Kurse in der ${selectedClass}` : `für die ${selectedClass}`}{" "}
@@ -151,11 +151,22 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const forceRefresh = useCallback(() => refresh(true), [refresh]);
   const isBusy = status !== "idle";
 
-  const [chosenDate, setChosenDate] = useState<string | null>(initialDay);
+  // A day tapped by the user (or in a notification while the app is open),
+  // with the school day it was chosen on: the next day it no longer applies.
+  const [chosen, setChosen] = useState<{ date: string; on: string } | null>(null);
+  const chooseDate = useCallback((date: string) => setChosen({ date, on: schoolToday(Date.now()) }), []);
+  const opened = useOpened();
+  const openedDay = opened !== null ? schoolToday(opened.last) : null;
+  const chosenDate = chosen && (openedDay === null || chosen.on === openedDay) ? chosen.date : null;
   // A page served from the service worker cache was rendered without
   // "?day=" (e.g. opened from a notification): the address still has it.
+  // Like a choice, it only applies on the day the app was opened with it.
   const addressDay = useSyncExternalStore(noSubscribe, dayInAddress, () => null);
-  const requestedDate = chosenDate ?? addressDay;
+  const linkDayApplies = opened === null || schoolToday(opened.first) === openedDay;
+  // After hydration the address is the truth: a cached page may carry the
+  // day it was rendered for.
+  const linkDay = opened === null ? initialDay : addressDay;
+  const requestedDate = chosenDate ?? (linkDayApplies ? linkDay : null);
 
   // A notification tapped while the app is open: show its day. Opening the
   // app also clears the number on its icon.
@@ -171,7 +182,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       const data = event.data as { type?: string; url?: string } | null;
       const day = data?.type === "open-url" && data.url ? dayFromUrl(data.url) : null;
       if (day) {
-        setChosenDate(day);
+        chooseDate(day);
       }
     };
     clearBadge();
@@ -181,7 +192,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       document.removeEventListener("visibilitychange", clearBadge);
       navigator.serviceWorker?.removeEventListener("message", onMessage);
     };
-  }, []);
+  }, [chooseDate]);
 
   const days = data?.days ?? [];
   // Keep the user's choice while it is still part of the plan.
@@ -189,7 +200,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     ? requestedDate
     : pickDefaultDate(
         days.map((day) => day.date),
-        now,
+        // Decided when the app is opened, not on every tick: at 16:00 the
+        // view does not jump to tomorrow while the user is reading.
+        opened?.last ?? now,
         settings.nextDayFromHour,
       );
   const selectedDay = days.find((day) => day.date === selectedDate) ?? null;
@@ -211,8 +224,11 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     headerStatus = "offline";
   } else if (holiday && !planAhead) {
     headerStatus = holiday.kind === "holidays" ? "holiday" : "public-holiday";
-  } else if (!data || data.stale || fromDevice || planIsPast) {
+  } else if (!data || data.stale || fromDevice) {
     headerStatus = "outdated";
+  } else if (planIsPast) {
+    // Up to date, but only past days: the next plan is not online yet.
+    headerStatus = "waiting";
   } else if (data.error) {
     headerStatus = "incomplete";
   }
@@ -298,6 +314,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       entries: visibleEntries,
       ownCoursesOnly: teachers.length > 0 && !showOtherCourses,
       sourceUpdated: data?.sourceUpdatedAt ? formatTimestamp(data.sourceUpdatedAt, now) : null,
+      appUrl: `${window.location.origin}/`,
     });
   const emptyDayLabel = selectedDay
     ? `Am ${selectedDay.dayLabel ?? formatPlanDateLabel(selectedDay.date, null)}`
@@ -342,16 +359,15 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             {viewedClass && myClass && viewedClass !== myClass ? (
               <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
                 <p className="min-w-0 text-sm leading-5 text-muted">
-                  Nur angesehen. Deine Klasse bleibt die{" "}
-                  <span className="font-semibold text-foreground">{myClass}</span>, auch für
-                  Benachrichtigungen.
+                  Nur angesehen. Beim nächsten Öffnen und für Benachrichtigungen gilt weiter die{" "}
+                  <span className="font-semibold text-foreground">{myClass}</span>.
                 </p>
                 <button
                   type="button"
                   onClick={() => chooseClass(myClass)}
-                  className="shrink-0 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-accent-strong"
+                  className="tap-target shrink-0 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-accent-strong"
                 >
-                  Zur {myClass}
+                  Zurück zur {myClass}
                 </button>
               </div>
             ) : null}
@@ -373,11 +389,18 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             />
           ) : null}
 
+          {headerStatus === "waiting" ? (
+            <p className="rounded-[1.4rem] border border-line bg-card px-4 py-3 text-sm leading-6 text-muted">
+              Der nächste Plan ist noch nicht online. Bis die Schule ihn hochlädt, siehst du hier
+              den letzten Plan.
+            </p>
+          ) : null}
+
           {!holidayMode && days.length > 1 && selectedDate ? (
             <DaySelector
               days={days}
               selectedDate={selectedDate}
-              onChange={setChosenDate}
+              onChange={chooseDate}
               counts={countsByDate}
               now={now}
             />
@@ -385,9 +408,21 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
 
           {!holidayMode ? <NoticesCard notices={visibleNotices} /> : null}
 
+          {/* Read out after switching day or class: a short summary, not the whole list. */}
+          <p role="status" className="sr-only">
+            {!holidayMode && data && selectedClass && selectedDay
+              ? `${selectedClass}, ${dateLabel}: ${
+                  visibleEntries.length === 0
+                    ? "keine Änderungen"
+                    : visibleEntries.length === 1
+                      ? "1 Änderung"
+                      : `${visibleEntries.length} Änderungen`
+                }`
+              : ""}
+          </p>
+
           <section
             className="space-y-4"
-            aria-live="polite"
             {...(days.length > 1 && selectedDate
               ? { id: DAY_PANEL_ID, role: "tabpanel", "aria-labelledby": dayTabId(selectedDate) }
               : {})}
@@ -473,9 +508,12 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
         onClose={() => setSettingsOpen(false)}
         focus={settingsFocus}
         courseFilter={
+          // The upper-school class on screen; otherwise the own one, whose
+          // courses the notifications are about.
           usesCourseFilter && selectedClass
             ? {
                 schoolClass: selectedClass,
+                own: selectedClass === myClass,
                 selected: storedTeachers,
                 suggestions: teacherSuggestions,
                 onChange: (value) => {
@@ -483,7 +521,15 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                   setTeachers(value);
                 },
               }
-            : null
+            : myClass && isCourseClass(myClass)
+              ? {
+                  schoolClass: myClass,
+                  own: true,
+                  selected: myStoredTeachers,
+                  suggestions: myTeacherSuggestions,
+                  onChange: setMyTeachers,
+                }
+              : null
         }
         sourceUrl={data?.sourceUrl}
         myClass={myClass ?? null}

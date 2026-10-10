@@ -102,7 +102,7 @@ export function InstallReminder() {
             Als App installieren?
           </h2>
           <p className="mt-0.5 text-sm leading-5 text-muted">
-            Ohne App Store, in einer Minute: startet schneller und kann dir Mitteilungen schicken.
+            Ohne App Store, in einer Minute: startet schneller und kann dir Benachrichtigungen schicken.
           </p>
           {!open ? (
             <button
@@ -118,7 +118,7 @@ export function InstallReminder() {
           type="button"
           onClick={dismiss}
           aria-label="Erinnerung schließen"
-          className="-mr-1 -mt-1 flex size-8 shrink-0 items-center justify-center rounded-full text-muted transition active:scale-95"
+          className="tap-target -mr-1 -mt-1 flex size-8 shrink-0 items-center justify-center rounded-full text-muted transition active:scale-95"
         >
           <svg
             aria-hidden

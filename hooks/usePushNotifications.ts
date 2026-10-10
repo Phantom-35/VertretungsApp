@@ -58,6 +58,10 @@ type Audience = {
   morningSummary: boolean;
 };
 
+/** Checks that failed (offline, slow service worker) are repeated after this. */
+const RETRY_MS = 15_000;
+const MAX_ATTEMPTS = 3;
+
 /**
  * Web push for the selected class (and courses). Keeps the server's copy of
  * class and teachers in sync while notifications are on.
@@ -79,19 +83,36 @@ export function usePushNotifications({
   const syncChainRef = useRef<Promise<unknown>>(Promise.resolve());
   const teachersKey = teachers.join(",");
   const groupsKey = notifyGroups.join(",");
+  // A failed check (offline, slow start) is repeated instead of hiding
+  // notifications for the whole visit.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: number | undefined;
     const update = (value: PushStatus) => {
       if (!cancelled) {
         setStatus(value);
       }
     };
+    const retry = () => {
+      if (!cancelled) {
+        setAttempt((value) => value + 1);
+      }
+    };
+    const retryLater = () => {
+      window.addEventListener("online", retry, { once: true });
+      retryTimer = window.setTimeout(retry, RETRY_MS);
+    };
 
     (async () => {
       const config = (await fetch("/api/push/config")
         .then((response) => response.json())
-        .catch(() => ({ enabled: false }))) as { enabled: boolean; publicKey?: string };
+        .catch(() => null)) as { enabled: boolean; publicKey?: string } | null;
+      if (!config) {
+        // Not reachable right now: stays "checking" and tries again.
+        return retryLater();
+      }
       if (!config.enabled || !config.publicKey) {
         return update("unavailable");
       }
@@ -113,14 +134,21 @@ export function usePushNotifications({
         const subscription = await registration.pushManager.getSubscription();
         update(subscription && Notification.permission === "granted" ? "on" : "off");
       } catch {
-        update("unsupported");
+        // The service worker was too slow to start: try again a few times.
+        if (attempt < MAX_ATTEMPTS) {
+          retryLater();
+        } else {
+          update("unsupported");
+        }
       }
     })();
 
     return () => {
       cancelled = true;
+      window.clearTimeout(retryTimer);
+      window.removeEventListener("online", retry);
     };
-  }, []);
+  }, [attempt]);
 
   // While on: tell the server about the current class and teachers (also
   // re-registers the device if the server lost it).
@@ -196,6 +224,9 @@ export function usePushNotifications({
       setStatus("on");
       setMessage("Eingeschaltet. Eine Bestätigung ist unterwegs.");
     } catch {
+      // The answer was lost: do not stay subscribed while the app says "off".
+      await post("/api/push/unsubscribe", { endpoint: subscription.endpoint }).catch(() => undefined);
+      await subscription.unsubscribe().catch(() => undefined);
       setMessage("Einschalten hat nicht geklappt. Bitte später erneut versuchen.");
     } finally {
       setBusy(false);

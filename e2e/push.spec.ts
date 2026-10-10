@@ -114,7 +114,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     await chooseClass(page, "5A");
     const settings = page.getByRole("group", { name: "Benachrichtigungen" });
     await settings.getByRole("button", { name: "Einschalten" }).click();
-    await expect(settings).toContainText("Mitteilungen an für 5A");
+    await expect(settings).toContainText("Benachrichtigungen an für 5A");
 
     // A confirmation reaches the device right away.
     const [welcome] = await waitForPushes(service.received, "/phone", 1);
@@ -141,7 +141,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     const [, change] = await waitForPushes(service.received, "/phone", 2);
     expect(read(phone, change)).toEqual({
       title: "5A · Morgen 3.–4. Std.",
-      body: "Jetzt: Entfall · 5AB · SVA · Raum 004 (vorher Statt-Vertretung)",
+      body: "Jetzt: Entfall · 5AB · SVA · Raum 004 (vorher Vertretung)",
       url: "/?day=2026-10-09",
       badgeCount: 1,
     });
@@ -151,8 +151,8 @@ test("notifies the right devices about changes, also a second upload", async ({ 
 
     // Only looking at another class does not move the notifications.
     await chooseClass(page, "7B");
-    await expect(page.getByText("Nur angesehen. Deine Klasse bleibt die 5A")).toBeVisible();
-    await expect(settings).toContainText("Mitteilungen an für 5A");
+    await expect(page.getByText(/Nur angesehen\..*gilt weiter die 5A/)).toBeVisible();
+    await expect(settings).toContainText("Benachrichtigungen an für 5A");
     await changePlan(
       request,
       4,
@@ -172,7 +172,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     await sheet.getByLabel("Meine Klasse").selectOption("7B");
     await sheet.getByRole("button", { name: "Fertig" }).click();
     await synced;
-    await expect(settings).toContainText("Mitteilungen an für 7B");
+    await expect(settings).toContainText("Benachrichtigungen an für 7B");
     await expect(page.getByText("Nur angesehen.")).toHaveCount(0);
     await changePlan(
       request,
@@ -185,7 +185,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     expect(read(phone, moved).title).toBe("7B · Morgen 5.–6. Std.");
 
     // Test button.
-    await settings.getByRole("button", { name: "Test" }).click();
+    await settings.getByRole("button", { name: "Testnachricht senden" }).click();
     await expect(settings.getByText(/^Testnachricht kommt in/)).toBeVisible();
     const [, , , testPush] = await waitForPushes(service.received, "/phone", 4);
     expect(read(phone, testPush).title).toBe("Testnachricht");
@@ -197,7 +197,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     expect(await hint.evaluate((element) => getComputedStyle(element.parentElement!).opacity)).toBe("0");
 
     // Switched off: no more notifications.
-    await settings.getByRole("button", { name: "Ausschalten" }).click();
+    await settings.getByRole("button", { name: "Benachrichtigungen ausschalten" }).click();
     await expect(settings.getByRole("button", { name: "Einschalten" })).toBeVisible();
     await changePlan(
       request,

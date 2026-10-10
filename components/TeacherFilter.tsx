@@ -29,7 +29,7 @@ export function TeacherHint({ schoolClass, selected, onOpenSettings }: TeacherHi
         type="button"
         onClick={onOpenSettings}
         aria-haspopup="dialog"
-        className="shrink-0 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-accent-strong"
+        className="tap-target shrink-0 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-accent-strong"
       >
         {selected.length > 0 ? "Ändern" : "Festlegen"}
       </button>

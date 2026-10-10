@@ -26,10 +26,10 @@ export function RefreshStatus({
 
   if (connectionError) {
     title = connectionError;
-    message = `Angezeigt wird der zuletzt geladene Stand (${lastSuccessLabel}).`;
+    message = `Du siehst den Plan, der zuletzt geladen wurde (${lastSuccessLabel}).`;
   } else if (stale) {
     title = "Die Webseite der Schule antwortet gerade nicht.";
-    message = `Angezeigt wird der Stand von ${lastSuccessLabel}.`;
+    message = `Du siehst den Stand von ${lastSuccessLabel}.`;
   } else if (error) {
     title = error;
     message = warnings.length > 0 ? warnings.join(" ") : null;
@@ -47,7 +47,8 @@ export function RefreshStatus({
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{title}</p>
         {message ? <p>{message}</p> : null}
-        {sourceUrl ? (
+        {/* Without a connection the school's page cannot be opened either. */}
+        {sourceUrl && !connectionError ? (
           <a
             href={sourceUrl}
             target="_blank"
@@ -61,9 +62,9 @@ export function RefreshStatus({
       <button
         type="button"
         onClick={onRetry}
-        className="shrink-0 rounded-full border border-warn/20 bg-surface/60 px-3 py-1 text-xs font-semibold"
+        className="tap-target shrink-0 rounded-full border border-warn/20 bg-surface/60 px-3 py-1 text-xs font-semibold"
       >
-        Erneut
+        Neu laden
       </button>
     </section>
   );

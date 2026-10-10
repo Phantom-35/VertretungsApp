@@ -101,7 +101,7 @@ export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySe
             </span>
             {count !== null ? (
               <span
-                aria-label={`${count} Änderungen`}
+                aria-hidden
                 className={`absolute right-1.5 top-1.5 min-w-5 rounded-full px-1.5 text-[0.68rem] font-bold leading-5 ${
                   count === 0
                     ? selected
@@ -114,6 +114,9 @@ export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySe
               >
                 {count}
               </span>
+            ) : null}
+            {count !== null ? (
+              <span className="sr-only">, {count === 1 ? "1 Änderung" : `${count} Änderungen`}</span>
             ) : null}
           </button>
         );

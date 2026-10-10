@@ -14,6 +14,8 @@ export type SettingsFocus = "teachers" | null;
 
 type CourseFilter = {
   schoolClass: string;
+  /** The student's own class (notifications follow it), not one only looked at. */
+  own: boolean;
   selected: readonly string[];
   suggestions: string[];
   onChange: (teachers: string[]) => void;
@@ -377,8 +379,8 @@ export function SettingsSheet({
         </Setting>
 
         <Setting
-          title="Nächsten Tag anzeigen ab"
-          description="Ab dieser Uhrzeit zeigt die App beim Öffnen den nächsten Schultag statt heute. Bei „Immer“ gleich den nächsten Schultag."
+          title="Ab wann den nächsten Schultag zeigen?"
+          description="Öffnest du die App nach dieser Uhrzeit, siehst du gleich den Plan für den nächsten Schultag. „Immer“: immer den nächsten Schultag, „Nie“: immer heute."
         >
           <Segmented
             name="next-day"
@@ -404,7 +406,7 @@ export function SettingsSheet({
 
         <Setting
           title="Benachrichtigungen"
-          description="Worüber du eine Mitteilung bekommst, wenn Benachrichtigungen auf der Startseite eingeschaltet sind."
+          description="Worüber du eine Nachricht bekommst. Ein- und ausschalten kannst du Benachrichtigungen auf der Startseite direkt unter deiner Klasse."
         >
           <div className="divide-y divide-line rounded-2xl border border-line bg-card">
             {NOTIFY_GROUPS.map((group) => (
@@ -441,8 +443,16 @@ export function SettingsSheet({
         {courseFilter ? (
           <Card
             id="settings-teachers"
-            title={`Oberstufe: Meine Lehrkräfte (${courseFilter.schoolClass})`}
-            description="Wähle die Lehrkräfte deiner Kurse. Dann siehst du nur deren Änderungen und bekommst nur dafür Benachrichtigungen. Einträge ohne Lehrkraft werden immer angezeigt."
+            title={
+              courseFilter.own
+                ? `Oberstufe: Meine Lehrkräfte (${courseFilter.schoolClass})`
+                : `Lehrkräfte für die ${courseFilter.schoolClass} (nur angesehen)`
+            }
+            description={
+              courseFilter.own
+                ? "Wähle die Lehrkräfte deiner Kurse. Dann siehst du nur deren Änderungen und bekommst nur dafür Benachrichtigungen. Einträge ohne Lehrkraft werden immer angezeigt."
+                : "Filtert nur die Anzeige dieser Klasse, z. B. für Geschwister. Deine Benachrichtigungen bleiben bei deiner Klasse."
+            }
           >
             <TeacherChooser
               key={courseFilter.schoolClass}

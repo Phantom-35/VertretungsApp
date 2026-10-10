@@ -1,6 +1,6 @@
 import { SettingsButton, ThemeToggle } from "@/components/ThemeSettings";
 
-export type HeaderStatus = "current" | "updating" | "offline" | "outdated" | "incomplete" | "holiday" | "public-holiday";
+export type HeaderStatus = "current" | "updating" | "offline" | "outdated" | "incomplete" | "holiday" | "public-holiday" | "waiting";
 
 type HeaderProps = {
   selectedClass: string | null | undefined;
@@ -20,7 +20,7 @@ const statusBadges: Record<HeaderStatus, { label: string; className: string }> =
     className: "border-accent/10 bg-accent-soft text-accent-strong",
   },
   updating: {
-    label: "Aktualisiere…",
+    label: "Lädt …",
     className: "border-accent/10 bg-accent-soft text-accent-strong animate-pulse",
   },
   offline: {
@@ -34,6 +34,11 @@ const statusBadges: Record<HeaderStatus, { label: string; className: string }> =
   holiday: {
     label: "Ferien",
     className: "border-accent/10 bg-accent-soft text-accent-strong",
+  },
+  // The school has not published the next day yet (e.g. at the weekend).
+  waiting: {
+    label: "Letzter Plan",
+    className: "border-line bg-surface-muted text-foreground/80",
   },
   "public-holiday": {
     label: "Feiertag",
