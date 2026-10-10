@@ -102,7 +102,7 @@ export function InstallReminder() {
             Als App installieren?
           </h2>
           <p className="mt-0.5 text-sm leading-5 text-muted">
-            Startet schneller und kann dir Mitteilungen schicken.
+            Ohne App Store, in einer Minute: startet schneller und kann dir Mitteilungen schicken.
           </p>
           {!open ? (
             <button

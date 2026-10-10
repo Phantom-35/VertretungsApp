@@ -49,6 +49,24 @@ const VERSION = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? nu
 
 /** Support website with the legal pages; the addresses can be changed on Vercel. */
 const SUPPORT_URL = "https://support-vertretung-kag.vercel.app";
+const FEEDBACK_EMAIL = "phandevstudios@gmx.de";
+
+/** An e-mail with the details that help to reproduce a problem. */
+function sendFeedback(myClass: string | null) {
+  const body = [
+    "Was ist dir aufgefallen?",
+    "",
+    "",
+    "---",
+    `Klasse: ${myClass ?? "–"}`,
+    `Als App installiert: ${isStandalone() ? "ja" : "nein"}`,
+    `Version: ${VERSION ?? "–"}`,
+    `Gerät: ${navigator.userAgent}`,
+  ].join("\n");
+  window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(
+    "Feedback KAG Vertretungsplan",
+  )}&body=${encodeURIComponent(body)}`;
+}
 const LEGAL_LINKS = [
   { label: "Impressum", url: process.env.NEXT_PUBLIC_IMPRESSUM_URL?.trim() || `${SUPPORT_URL}/impressum` },
   { label: "Datenschutz", url: process.env.NEXT_PUBLIC_DATENSCHUTZ_URL?.trim() || `${SUPPORT_URL}/datenschutz` },
@@ -439,7 +457,7 @@ export function SettingsSheet({
         {!installed ? (
           <Card
             title="Als App installieren"
-            description="Als App startet der Plan schneller, funktioniert offline und kann Benachrichtigungen schicken."
+            description="Ohne App Store, direkt aus dem Browser. Als App startet der Plan schneller, funktioniert offline und kann Benachrichtigungen schicken."
           >
             <InstallGuide />
           </Card>
@@ -468,6 +486,13 @@ export function SettingsSheet({
             className="block text-sm font-semibold text-accent-strong underline underline-offset-2"
           >
             Einführung nochmal ansehen
+          </button>
+          <button
+            type="button"
+            onClick={() => sendFeedback(myClass)}
+            className="block text-sm font-semibold text-accent-strong underline underline-offset-2"
+          >
+            Feedback senden oder Fehler melden
           </button>
           {sourceUrl ? (
             <a

@@ -236,6 +236,20 @@ export function Onboarding({
                 >
                   Die Änderungen eines Tages mit einem Tipp an Freunde oder Eltern schicken.
                 </Feature>
+                {!installed ? (
+                  <Feature
+                    title="Kein App Store nötig"
+                    icon={
+                      <svg {...iconProps}>
+                        <rect x="6" y="2" width="12" height="20" rx="3" />
+                        <path d="M12 7v7M9 11l3 3 3-3" />
+                      </svg>
+                    }
+                  >
+                    Eine Web-App: Du legst sie direkt aus dem Browser auf deinen Home-Bildschirm. Wie
+                    das geht, zeigen wir dir gleich.
+                  </Feature>
+                ) : null}
               </ul>
             </div>
             <div className="mt-10">
@@ -342,9 +356,13 @@ export function Onboarding({
               <h2 id="onboarding-title" className="mt-6 text-3xl font-semibold tracking-[-0.04em]">
                 Als App installieren
               </h2>
-              <p className="mt-2 text-base leading-7 text-muted">
-                Dann liegt der Plan wie eine App auf dem Home-Bildschirm, startet schneller, geht
-                auch ohne Internet und kann dir Benachrichtigungen schicken.
+              <p className="mt-2 text-base leading-7 text-foreground">
+                Diese App gibt es nicht im App Store oder bei Google Play. Du legst sie direkt aus
+                dem Browser auf deinen Home-Bildschirm: kostenlos, ohne Anmeldung, in einer Minute.
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                Danach öffnest du sie über das Symbol wie jede andere App. Sie startet schneller,
+                geht auch ohne Internet und kann dir Benachrichtigungen schicken.
               </p>
               <div className="mt-6 rounded-[1.4rem] border border-line bg-card p-4">
                 <InstallGuide />

@@ -122,6 +122,7 @@ test("links the legal pages and offers a QR code to pass the app on", async ({ p
     "href",
     "https://support-vertretung-kag.vercel.app/datenschutz",
   );
+  await expect(dialog.getByRole("button", { name: "Feedback senden oder Fehler melden" })).toBeVisible();
   await page.getByRole("link", { name: "QR-Code zeigen" }).click();
   await expect(page).toHaveURL(/\/teilen$/);
   const origin = new URL(page.url()).origin;
@@ -282,6 +283,8 @@ test.describe("first start", () => {
     await page.goto("/");
     const intro = page.getByRole("dialog");
     await expect(intro.getByRole("heading", { name: "Willkommen!" })).toBeVisible();
+    // In the browser it says right away that no app store is needed.
+    await expect(intro.getByText("Kein App Store nötig")).toBeVisible();
     await intro.getByRole("button", { name: "Los geht’s" }).click();
 
     await expect(intro.getByRole("heading", { name: "Deine Klasse" })).toBeVisible();
@@ -299,6 +302,7 @@ test.describe("first start", () => {
 
     // In the browser: how to install it as an app.
     await expect(intro.getByRole("heading", { name: "Als App installieren" })).toBeVisible();
+    await expect(intro.getByText(/nicht im App Store oder bei Google Play/)).toBeVisible();
     // Steps for this browser (Chrome on a computer).
     await expect(intro.getByText("Seite als App installieren", { exact: true })).toBeVisible();
     await intro.getByRole("button", { name: "Später" }).click();
