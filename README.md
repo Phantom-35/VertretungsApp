@@ -30,12 +30,14 @@ Die CI (`.github/workflows/ci.yml`) führt all das bei jedem Push aus (außer `c
 | --- | --- |
 | `SUBSTITUTION_BASE_URL` | Andere Quelle für die Untis-Seiten, z. B. für Tests. Standard: die Seite der Schule. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`, Upstash-Variablen | Benachrichtigungen, siehe unten. |
-| `ALERT_WEBHOOK_URL` | Optional. Bekommt eine Nachricht, wenn der Plan nicht mehr vollständig gelesen werden kann (z. B. weil Untis das Format geändert hat) und wenn das Problem wieder behoben ist. Geht mit einem [ntfy.sh](https://ntfy.sh)-Thema (Push aufs Handy, ohne Konto, z. B. `https://ntfy.sh/ein-geheimer-name`), einem Discord- oder einem Slack-Webhook. |
+| `NEXT_PUBLIC_IMPRESSUM_URL`, `NEXT_PUBLIC_DATENSCHUTZ_URL` | Optional. Links zu Impressum und Datenschutzerklärung auf einer eigenen Website, unten in den Einstellungen („Über die App“). Ohne Wert erscheinen sie nicht. Nach dem Eintragen einmal neu deployen. |
+| `ALERT_WEBHOOK_URL` | Optional. Bekommt eine Nachricht, wenn der Plan nicht mehr vollständig gelesen werden kann (z. B. weil Untis das Format geändert hat) und wenn das Problem wieder behoben ist, außerdem wenn Benachrichtigungen bei keinem Gerät ankommen. Geht mit einem [ntfy.sh](https://ntfy.sh)-Thema (Push aufs Handy, ohne Konto, z. B. `https://ntfy.sh/ein-geheimer-name`), einem Discord- oder einem Slack-Webhook. |
 
 ## Überwachung
 
-`GET /api/health` antwortet mit **200**, solange der Plan vollständig gelesen wird, und
-sonst mit **503** und den Gründen (`problems`). Ein kostenloser Uptime-Dienst
+`GET /api/health` antwortet mit **200**, solange der Plan vollständig gelesen wird (und,
+wenn Benachrichtigungen eingerichtet sind, der Push-Check in den letzten 30 Minuten lief),
+und sonst mit **503** und den Gründen (`problems`). Ein kostenloser Uptime-Dienst
 (z. B. UptimeRobot) kann diese Adresse alle paar Minuten abfragen und meldet sich,
 wenn etwas nicht stimmt, auch wenn die Schulseite ganz ausfällt.
 

@@ -79,3 +79,28 @@ export async function reportPlanProblems(problems: string[], now = Date.now()) {
     return "failed" as const;
   }
 }
+
+const deliveryState: AlertState = { signature: null, sentAt: 0 };
+
+/**
+ * Reports when no device got its notification in a check (e.g. wrong VAPID
+ * keys or the push services down), at most every few hours. Never throws.
+ */
+export async function reportDeliveryProblem(failed: number, now = Date.now()) {
+  const url = process.env.ALERT_WEBHOOK_URL;
+  if (!url || now - deliveryState.sentAt < REPEAT_AFTER_MS) {
+    return url ? ("skipped" as const) : ("disabled" as const);
+  }
+  deliveryState.sentAt = now;
+  try {
+    await send(
+      url,
+      `${TITLE}: ${failed === 1 ? "Eine Benachrichtigung konnte" : `${failed} Benachrichtigungen konnten`} an kein Gerät zugestellt werden. Bitte VAPID-Schlüssel und Vercel-Logs prüfen.`,
+    );
+    return "sent" as const;
+  } catch (error) {
+    deliveryState.sentAt = 0;
+    console.warn("[push] Warnung konnte nicht gesendet werden:", error);
+    return "failed" as const;
+  }
+}

@@ -20,9 +20,15 @@ const payload = (overrides: Partial<SubstitutionPayload>): SubstitutionPayload =
   ...overrides,
 });
 
-async function health(data: SubstitutionPayload) {
+async function health(data: SubstitutionPayload, lastCheck?: string | null) {
   vi.resetModules();
   vi.doMock("@/lib/cache", () => ({ getCachedSubstitutionData: async () => data }));
+  if (lastCheck !== undefined) {
+    vi.stubEnv("CRON_SECRET", "secret");
+    vi.doMock("@/lib/push/service", () => ({
+      getPushService: () => ({ store: { getMeta: async () => lastCheck } }),
+    }));
+  }
   const { GET } = await import("@/app/api/health/route");
   const response = await GET();
   return { status: response.status, body: await response.json() };
@@ -30,6 +36,8 @@ async function health(data: SubstitutionPayload) {
 
 afterEach(() => {
   vi.doUnmock("@/lib/cache");
+  vi.doUnmock("@/lib/push/service");
+  vi.unstubAllEnvs();
 });
 
 describe("GET /api/health", () => {
@@ -46,6 +54,18 @@ describe("GET /api/health", () => {
     );
     expect(status).toBe(503);
     expect(body.problems).toEqual([problem]);
+  });
+
+  it("reports when the push check has not run for a while", async () => {
+    const recent = await health(payload({}), new Date(Date.now() - 5 * 60_000).toISOString());
+    expect(recent.status).toBe(200);
+
+    const overdue = await health(payload({}), new Date(Date.now() - 45 * 60_000).toISOString());
+    expect(overdue.status).toBe(503);
+    expect(overdue.body.problems[0]).toMatch(/^Push-Check lief zuletzt vor 45 Minuten/);
+
+    const never = await health(payload({}), null);
+    expect(never.body.problems[0]).toMatch(/^Push-Check lief noch nie/);
   });
 
   it("reports an unreachable school website", async () => {

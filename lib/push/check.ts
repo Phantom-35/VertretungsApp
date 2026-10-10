@@ -1,3 +1,4 @@
+import { reportDeliveryProblem } from "@/lib/alert";
 import { diffPlan } from "@/lib/push/diff";
 import {
   buildNotification,
@@ -46,6 +47,8 @@ type CheckOptions = {
 
 /** Bookkeeping key: the day the last evening summary was about. */
 const SUMMARY_META = "summary-day";
+/** Bookkeeping key: when the scheduler last called the check (see /api/health). */
+export const LAST_CHECK_META = "last-check";
 
 /**
  * Compares the current plan with the last known one and notifies every
@@ -54,6 +57,8 @@ const SUMMARY_META = "summary-day";
  * minutes; runs that overlap are skipped.
  */
 export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: CheckOptions): Promise<CheckResult> {
+  // Also at night: shows that the scheduler still runs.
+  await store.setMeta(LAST_CHECK_META, new Date(now).toISOString());
   if (isQuietTime(now)) {
     // Nothing is recorded, so the first check in the morning reports it all.
     return { status: "quiet" };
@@ -113,6 +118,10 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
 
     for (let index = 0; index < subscribers.length; index += PARALLEL_SENDS) {
       await Promise.all(subscribers.slice(index, index + PARALLEL_SENDS).map(notify));
+    }
+    // Something to send, but nothing arrived anywhere: worth a warning.
+    if (stats.failed > 0 && stats.notified + stats.summaries === 0) {
+      await reportDeliveryProblem(stats.failed, now);
     }
 
     if (diff.initial) {

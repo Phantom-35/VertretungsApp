@@ -1,12 +1,39 @@
 import { NextResponse } from "next/server";
 import { getCachedSubstitutionData } from "@/lib/cache";
+import { LAST_CHECK_META } from "@/lib/push/check";
+import { getPushService } from "@/lib/push/service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+/** The scheduler calls the push check every 10 minutes. */
+const CHECK_OVERDUE_MS = 30 * 60_000;
+
+/** With notifications set up: whether the scheduler still calls the check. */
+async function pushCheckProblem(now: number) {
+  // The in-memory store is for tests, which have no scheduler.
+  const service = process.env.CRON_SECRET && process.env.PUSH_STORE !== "memory" ? getPushService() : null;
+  if (!service) {
+    return null;
+  }
+  try {
+    const last = await service.store.getMeta(LAST_CHECK_META);
+    const age = last ? now - Date.parse(last) : Number.POSITIVE_INFINITY;
+    if (age > CHECK_OVERDUE_MS) {
+      return last
+        ? `Push-Check lief zuletzt vor ${Math.round(age / 60_000)} Minuten (cron-job.org prüfen).`
+        : "Push-Check lief noch nie (cron-job.org prüfen).";
+    }
+  } catch {
+    return "Push-Speicher (Redis) nicht erreichbar.";
+  }
+  return null;
+}
+
 /**
  * For an uptime monitor (e.g. UptimeRobot): 200 while the plan is read
- * completely, 503 with the reasons otherwise.
+ * completely (and, with notifications, the push check runs), 503 with the
+ * reasons otherwise.
  */
 export async function GET() {
   const payload = await getCachedSubstitutionData();
@@ -22,6 +49,11 @@ export async function GET() {
     if (!payload.stale && payload.error) {
       problems.push(...payload.warnings);
     }
+  }
+
+  const pushProblem = await pushCheckProblem(Date.now());
+  if (pushProblem) {
+    problems.push(pushProblem);
   }
 
   const unique = Array.from(new Set(problems));

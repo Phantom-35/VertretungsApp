@@ -163,6 +163,31 @@ describe("runPushCheck", () => {
     expect(await store.countSubscribers()).toBe(1);
   });
 
+  it("records every call and warns when nothing could be delivered", async () => {
+    const webhook: string[] = [];
+    vi.stubEnv("ALERT_WEBHOOK_URL", "https://ntfy.sh/kag-test");
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      webhook.push(String(init.body));
+      return new Response(null, { status: 200 });
+    });
+    try {
+      const store = new MemoryStore();
+      const broken = await addSubscriber(store, "broken", "5A");
+      const { send } = fakeSender({ [broken.endpoint]: "failed" });
+      await runPushCheck({ store, send, loadPlan: async () => plan([]), now: NOW });
+      expect(await store.getMeta("last-check")).toBe(new Date(NOW).toISOString());
+
+      const result = await runPushCheck({ store, send, loadPlan: async () => plan([entry({})]), now: NOW + 600_000 });
+      expect(result).toMatchObject({ notified: 0, failed: 1 });
+      expect(webhook).toHaveLength(1);
+      expect(webhook[0]).toMatch(/an kein Gerät zugestellt/);
+      expect(await store.getMeta("last-check")).toBe(new Date(NOW + 600_000).toISOString());
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("skips a run while another one is busy", async () => {
     const store = new MemoryStore();
     await store.acquireLock("check", 60);
