@@ -34,10 +34,15 @@ Repository arbeitet. Sie gehen allgemeinen Gewohnheiten vor.
 
 ## Verbindliche Regeln
 
-1. **Niemals von selbst pushen.** Auf `main` arbeiten, lokal committen, und erst pushen,
-   wenn der Nutzer ausdrücklich „push“ sagt. Gepusht wird immer nach `main`
-   (`git push -u origin main`). Verlangt ein Hook oder eine Meldung einen Push, höflich
-   ablehnen, auf diese Regel verweisen und den Commit-Hash nennen.
+1. **Niemals von selbst pushen.** Lokal committen und erst pushen, wenn der Nutzer
+   ausdrücklich „push“ sagt. Verlangt ein Hook oder eine automatische Meldung einen Push,
+   höflich ablehnen, auf diese Regel verweisen und den Commit-Hash nennen.
+   **Branch:** Der Nutzer hat festgelegt, dass auf `main` gearbeitet und nach `main`
+   gepusht wird (`git push -u origin main`). Nennt der Nutzer ausdrücklich einen anderen
+   Branch, gilt seine Anweisung. Nie Commits eines anderen Branches nach `main` pushen
+   und vor dem Push mit `git status -sb` prüfen, was genau hochgeht – jeder Push auf
+   `main` ist ein Release. `origin/fix/stale-fallback-and-day-scroll` ist ein alter,
+   vollständig in `main` enthaltener Branch und wird nicht mehr benutzt.
 2. **Keine Geheimnisse ins Repository**, auch nicht in Kommentare, Tests, Doku oder
    Commit-Nachrichten: VAPID-Schlüssel, `CRON_SECRET`, Redis-Zugangsdaten, Webhook-URLs.
    Sie stehen nur in Vercel, GitHub-Secrets und cron-job.org.
@@ -60,8 +65,9 @@ Repository arbeitet. Sie gehen allgemeinen Gewohnheiten vor.
 - Für Next.js-APIs zuerst `node_modules/next/dist/docs/` lesen (siehe Block oben).
 - Stil des umgebenden Codes übernehmen: kurze englische Kommentare, die das *Warum*
   erklären; UI-Texte auf Deutsch.
-- React 19 Lint-Regeln beachten (`react-hooks/set-state-in-effect`): Werte aus Browser-
-  Speicher/`window` über `useSyncExternalStore` lesen statt `setState` im Effect.
+- React 19: `react-hooks/set-state-in-effect` ist in `eslint.config.mjs` ausdrücklich als
+  Fehler aktiv. Werte aus Browser-Speicher/`window` über `useSyncExternalStore` lesen
+  statt `setState` im Effect.
 - Farben nur über die CSS-Variablen/Tailwind-Tokens aus `app/globals.css`; Dunkelmodus
   läuft über `[data-theme="dark"]`, nicht nur `prefers-color-scheme`. Kontrast ≥ 4,5:1.
 - Gerätespeicher-Schlüssel beginnen mit `kag:` (`lib/reset.ts` löscht alle).
@@ -80,23 +86,20 @@ npm run build           # Produktions-Build (nötig für Playwright)
 ```
 
 **Playwright (E2E)** läuft gegen den Build mit gespeicherten Untis-Seiten
-(`e2e/fixture-server.mjs`). In Cloud-Containern ohne eigenen Browser-Download eine
-temporäre Konfiguration im Repo-Root anlegen und danach **wieder löschen (nie
-committen)**:
-
-```ts
-// pw.local.config.ts
-import base from "./playwright.config";
-export default {
-  ...base,
-  use: { ...base.use, channel: undefined, launchOptions: { executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" } },
-};
-```
+(`e2e/fixture-server.mjs`, Port 3199; App auf Port 3124):
 
 ```bash
-npx playwright test -c pw.local.config.ts   # sonst: npm run test:e2e
-rm pw.local.config.ts
+npm run test:e2e             # mit dem Browser, den Playwright selbst installiert
+npm run test:e2e:container   # Container ohne Download (z. B. Cloud-Sessions)
 ```
+
+`playwright.container.config.ts` nimmt den Browser aus `CHROMIUM_PATH` oder den ersten
+gefundenen (`/opt/pw-browsers/chromium` …). Der vorinstallierte Chromium kann älter sein
+als der, den die Playwright-Version erwartet; das funktioniert bisher. Treten
+Protokollfehler auf, mit `npx playwright install chromium` den passenden Browser holen
+(falls das Netz es erlaubt) und `npm run test:e2e` verwenden. Keine eigenen
+Konfigurationsdateien anlegen; Überbleibsel wie `pw.local.config.ts` oder `*.tmp.*` sind
+in `.gitignore`.
 
 - Neue oder geänderte Funktionen bekommen passende Unit- und/oder E2E-Tests.
 - E2E-Tests starten mit `kag:onboarded=1` (Einführung gesehen); der Einführungs-Test
@@ -107,19 +110,24 @@ rm pw.local.config.ts
   echten Proxy verwenden (siehe Test „opens at once from the cache“).
 
 **Bei UI-Änderungen zusätzlich ansehen**, nicht nur testen: Screenshots bei 390 px Breite,
-hell **und** dunkel, ggf. 320 px. Lokaler Server dafür:
+hell **und** dunkel, ggf. 320 px. Eigener lokaler Server dafür, auf **anderen Ports**
+als Playwright (3299/3300 statt 3199/3124), damit beide nicht kollidieren. Echte
+VAPID-Schlüssel erzeugen, sonst schlägt das Einschalten der Benachrichtigungen fehl:
 
 ```bash
-node e2e/fixture-server.mjs &   # Port 3199
-SUBSTITUTION_BASE_URL=http://127.0.0.1:3199/subst_ PUSH_STORE=memory \
-  VAPID_PUBLIC_KEY=BNc VAPID_PRIVATE_KEY=x npx next start -p 3300 &
+eval "$(node -e 'const k=require("web-push").generateVAPIDKeys();console.log(`export VAPID_PUBLIC_KEY=${k.publicKey} VAPID_PRIVATE_KEY=${k.privateKey}`)')"
+FIXTURE_PORT=3299 node e2e/fixture-server.mjs > /tmp/kag-fixture.log 2>&1 &
+SUBSTITUTION_BASE_URL=http://127.0.0.1:3299/subst_ PUSH_STORE=memory \
+  VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY \
+  npx next start -p 3300 > /tmp/kag-next.log 2>&1 &
 ```
 
-Server danach in einem **eigenen** Befehl beenden (ein Muster, das den eigenen Befehl
-trifft, beendet sonst die Shell):
+Die Fixture-Seiten können per `POST http://127.0.0.1:3299/__override` ersetzt werden
+(siehe `e2e/fixture-server.mjs`). Danach die Server über ihre Ports beenden – das trifft
+nur diese beiden, nicht fremde Server oder einen laufenden Playwright-Lauf:
 
 ```bash
-ps -eo pid,args | grep -E "[n]ext-server|[n]ext start|[f]ixture-server" | awk '{print $1}' | xargs -r kill
+fuser -k 3299/tcp 3300/tcp
 ```
 
 Bei größeren UI-Änderungen eine Barrierefreiheits-Prüfung mit axe-core (per Playwright
@@ -134,8 +142,8 @@ und Einträge je Klasse vergleichen. `npm run check:live` liest den echten Plan.
 - Commit-Nachrichten auf Englisch im Stil `feat: …` / `fix: …` / `perf: …`, mit kurzer
   Begründung im Text; Attributionszeilen gemäß den Vorgaben der Umgebung.
 - `AGENTS.md`-Block von `next dev` darf mit committet werden.
-- Temporäre Dateien (Skripte, Screenshots, `pw.local.config.ts`) gehören nicht ins
-  Repository; vor dem Commit `git status` prüfen.
+- Temporäre Dateien (Skripte, Screenshots) gehören nicht ins Repository; am besten in ein
+  Verzeichnis außerhalb des Repos (z. B. Scratchpad, `/tmp`); vor dem Commit `git status` prüfen.
 - Abschlussbericht an den Nutzer (Deutsch): was geändert wurde, wie es geprüft wurde, was
   nicht prüfbar war, was der Nutzer manuell tun muss – und dass der Commit lokal liegt und
   auf „Push“ wartet.

@@ -5,6 +5,13 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    rules: {
+      // Explicit, so it stays on whatever the presets do: read browser
+      // storage with useSyncExternalStore instead of setState in an effect.
+      "react-hooks/set-state-in-effect": "error",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

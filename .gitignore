@@ -43,3 +43,8 @@ next-env.d.ts
 # playwright
 /test-results/
 /playwright-report/
+/pw.local.config.ts
+
+# scratch files of local checks (scripts, screenshots)
+*.tmp.*
+/shots/

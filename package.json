@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:container": "playwright test -c playwright.container.config.ts",
     "check:live": "vitest run --config vitest.live.config.ts"
   },
   "dependencies": {
