@@ -1,4 +1,11 @@
-import { displayType, formatClassName, formatLesson, isOpenSubstitute } from "@/lib/entries";
+import {
+  displayType,
+  formatClassName,
+  formatLesson,
+  getEntryKind,
+  isOpenSubstitute,
+  type EntryKind,
+} from "@/lib/entries";
 import type { SubstitutionEntry } from "@/lib/types";
 
 type ShareOptions = {
@@ -12,6 +19,20 @@ type ShareOptions = {
   sourceUpdated: string | null;
   /** The app's address, so that whoever gets the message can find the app. */
   appUrl?: string | null;
+  /** The school's notes for the day ("Nachrichten zum Tag"). */
+  notices?: readonly string[];
+};
+
+/** A symbol per kind of change, to see at a glance in a chat what it is about. */
+const KIND_SYMBOLS: Record<EntryKind, string> = {
+  cancelled: "❌",
+  "self-study": "📚",
+  substitution: "🔄",
+  supervision: "🧑‍🏫",
+  room: "🚪",
+  moved: "↪️",
+  exam: "📝",
+  event: "📌",
 };
 
 /** "3 - 4" -> "3.–4. Std.", "5" -> "5. Std." */
@@ -55,27 +76,29 @@ export function formatShareLine(entry: DescribedEntry, schoolClass: string) {
 }
 
 /**
- * One change as a short block for messengers:
- *   3.–4. Std. · Vertretung (9AB)
+ * One change as a short block for messengers. "*…*" is bold in WhatsApp
+ * (most other messengers show the stars as they are):
+ *   🔄 *3.–4. Std.* · Vertretung (9AB)
  *   Lehrer FER → GOT · Raum 109
  *   „Aufgaben im Lernraum“
  */
 export function formatShareBlock(entry: DescribedEntry, schoolClass: string) {
   const className = formatClassName(entry.className);
   const teacher = teacherLabel(entry);
+  const symbol = isOpenSubstitute(entry.substitute) ? "❓" : KIND_SYMBOLS[getEntryKind(entry.type)];
   const details = [
     entry.subject ? `Fach ${entry.subject}` : "",
     teacher ? `Lehrer ${teacher}` : "",
     entry.room ? `Raum ${entry.room}` : "",
   ].filter(Boolean);
   return [
-    `${lessonLabel(entry.lesson)} · ${displayType(entry.type)}${className !== schoolClass ? ` (${className})` : ""}`,
+    `${symbol} *${lessonLabel(entry.lesson)}* · ${displayType(entry.type)}${className !== schoolClass ? ` (${className})` : ""}`,
     ...(details.length > 0 ? [details.join(" · ")] : []),
     ...(entry.text ? [`„${entry.text}“`] : []),
   ].join("\n");
 }
 
-/** Plain text of one day's changes, for messengers or the clipboard. */
+/** Text of one day's changes, for messengers or the clipboard. */
 export function buildShareText({
   schoolClass,
   dayLabel,
@@ -83,16 +106,22 @@ export function buildShareText({
   ownCoursesOnly,
   sourceUpdated,
   appUrl = null,
+  notices = [],
 }: ShareOptions) {
-  const heading = [`Vertretungsplan ${schoolClass}${ownCoursesOnly ? " (meine Kurse)" : ""}`, dayLabel].join("\n");
+  const count = entries.length === 1 ? "1 Änderung" : `${entries.length} Änderungen`;
+  const heading = [
+    `📋 *Vertretungsplan ${schoolClass}${ownCoursesOnly ? " (meine Kurse)" : ""}*`,
+    entries.length > 0 ? `${dayLabel} · ${count}` : dayLabel,
+  ].join("\n");
   const body =
     entries.length > 0
       ? entries.map((entry) => formatShareBlock(entry, schoolClass))
-      : ["Keine Änderungen eingetragen."];
-  // Blank lines between the blocks keep it readable in a chat.
+      : ["✅ Keine Änderungen, alles nach Stundenplan."];
+  const notes = notices.length > 0 ? [notices.map((notice) => `ℹ️ ${notice}`).join("\n")] : [];
   const footer = [
-    ...(sourceUpdated ? [`Stand der Schule: ${sourceUpdated}`] : []),
-    ...(appUrl ? [`Ganzer Plan in der App: ${appUrl}`] : []),
+    ...(sourceUpdated ? [`🕐 Stand der Schule: ${sourceUpdated}`] : []),
+    ...(appUrl ? [`📲 Ganzer Plan: ${appUrl}`] : []),
   ].join("\n");
-  return [heading, ...body, ...(footer ? [footer] : [])].join("\n\n");
+  // Blank lines between the blocks keep it readable in a chat.
+  return [heading, ...body, ...notes, ...(footer ? [footer] : [])].join("\n\n");
 }

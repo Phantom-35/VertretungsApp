@@ -716,13 +716,17 @@ test("shares the day's changes", async ({ page, context }) => {
   const fiveA = plan.entries.filter(
     (entry) => entry.date === "2026-10-08" && entryAppliesToClass(entry.className, "5A"),
   );
-  expect(lines.slice(0, 2)).toEqual(["Vertretungsplan 5A", "Heute, Donnerstag, 08.10."]);
-  // One block per change, separated by blank lines.
+  expect(lines.slice(0, 2)).toEqual([
+    "📋 *Vertretungsplan 5A*",
+    `Heute, Donnerstag, 08.10. · ${fiveA.length} Änderungen`,
+  ]);
+  // One block per change (with a symbol and the lesson in bold), separated by
+  // blank lines.
   expect(shared[0].text!.split("\n\n")).toHaveLength(fiveA.length + 2);
-  expect(lines.filter((line) => / Std\. · /.test(line))).toHaveLength(fiveA.length);
-  expect(lines.at(-2)).toMatch(/^Stand der Schule: /);
+  expect(lines.filter((line) => / \*[^*]+ Std\.\* · /.test(line))).toHaveLength(fiveA.length);
+  expect(lines.at(-2)).toMatch(/^🕐 Stand der Schule: /);
   // Whoever gets the message can find the app.
-  expect(lines.at(-1)).toBe(`Ganzer Plan in der App: ${new URL(page.url()).origin}/`);
+  expect(lines.at(-1)).toBe(`📲 Ganzer Plan: ${new URL(page.url()).origin}/`);
   // Only the text: no separate title or link for the share menu to add.
   expect(shared[0].title).toBeUndefined();
   expect(shared[0].url).toBeUndefined();
@@ -735,7 +739,7 @@ test("shares the day's changes", async ({ page, context }) => {
   await expect(share).toHaveCount(1);
   await share.click();
   const empty = await page.evaluate(() => (window as unknown as { shared: ShareData[] }).shared.at(-1)!.text!);
-  expect(empty).toMatch(/^Vertretungsplan 9B\nMorgen, Freitag, 09\.10\.\n\nKeine Änderungen eingetragen\./);
+  expect(empty).toMatch(/^📋 \*Vertretungsplan 9B\*\nMorgen, Freitag, 09\.10\.\n\n✅ Keine Änderungen, alles nach Stundenplan\./);
 
   // Without a share menu (desktop): copied to the clipboard instead.
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -749,7 +753,7 @@ test("shares the day's changes", async ({ page, context }) => {
   await desktop.getByRole("button", { name: "Teilen" }).click();
   await expect(desktop.getByText("Kopiert")).toBeVisible();
   const copied = await desktop.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toMatch(/^Vertretungsplan 5A\nMorgen, Freitag, 09\.10\.\n\n/);
+  expect(copied).toMatch(/^📋 \*Vertretungsplan 5A\*\nMorgen, Freitag, 09\.10\. · \d+ Änderung/);
   // Only the app's own address, so whoever gets it can find the app.
   expect(copied.match(/https?:\/\/\S+/g)).toEqual([`${new URL(desktop.url()).origin}/`]);
 });

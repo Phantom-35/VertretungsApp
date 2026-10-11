@@ -338,11 +338,31 @@ describe("share text", () => {
         sourceUpdated: "15:34 Uhr",
       }),
     ).toBe(
-      "Vertretungsplan Q1 (meine Kurse)\nHeute, Donnerstag, 08.10.\n\n2. Std. · Klausur\nLehrer RUK · Raum 217\n\nStand der Schule: 15:34 Uhr",
+      "📋 *Vertretungsplan Q1 (meine Kurse)*\nHeute, Donnerstag, 08.10. · 1 Änderung\n\n📝 *2. Std.* · Klausur\nLehrer RUK · Raum 217\n\n🕐 Stand der Schule: 15:34 Uhr",
     );
     expect(
       buildShareText({ schoolClass: "5A", dayLabel: "Freitag, 09.10.", entries: [], ownCoursesOnly: false, sourceUpdated: null }),
-    ).toBe("Vertretungsplan 5A\nFreitag, 09.10.\n\nKeine Änderungen eingetragen.");
+    ).toBe("📋 *Vertretungsplan 5A*\nFreitag, 09.10.\n\n✅ Keine Änderungen, alles nach Stundenplan.");
+    // With the school's notes for the day and the app's address.
+    expect(
+      buildShareText({
+        schoolClass: "5A",
+        dayLabel: "Freitag, 09.10.",
+        entries: [{ ...base, type: "Entfall", teacher: "ABC" }, { ...base, lesson: "3", room: "108", type: "Raum-Vtr." }],
+        ownCoursesOnly: false,
+        sourceUpdated: "08.10., 15:34 Uhr",
+        appUrl: "https://example.org/",
+        notices: ["Bitte Einsätze in SPR beachten."],
+      }),
+    ).toBe(
+      [
+        "📋 *Vertretungsplan 5A*\nFreitag, 09.10. · 2 Änderungen",
+        "❌ *1. Std.* · Entfall\nLehrer ABC",
+        "🚪 *3. Std.* · Raumänderung\nRaum 108",
+        "ℹ️ Bitte Einsätze in SPR beachten.",
+        "🕐 Stand der Schule: 08.10., 15:34 Uhr\n📲 Ganzer Plan: https://example.org/",
+      ].join("\n\n"),
+    );
   });
 
   it("puts each change in a short block", () => {
@@ -351,14 +371,14 @@ describe("share text", () => {
         { ...base, className: "06ABCD", lesson: "3 - 4", teacher: "ABC", substitute: "DEF", room: "204", text: "Aufgaben" },
         "6B",
       ),
-    ).toBe("3.–4. Std. · Vertretung (6ABCD)\nLehrer ABC → DEF · Raum 204\n„Aufgaben“");
-    expect(formatShareBlock({ ...base, type: "Entfall", teacher: "ABC" }, "5A")).toBe("1. Std. · Entfall\nLehrer ABC");
-    expect(formatShareBlock({ ...base, lesson: "", type: "" }, "5A")).toBe("Std. ? · Änderung");
+    ).toBe("🔄 *3.–4. Std.* · Vertretung (6ABCD)\nLehrer ABC → DEF · Raum 204\n„Aufgaben“");
+    expect(formatShareBlock({ ...base, type: "Entfall", teacher: "ABC" }, "5A")).toBe("❌ *1. Std.* · Entfall\nLehrer ABC");
+    expect(formatShareBlock({ ...base, lesson: "", type: "" }, "5A")).toBe("🔄 *Std. ?* · Änderung");
   });
 
   it("says when no substitute has been found yet", () => {
     expect(formatShareBlock({ ...base, teacher: "FCH", substitute: "???", room: "TU2" }, "5A")).toBe(
-      "1. Std. · Vertretung\nLehrer FCH → noch offen · Raum TU2",
+      "❓ *1. Std.* · Vertretung\nLehrer FCH → noch offen · Raum TU2",
     );
     expect(formatShareLine({ ...base, substitute: "???" }, "5A")).toBe("• 1. Std.: Vertretung · noch offen");
   });

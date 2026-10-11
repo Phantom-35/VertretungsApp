@@ -324,6 +324,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       ownCoursesOnly: teachers.length > 0 && !showOtherCourses,
       sourceUpdated: data?.sourceUpdatedAt ? formatTimestamp(data.sourceUpdatedAt, now) : null,
       appUrl: `${window.location.origin}/`,
+      notices: visibleNotices,
     });
   const emptyDayLabel = selectedDay
     ? `Am ${selectedDay.dayLabel ?? formatPlanDateLabel(selectedDay.date, null)}`
