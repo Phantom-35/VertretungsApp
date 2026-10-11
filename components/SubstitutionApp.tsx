@@ -380,7 +380,12 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                 </button>
               </div>
             ) : null}
-            <NotificationSettings push={push} schoolClass={myClass} teachers={myTeachers} />
+            <NotificationSettings
+              push={push}
+              schoolClass={myClass}
+              teachers={myTeachers}
+              onOpenSummaries={() => openSettings("summaries")}
+            />
           </ClassSelector>
 
           {data ? (

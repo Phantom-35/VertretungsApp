@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { FadingStatus } from "@/components/FadingStatus";
 import { InstallGuide } from "@/components/InstallGuide";
+import { SummarySwitches } from "@/components/SummarySwitches";
 import { TeacherChooser } from "@/components/TeacherFilter";
 import type { PushControls } from "@/hooks/usePushNotifications";
 import { cachedBrowser, freshStartAfterInstall, isStandalone } from "@/lib/device";
@@ -67,10 +68,16 @@ function NotificationStep({ push, myClass }: { push: PushControls; myClass: stri
   let content: ReactNode;
   switch (status) {
     case "on":
+      // Right after switching on, where it is seen: the daily overviews
+      // (otherwise only in the settings, where few would find them).
       content = (
-        <p className="rounded-2xl border border-accent/15 bg-accent-soft px-4 py-3 text-sm font-semibold text-accent-strong">
-          ✓ Eingeschaltet für {myClass}
-        </p>
+        <>
+          <p className="rounded-2xl border border-accent/15 bg-accent-soft px-4 py-3 text-sm font-semibold text-accent-strong">
+            ✓ Eingeschaltet für {myClass}
+          </p>
+          <p className="pt-2 text-sm font-semibold text-foreground">Auch eine tägliche Übersicht?</p>
+          <SummarySwitches />
+        </>
       );
       break;
     case "off":

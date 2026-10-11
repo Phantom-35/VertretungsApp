@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FadingStatus } from "@/components/FadingStatus";
 import { InstallGuide } from "@/components/InstallGuide";
 import type { PushControls } from "@/hooks/usePushNotifications";
+import { useSettings } from "@/hooks/useSettings";
 
 type NotificationSettingsProps = {
   push: PushControls;
@@ -9,15 +10,21 @@ type NotificationSettingsProps = {
   schoolClass: string | null | undefined;
   /** Upper school course filter of that class; empty means all courses. */
   teachers: readonly string[];
+  /** Opens the settings at the daily overviews. */
+  onOpenSummaries: () => void;
 };
 
 const buttonClass =
   "tap-target shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 disabled:opacity-60";
 
 /** Push notifications for the student's own class, part of the class card. */
-export function NotificationSettings({ push, schoolClass, teachers }: NotificationSettingsProps) {
+export function NotificationSettings({ push, schoolClass, teachers, onOpenSummaries }: NotificationSettingsProps) {
   const { status, busy, message, enable, disable, sendTest } = push;
   const [showInstall, setShowInstall] = useState(false);
+  // Just switched on here: the daily overviews are offered once (they are
+  // off by default and otherwise only found in the settings).
+  const [justEnabled, setJustEnabled] = useState(false);
+  const [settings] = useSettings();
 
   if (status === "checking" || status === "unavailable") {
     return null;
@@ -85,7 +92,10 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
       actions = (
         <button
           type="button"
-          onClick={() => void enable()}
+          onClick={() => {
+            setJustEnabled(true);
+            void enable();
+          }}
           disabled={busy || !audience}
           className={`${buttonClass} bg-accent text-white`}
         >
@@ -121,6 +131,20 @@ export function NotificationSettings({ push, schoolClass, teachers }: Notificati
           <div className="flex shrink-0 gap-2">{actions}</div>
         </div>
         <FadingStatus message={message} className="pt-2" />
+        {justEnabled && !settings.eveningSummary && !settings.morningSummary ? (
+          <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl bg-accent-soft/60 px-3 py-2">
+            <p className="min-w-0 text-sm leading-5 text-foreground">
+              Auch eine tägliche Übersicht, morgens oder abends?
+            </p>
+            <button
+              type="button"
+              onClick={onOpenSummaries}
+              className={`${buttonClass} border border-line bg-surface text-accent-strong`}
+            >
+              Einstellen
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   }

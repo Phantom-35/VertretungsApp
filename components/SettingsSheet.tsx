@@ -2,15 +2,17 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import Link from "next/link";
 import { InstallGuide } from "@/components/InstallGuide";
 import { Segmented } from "@/components/Segmented";
+import { SummarySwitches } from "@/components/SummarySwitches";
+import { Switch } from "@/components/Switch";
 import { TeacherChooser } from "@/components/TeacherFilter";
 import { ThemeChoice } from "@/components/ThemeSettings";
 import { NEXT_DAY_HOURS, useSettings, type TextSize } from "@/hooks/useSettings";
 import { isStandalone } from "@/lib/device";
 import { SCHOOL_CLASSES } from "@/lib/entries";
-import { EVENING_SUMMARY_HOUR, MORNING_SUMMARY_HOUR, NOTIFY_GROUP_LABELS, NOTIFY_GROUPS } from "@/lib/notify";
+import { NOTIFY_GROUP_LABELS, NOTIFY_GROUPS } from "@/lib/notify";
 import { resetDevice } from "@/lib/reset";
 
-export type SettingsFocus = "teachers" | null;
+export type SettingsFocus = "teachers" | "summaries" | null;
 
 type CourseFilter = {
   schoolClass: string;
@@ -93,33 +95,6 @@ function Setting({ title, description, children }: { title: string; description?
 }
 
 /** A labelled on/off switch row. */
-function Switch({ label, hint, checked, onChange }: {
-  label: string;
-  hint?: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3">
-      <span className="min-w-0">
-        <span className="block text-sm font-medium">{label}</span>
-        {hint ? <span className="mt-0.5 block text-xs leading-5 text-muted">{hint}</span> : null}
-      </span>
-      <input
-        type="checkbox"
-        role="switch"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="peer sr-only"
-      />
-      <span
-        aria-hidden
-        className="relative h-7 w-12 shrink-0 rounded-full bg-foreground/15 transition peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40 after:absolute after:left-1 after:top-1 after:size-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5"
-      />
-    </label>
-  );
-}
-
 /** A separate card further down the sheet. */
 function Card({ id, title, description, tone = "normal", children }: {
   id?: string;
@@ -131,7 +106,7 @@ function Card({ id, title, description, tone = "normal", children }: {
   return (
     <section
       id={id}
-      className={`mt-3 scroll-mt-4 space-y-3 rounded-[1.4rem] border p-4 ${
+      className={`mt-3 scroll-mt-24 space-y-3 rounded-[1.4rem] border p-4 ${
         tone === "warn" ? "border-warn/20 bg-warn-soft/50" : "border-line bg-card"
       }`}
     >
@@ -201,8 +176,8 @@ export function SettingsSheet({
       dialog.style.transform = "";
       dialog.style.transition = "";
       dialog.showModal();
-      if (focus === "teachers") {
-        document.getElementById("settings-teachers")?.scrollIntoView({ block: "start" });
+      if (focus === "teachers" || focus === "summaries") {
+        document.getElementById(`settings-${focus}`)?.scrollIntoView({ block: "start" });
       } else {
         dialog.scrollTop = 0;
       }
@@ -424,20 +399,7 @@ export function SettingsSheet({
               />
             ))}
           </div>
-          <div className="divide-y divide-line rounded-2xl border border-line bg-card">
-            <Switch
-              label="Abends Überblick für morgen"
-              hint={`Um ${EVENING_SUMMARY_HOUR} Uhr vor jedem Schultag, sobald der Plan da ist – auch wenn sich nichts ändert.`}
-              checked={settings.eveningSummary}
-              onChange={(eveningSummary) => updateSettings({ eveningSummary })}
-            />
-            <Switch
-              label="Morgens Überblick für heute"
-              hint={`Um ${MORNING_SUMMARY_HOUR} Uhr an jedem Schultag – auch wenn sich nichts ändert.`}
-              checked={settings.morningSummary}
-              onChange={(morningSummary) => updateSettings({ morningSummary })}
-            />
-          </div>
+          <SummarySwitches id="settings-summaries" />
         </Setting>
 
         {courseFilter ? (

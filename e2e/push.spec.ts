@@ -227,9 +227,25 @@ test("notifies only about the chosen kinds, and sends the evening summary", asyn
     await settings.getByRole("button", { name: "Einschalten" }).click();
     await waitForPushes(service.received, "/choices", 1);
 
-    // No substitutions, but the evening summary.
-    await page.getByRole("button", { name: "Einstellungen" }).click();
+    // Just switched on: the daily overviews are offered, and lead straight
+    // to them in the settings.
+    const offer = settings.getByText("Auch eine tägliche Übersicht, morgens oder abends?");
+    await expect(offer).toBeVisible();
+    await settings.getByRole("button", { name: "Einstellen" }).click();
     const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+    const evening = dialog.getByText("Abends Überblick für morgen", { exact: true });
+    await expect(evening).toBeInViewport();
+    // Not hidden under the sheet's sticky title bar.
+    await expect
+      .poll(() =>
+        evening.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return element.contains(document.elementFromPoint(box.left + 4, box.top + box.height / 2));
+        }),
+      )
+      .toBe(true);
+
+    // No substitutions, but the evening summary.
     let synced = page.waitForRequest(
       (req) => req.url().endsWith("/api/push/subscribe") && !(req.postDataJSON().notifyGroups as string[]).includes("substitution"),
     );
@@ -241,6 +257,8 @@ test("notifies only about the chosen kinds, and sends the evening summary", asyn
     await dialog.getByText("Abends Überblick für morgen", { exact: true }).click();
     const body = (await synced).postDataJSON();
     expect(body.notifyGroups).toEqual(["cancelled", "room", "exam"]);
+    // Chosen: no longer offered.
+    await expect(offer).toHaveCount(0);
     await page.waitForTimeout(300);
 
     // A new substitution: not wanted.
