@@ -104,7 +104,7 @@ test("says when the next plan is not online yet, and marks past days", async ({ 
   await expect(page.locator("header")).toContainText("Letzter Plan");
   await expect(page.getByText("Der nächste Plan ist noch nicht online.")).toBeVisible();
   // A past day is not mistaken for the coming one.
-  await expect(page.getByRole("tab").nth(0)).toContainText("vorbei · Do., 08.10.");
+  await expect(page.getByRole("tab").nth(0)).toContainText("vorbei, 08.10.");
   await expect(page.getByRole("tab").nth(1)).toContainText("Gestern");
 });
 
@@ -299,16 +299,6 @@ test.describe("first start", () => {
     await expect(intro.getByText("Kein App Store nötig")).toBeVisible();
     await intro.getByRole("button", { name: "Los geht’s" }).click();
 
-    // In the browser: how to install it as an app, before choosing the class
-    // (the installed app keeps its own storage and asks again).
-    await expect(intro.getByRole("heading", { name: "Als App installieren" })).toBeVisible();
-    await expect(intro.getByText(/nicht im App Store oder bei Google Play/)).toBeVisible();
-    // Steps for this browser (Chrome on a computer).
-    await expect(intro.getByText("Seite als App installieren", { exact: true })).toBeVisible();
-    // The way on stays in sight below the long steps.
-    await expect(intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" })).toBeInViewport();
-    await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
-
     await expect(intro.getByRole("heading", { name: "Deine Klasse" })).toBeVisible();
     await expect(intro.getByRole("button", { name: "Weiter" })).toBeDisabled();
     await intro.getByRole("radio", { name: "Q1" }).click();
@@ -321,6 +311,15 @@ test.describe("first start", () => {
     await intro.getByRole("button", { name: "RUK", exact: true }).click();
     await expect(intro.getByRole("button", { name: "RUK", exact: true })).toHaveAttribute("aria-pressed", "true");
     await intro.getByRole("button", { name: "Weiter" }).click();
+
+    // In the browser: how to install it as an app. Here (a computer, which
+    // shares its storage with the installed app) after choosing the class.
+    await expect(intro.getByRole("heading", { name: "Als App installieren" })).toBeVisible();
+    await expect(intro.getByText(/nicht im App Store oder bei Google Play/)).toBeVisible();
+    // Steps for this browser (Chrome on a computer).
+    await expect(intro.getByText("Seite als App installieren", { exact: true })).toBeVisible();
+    await expect(intro.getByText(/Dort wählst du deine Klasse/)).toHaveCount(0);
+    await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
 
     await expect(intro.getByRole("heading", { name: "Nichts mehr verpassen" })).toBeVisible();
     await expect(intro.getByRole("button", { name: "Benachrichtigungen einschalten" })).toBeVisible();
@@ -356,8 +355,8 @@ test.describe("first start", () => {
     await page.goto("/");
     const intro = page.getByRole("dialog");
     await intro.getByRole("button", { name: "Los geht’s" }).click();
-    await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
     await intro.getByRole("button", { name: "Später festlegen" }).click();
+    await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
     await expect(intro.getByText(/Lege zuerst deine Klasse fest/)).toBeVisible();
     await intro.getByRole("button", { name: "Weiter" }).click();
     await intro.getByRole("button", { name: "Fertig" }).click();
@@ -366,6 +365,34 @@ test.describe("first start", () => {
     await chooseClass(page, "6D");
     await page.getByRole("button", { name: "Einstellungen" }).click();
     await expect(page.getByRole("dialog", { name: "Einstellungen" }).getByLabel("Meine Klasse")).toHaveValue("6D");
+  });
+
+  test("on an iPhone offers installing before the class", async ({ browser }) => {
+    const iphone = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+      locale: "de-DE",
+      timezoneId: "Europe/Berlin",
+    });
+    const page = await iphone.newPage();
+    await page.clock.setFixedTime(TODAY);
+    await page.goto("/");
+    const intro = page.getByRole("dialog");
+    await intro.getByRole("button", { name: "Los geht’s" }).click();
+    // The installed app on an iPhone keeps its own storage: installing first,
+    // so the class is chosen only once, in the app.
+    await expect(intro.getByRole("heading", { name: "Als App installieren" })).toBeVisible();
+    await expect(intro.getByText(/Dort wählst du deine Klasse/)).toBeVisible();
+    // The way on stays in sight below the long Safari steps.
+    const onward = intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" });
+    await expect(onward).toBeInViewport();
+    // Escape does not end the introduction before the class is chosen.
+    await page.keyboard.press("Escape");
+    await expect(intro.getByRole("heading", { name: "Deine Klasse" })).toBeVisible();
+    await iphone.close();
   });
 });
 

@@ -3,7 +3,7 @@ import { FadingStatus } from "@/components/FadingStatus";
 import { InstallGuide } from "@/components/InstallGuide";
 import { TeacherChooser } from "@/components/TeacherFilter";
 import type { PushControls } from "@/hooks/usePushNotifications";
-import { isStandalone } from "@/lib/device";
+import { isIos, isStandalone } from "@/lib/device";
 import { SCHOOL_CLASSES, isCourseClass } from "@/lib/entries";
 
 type OnboardingProps = {
@@ -136,17 +136,22 @@ export function Onboarding({
 }: OnboardingProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const installed = useSyncExternalStore(noSubscribe, isStandalone, () => false);
+  // Only on iPhone/iPad the app on the home screen keeps its own storage:
+  // there it asks for the class again, elsewhere it takes over the browser's.
+  const separateAppStorage = useSyncExternalStore(noSubscribe, isIos, () => false);
   const upperSchool = Boolean(myClass && isCourseClass(myClass));
   // Only the steps that apply: installing in the browser, courses in the
   // upper school, notifications where they can be switched on right here (on
   // an iPhone only in the installed app, which starts with this introduction).
-  // Installing comes first: the installed app keeps its own storage, so
-  // whoever installs right away chooses the class only once, in the app.
+  // On an iPhone installing comes first: the installed app keeps its own
+  // storage, so whoever installs right away chooses the class only once.
+  const installFirst = !installed && separateAppStorage;
   const steps: Step[] = [
     "welcome",
-    ...(installed ? [] : (["install"] as const)),
+    ...(installFirst ? (["install"] as const) : []),
     "class",
     ...(upperSchool ? (["courses"] as const) : []),
+    ...(!installed && !installFirst ? (["install"] as const) : []),
     ...(push.status === "unavailable" || push.status === "install" ? [] : (["notifications"] as const)),
     "tips",
   ];
@@ -174,8 +179,16 @@ export function Onboarding({
       ref={dialogRef}
       tabIndex={-1}
       aria-labelledby="onboarding-title"
-      // Escape skips the introduction; it does not come back.
-      onCancel={onFinish}
+      // Escape (or Android's back button) skips the introduction for good; but
+      // not before the class step, so nobody ends up without a class unasked.
+      onCancel={(event) => {
+        if (!myClass && index < steps.indexOf("class")) {
+          event.preventDefault();
+          setStep("class");
+          return;
+        }
+        onFinish();
+      }}
       className="onboarding fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto border-0 outline-none overscroll-contain bg-background p-0 text-foreground backdrop:bg-background"
     >
       <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
@@ -369,13 +382,15 @@ export function Onboarding({
               <div className="mt-6 rounded-[1.4rem] border border-line bg-card p-4">
                 <InstallGuide />
               </div>
-              <p className="mt-3 text-xs leading-5 text-muted">
-                Die installierte App startet mit dieser Einführung: Dort wählst du deine Klasse
-                {push.status === "install" ? " und kannst Benachrichtigungen einschalten" : ""}.
-              </p>
+              {separateAppStorage ? (
+                <p className="mt-3 text-xs leading-5 text-muted">
+                  Die installierte App startet mit dieser Einführung: Dort wählst du deine Klasse
+                  {push.status === "install" ? " und kannst Benachrichtigungen einschalten" : ""}.
+                </p>
+              ) : null}
             </div>
             {/* Always in sight: the steps above fill the screen. */}
-            <div className="sticky bottom-0 -mx-5 mt-6 border-t border-line bg-background/95 px-5 pt-3 backdrop-blur">
+            <div className="sticky bottom-0 -mx-5 mt-6 border-t border-line bg-background/95 px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
               <button type="button" onClick={next} className={secondaryButton}>
                 Erst mal ohne Installieren weiter
               </button>
