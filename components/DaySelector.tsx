@@ -93,11 +93,12 @@ export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySe
                   : "text-foreground"
             }`}
           >
-            <span className="block text-sm font-semibold">
+            <span className="block px-3 text-sm font-semibold">
               {relative ?? day.dayLabel ?? formatShortDate(day.date)}
             </span>
             <span className={`block text-xs ${selected ? "text-white/80" : "text-muted"}`}>
-              {formatShortDate(day.date)}
+              {/* "vorbei": a past day is not mistaken for the coming one. */}
+              {past && !relative ? `vorbei · ${formatShortDate(day.date)}` : formatShortDate(day.date)}
             </span>
             {count !== null ? (
               <span

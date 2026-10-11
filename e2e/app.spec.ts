@@ -96,6 +96,18 @@ test("shows the NRW holidays instead of an old plan", async ({ page }) => {
   await expect(page.locator("article").first()).toBeVisible();
 });
 
+test("says when the next plan is not online yet, and marks past days", async ({ page }) => {
+  // Saturday after the saved plan (08./09.10.), no holidays.
+  await page.clock.setFixedTime(new Date("2026-10-10T11:00:00+02:00"));
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  await expect(page.locator("header")).toContainText("Letzter Plan");
+  await expect(page.getByText("Der nächste Plan ist noch nicht online.")).toBeVisible();
+  // A past day is not mistaken for the coming one.
+  await expect(page.getByRole("tab").nth(0)).toContainText("vorbei · Do., 08.10.");
+  await expect(page.getByRole("tab").nth(1)).toContainText("Gestern");
+});
+
 test("shows a public holiday instead of an old plan", async ({ page }) => {
   // Christi Himmelfahrt 2027 (Thursday); the saved plan is from 08./09.10.2026.
   await page.clock.setFixedTime(new Date("2027-05-06T09:00:00+02:00"));
@@ -287,6 +299,16 @@ test.describe("first start", () => {
     await expect(intro.getByText("Kein App Store nötig")).toBeVisible();
     await intro.getByRole("button", { name: "Los geht’s" }).click();
 
+    // In the browser: how to install it as an app, before choosing the class
+    // (the installed app keeps its own storage and asks again).
+    await expect(intro.getByRole("heading", { name: "Als App installieren" })).toBeVisible();
+    await expect(intro.getByText(/nicht im App Store oder bei Google Play/)).toBeVisible();
+    // Steps for this browser (Chrome on a computer).
+    await expect(intro.getByText("Seite als App installieren", { exact: true })).toBeVisible();
+    // The way on stays in sight below the long steps.
+    await expect(intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" })).toBeInViewport();
+    await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
+
     await expect(intro.getByRole("heading", { name: "Deine Klasse" })).toBeVisible();
     await expect(intro.getByRole("button", { name: "Weiter" })).toBeDisabled();
     await intro.getByRole("radio", { name: "Q1" }).click();
@@ -299,13 +321,6 @@ test.describe("first start", () => {
     await intro.getByRole("button", { name: "RUK", exact: true }).click();
     await expect(intro.getByRole("button", { name: "RUK", exact: true })).toHaveAttribute("aria-pressed", "true");
     await intro.getByRole("button", { name: "Weiter" }).click();
-
-    // In the browser: how to install it as an app.
-    await expect(intro.getByRole("heading", { name: "Als App installieren" })).toBeVisible();
-    await expect(intro.getByText(/nicht im App Store oder bei Google Play/)).toBeVisible();
-    // Steps for this browser (Chrome on a computer).
-    await expect(intro.getByText("Seite als App installieren", { exact: true })).toBeVisible();
-    await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
 
     await expect(intro.getByRole("heading", { name: "Nichts mehr verpassen" })).toBeVisible();
     await expect(intro.getByRole("button", { name: "Benachrichtigungen einschalten" })).toBeVisible();
@@ -341,8 +356,8 @@ test.describe("first start", () => {
     await page.goto("/");
     const intro = page.getByRole("dialog");
     await intro.getByRole("button", { name: "Los geht’s" }).click();
-    await intro.getByRole("button", { name: "Später festlegen" }).click();
     await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
+    await intro.getByRole("button", { name: "Später festlegen" }).click();
     await expect(intro.getByText(/Lege zuerst deine Klasse fest/)).toBeVisible();
     await intro.getByRole("button", { name: "Weiter" }).click();
     await intro.getByRole("button", { name: "Fertig" }).click();

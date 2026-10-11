@@ -159,11 +159,11 @@ function stepsFor({ platform, browser }: BrowserInfo): ReactNode[] | ReactNode {
       case "safari":
         return [
           <>
-            Auf {share} tippen. Mit der neuen Tab-Leiste erst unten rechts auf{" "}
+            Auf {share} tippen. Kein Teilen-Symbol zu sehen? Dann erst unten rechts auf{" "}
             <Key>
               <MoreSymbol />
-            </Key>
-            .
+            </Key>{" "}
+            tippen.
           </>,
           <>{addToHomeScreen} wählen (falls nötig etwas nach unten scrollen).</>,
           <>„Als Web-App öffnen“ eingeschaltet lassen, falls angezeigt. {confirmIos}</>,

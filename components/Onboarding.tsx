@@ -137,14 +137,16 @@ export function Onboarding({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const installed = useSyncExternalStore(noSubscribe, isStandalone, () => false);
   const upperSchool = Boolean(myClass && isCourseClass(myClass));
-  // Only the steps that apply: courses in the upper school, installing in the
-  // browser, notifications where they can be switched on right here (on an
-  // iPhone only in the installed app, which starts with this introduction).
+  // Only the steps that apply: installing in the browser, courses in the
+  // upper school, notifications where they can be switched on right here (on
+  // an iPhone only in the installed app, which starts with this introduction).
+  // Installing comes first: the installed app keeps its own storage, so
+  // whoever installs right away chooses the class only once, in the app.
   const steps: Step[] = [
     "welcome",
+    ...(installed ? [] : (["install"] as const)),
     "class",
     ...(upperSchool ? (["courses"] as const) : []),
-    ...(installed ? [] : (["install"] as const)),
     ...(push.status === "unavailable" || push.status === "install" ? [] : (["notifications"] as const)),
     "tips",
   ];
@@ -367,14 +369,13 @@ export function Onboarding({
               <div className="mt-6 rounded-[1.4rem] border border-line bg-card p-4">
                 <InstallGuide />
               </div>
-              {push.status === "install" ? (
-                <p className="mt-3 text-xs leading-5 text-muted">
-                  Die installierte App startet mit dieser Einführung. Dort kannst du dann
-                  Benachrichtigungen einschalten.
-                </p>
-              ) : null}
+              <p className="mt-3 text-xs leading-5 text-muted">
+                Die installierte App startet mit dieser Einführung: Dort wählst du deine Klasse
+                {push.status === "install" ? " und kannst Benachrichtigungen einschalten" : ""}.
+              </p>
             </div>
-            <div className="mt-8">
+            {/* Always in sight: the steps above fill the screen. */}
+            <div className="sticky bottom-0 -mx-5 mt-6 border-t border-line bg-background/95 px-5 pt-3 backdrop-blur">
               <button type="button" onClick={next} className={secondaryButton}>
                 Erst mal ohne Installieren weiter
               </button>
