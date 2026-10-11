@@ -380,8 +380,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               />
             ) : null}
             {viewedClass && myClass && viewedClass !== myClass ? (
-              <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
-                <p className="min-w-0 text-sm leading-5 text-muted">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+                {/* With large text on a narrow phone the button moves below the text. */}
+                <p className="min-w-[11rem] flex-1 text-sm leading-5 text-muted">
                   Nur angesehen. Beim nächsten Öffnen und für Benachrichtigungen gilt weiter die{" "}
                   <span className="font-semibold text-foreground">{myClass}</span>.
                 </p>

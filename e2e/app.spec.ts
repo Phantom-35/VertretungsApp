@@ -85,7 +85,7 @@ test("shows the NRW holidays instead of an old plan", async ({ page }) => {
   await expect(header).toContainText("Ferien");
   await expect(header).not.toContainText("Veraltet");
   const card = page.getByRole("region", { name: "Schöne Herbstferien!" });
-  await expect(card).toContainText("Der Plan für Mo., 02.11. erscheint hier");
+  await expect(card).toContainText("Frei bis Sa., 31.10. Der Plan für Mo., 02.11. erscheint hier");
   await expect(page.getByRole("tab")).toHaveCount(0);
   await expect(page.locator("article")).toHaveCount(0);
 
@@ -162,6 +162,18 @@ test("links the legal pages and offers a QR code to pass the app on", async ({ p
 
   await page.getByRole("link", { name: "← Zurück zur App" }).click();
   await expect(page.locator("header")).toContainText("5A");
+});
+
+test("keeps the settings button on screen with large text on a small phone", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("kag:settings", JSON.stringify({ textSize: "large" })));
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/");
+  await chooseClass(page, "Q1");
+  const gear = page.getByRole("button", { name: "Einstellungen" });
+  await expect(gear).toBeInViewport({ ratio: 1 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  // Short hint on self-study cards: one line, not three.
+  await expect(page.getByText("Aufgaben selbst bearbeiten").first()).toBeVisible();
 });
 
 test("shows the install steps of the browser in use", async ({ browser }) => {

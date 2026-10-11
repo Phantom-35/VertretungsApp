@@ -70,7 +70,9 @@ export function Header({
       <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(31,107,103,0.16),transparent_65%)]" />
       <div className="relative">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-accent-strong/85">
+          {/* Smaller on narrow screens: "VERTRETUNGSPLAN" cannot wrap and would push
+              the buttons (settings!) off the screen, e.g. with large text. */}
+          <p className="min-w-0 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-accent-strong/85 [overflow-wrap:anywhere] min-[360px]:text-[0.72rem] min-[360px]:tracking-[0.28em]">
             KAG Vertretungsplan
           </p>
           <div className="flex shrink-0 items-center gap-2">

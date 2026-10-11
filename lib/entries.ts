@@ -158,7 +158,7 @@ export function displayType(type: string) {
 }
 
 export const entryKindHints: Partial<Record<EntryKind, string>> = {
-  "self-study": "Eigenverantwortliches Arbeiten: Aufgaben selbst bearbeiten",
+  "self-study": "Aufgaben selbst bearbeiten",
   cancelled: "Unterricht fällt aus",
   moved: "Stunde wurde verlegt",
   supervision: "Klasse wird beaufsichtigt",

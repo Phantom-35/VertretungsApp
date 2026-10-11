@@ -14,7 +14,7 @@ function texts(holiday: HolidayBreak, today: string | null) {
   if (holiday.kind === "holidays") {
     return {
       title: `Schöne ${holiday.name}!`,
-      text: holiday.from === holiday.to ? "Heute ist frei." : `Frei bis ${formatShortDate(holiday.to)}.`,
+      text: holiday.from === holiday.to ? "Heute ist frei." : `Frei bis ${formatShortDate(holiday.to)}`,
     };
   }
   const onHoliday = today !== null && today >= holiday.from && today <= holiday.to;
