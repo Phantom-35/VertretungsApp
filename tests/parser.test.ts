@@ -145,6 +145,21 @@ describe("checkParsedPages (self-check)", () => {
     expect(page.stats.tableRows).toBe(page.entries.length);
   });
 
+  it("only notes an all-day row on a short page", () => {
+    const html = loadFixture(1);
+    const rows = html.match(/<tr class='list (odd|even)'>.*?<\/tr>/g)!;
+    const cells = rows[0].match(/<td[^>]*>.*?<\/td>/g)!;
+    const allDay = rows[0].replace(cells[1], cells[1].replace(/>[^<]*</, ">ganztägig<"));
+    // Only two rows left on the page, one of them without a lesson number.
+    let short = html.replace(rows[0], allDay);
+    rows.slice(2).forEach((row) => {
+      short = short.replace(row, "");
+    });
+    const page = parseSubstitutionPage(short, 1);
+    expect(page.entries).toHaveLength(2);
+    expect(checkParsedPages([page]).problems).toEqual([]);
+  });
+
   it("only notes a few rows without a lesson, e.g. an all-day event", () => {
     const html = loadFixture(1);
     const row = html.match(/<tr class='list odd'>.*?<\/tr>/)![0];

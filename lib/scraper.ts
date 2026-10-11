@@ -340,12 +340,13 @@ export function checkParsedPages(pages: ParsedPage[]) {
     }
 
     // A lesson without a number means the columns were mapped wrongly.
-    // A few such rows (e.g. an all-day event) are normal; most of them are not.
+    // A few such rows (e.g. an all-day event, also on a short last page) are
+    // normal; many of them, making up most of the page, are not.
     const implausible = entries.filter(
       (entry) => !entry.className || !/\d/.test(entry.lesson),
     ).length;
     if (implausible > 0) {
-      (implausible * 2 >= entries.length ? problems : notes).push(
+      (implausible >= 3 && implausible * 2 >= entries.length ? problems : notes).push(
         `${label}: ${implausible} Einträge ohne gültige Klasse oder Stunde.`,
       );
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ClassSelector } from "@/components/ClassSelector";
 import { DAY_PANEL_ID, DaySelector, dayTabId } from "@/components/DaySelector";
 import { DaySummary } from "@/components/DaySummary";
@@ -154,9 +154,18 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   // A day tapped by the user (or in a notification while the app is open),
   // with the school day it was chosen on: the next day it no longer applies.
   const [chosen, setChosen] = useState<{ date: string; on: string } | null>(null);
-  const chooseDate = useCallback((date: string) => setChosen({ date, on: schoolToday(Date.now()) }), []);
   const opened = useOpened();
   const openedDay = opened !== null ? schoolToday(opened.last) : null;
+  // A choice belongs to the opening it was made in (also past midnight while
+  // the app stays on screen).
+  const openedDayRef = useRef(openedDay);
+  useEffect(() => {
+    openedDayRef.current = openedDay;
+  }, [openedDay]);
+  const chooseDate = useCallback(
+    (date: string) => setChosen({ date, on: openedDayRef.current ?? schoolToday(Date.now()) }),
+    [],
+  );
   const chosenDate = chosen && (openedDay === null || chosen.on === openedDay) ? chosen.date : null;
   // A page served from the service worker cache was rendered without
   // "?day=" (e.g. opened from a notification): the address still has it.

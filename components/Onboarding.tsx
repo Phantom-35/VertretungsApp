@@ -145,16 +145,20 @@ export function Onboarding({
   // upper school, notifications where they can be switched on right here (on
   // an iPhone only in the installed app, which starts with this introduction).
   const install: Step[] = installed ? [] : ["install"];
+  const [step, setStep] = useState<Step>("welcome");
+  // The notifications step stays while it is shown, even if the status turns
+  // out to rule it out meanwhile (a delayed check): no jump back.
+  const showNotifications =
+    step === "notifications" || !(push.status === "unavailable" || push.status === "install");
   const steps: Step[] = [
     "welcome",
     ...(freshStart ? install : []),
     "class",
     ...(upperSchool ? (["courses"] as const) : []),
     ...(freshStart ? [] : install),
-    ...(push.status === "unavailable" || push.status === "install" ? [] : (["notifications"] as const)),
+    ...(showNotifications ? (["notifications"] as const) : []),
     "tips",
   ];
-  const [step, setStep] = useState<Step>("welcome");
   const index = Math.max(0, steps.indexOf(step));
   const next = () => setStep(steps[Math.min(index + 1, steps.length - 1)]);
 
