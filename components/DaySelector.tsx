@@ -88,7 +88,7 @@ export function DaySelector({ days, selectedDate, onChange, counts, now, pending
             aria-controls={DAY_PANEL_ID}
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(day.date)}
-            className={`relative rounded-[1.1rem] px-2 py-2.5 text-center transition ${
+            className={`relative rounded-[1.1rem] px-2 py-3 text-center transition ${
               selected
                 ? pending
                   ? "border border-dashed border-accent bg-accent-soft text-accent-strong"
@@ -115,10 +115,12 @@ export function DaySelector({ days, selectedDate, onChange, counts, now, pending
             {count !== null ? (
               <span
                 aria-hidden
-                className={`absolute right-1.5 top-1.5 min-w-5 rounded-full px-1.5 text-[0.68rem] font-bold leading-5 ${
+                // On the corner, above the label: long weekdays ("Donnerstag")
+                // fill narrow tabs completely.
+                className={`absolute -right-0.5 -top-1 min-w-5 rounded-full px-1.5 text-[0.68rem] font-bold leading-[1.1rem] ring-2 ring-card ${
                   count === 0
                     ? selected
-                      ? "bg-white/20 text-white/80"
+                      ? "bg-accent text-white/80"
                       : "bg-surface-muted text-muted"
                     : selected
                       ? "bg-white text-accent"

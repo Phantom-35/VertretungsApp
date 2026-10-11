@@ -36,7 +36,7 @@ import {
   normalizeTeacher,
 } from "@/lib/entries";
 import { formatAge, formatPlanDateLabel, formatShortDate, formatTimestamp, formatWeekday, isPastDate } from "@/lib/format";
-import { holidayBreak, nextSchoolDay } from "@/lib/holidays";
+import { freeUntil, holidayBreak, nextSchoolDay } from "@/lib/holidays";
 import { entryKey, findNewKeys } from "@/lib/seen";
 import { buildShareText } from "@/lib/share";
 import { pickDefaultDate, schoolToday } from "@/lib/time";
@@ -192,6 +192,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       const day = data?.type === "open-url" && data.url ? dayFromUrl(data.url) : null;
       if (day) {
         chooseDate(day);
+        // The announced change may not be in the copy on screen yet.
+        void forceRefresh();
       }
     };
     clearBadge();
@@ -201,7 +203,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       document.removeEventListener("visibilitychange", clearBadge);
       navigator.serviceWorker?.removeEventListener("message", onMessage);
     };
-  }, [chooseDate]);
+  }, [chooseDate, forceRefresh]);
 
   const days = data?.days ?? [];
   const latestDate = days.at(-1)?.date ?? null;
@@ -215,15 +217,24 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   // The next school day, when the school has not published it yet: shown as
   // a pale extra tab, so "no changes" is not mistaken for "no plan yet".
   const upcoming = today !== null ? nextSchoolDay(today) : null;
+  // Also on the weekend after the last plan day (Friday's plan, Monday not
+  // there yet), as on Friday evening; in the holidays their card says it all.
+  const followsPlan = !holiday && latestDate !== null && nextSchoolDay(latestDate) === upcoming;
   const pendingDate =
-    planAhead && upcoming !== null && !days.some((day) => day.date === upcoming) ? upcoming : null;
+    (planAhead || followsPlan) && upcoming !== null && !days.some((day) => day.date === upcoming)
+      ? upcoming
+      : null;
   const tabDays: PlanDay[] = pendingDate
     ? [...days, { date: pendingDate, dayLabel: formatWeekday(pendingDate), weekLabel: null }].sort(
         (left, right) => left.date.localeCompare(right.date),
       )
     : days;
-  // Keep the user's choice while it is still part of the plan.
-  const selectedDate = tabDays.some((day) => day.date === requestedDate)
+  // Before hydration the time (and the class) are unknown: no day is picked,
+  // rather than the plan's first day flashing up as the current one.
+  const selectedDate = now === null
+    ? null
+    : tabDays.some((day) => day.date === requestedDate)
+    // Keep the user's choice while it is still part of the plan.
     ? requestedDate
     : pickDefaultDate(
         tabDays.map((day) => day.date),
@@ -238,7 +249,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const holidayMode = Boolean(holiday && !planAhead && !showOldPlan);
 
   let headerStatus: HeaderStatus = "current";
-  if (isBusy) {
+  if (isBusy || now === null) {
     headerStatus = "updating";
   } else if (connectionError) {
     headerStatus = "offline";
@@ -253,10 +264,12 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     headerStatus = "incomplete";
   }
 
-  const dateLabel = holidayMode && holiday
+  const dateLabel = now === null
+    ? "Wird geladen …"
+    : holidayMode && holiday
     ? holiday.from === holiday.to || holiday.kind === "public-holiday"
       ? holiday.name
-      : `${holiday.name} bis ${formatShortDate(holiday.to)}`
+      : `${holiday.name} bis ${formatShortDate(freeUntil(holiday, today))}`
     : showsPendingDay && pendingDate
     ? formatPlanDateLabel(pendingDate, now)
     : selectedDay
@@ -277,7 +290,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   // Entries without a readable date are shown (and counted) on every day.
   const isOnDay = (entry: { date: string }, date: string | null) =>
     !date || !entry.date || entry.date === date;
-  const onSelectedDay = (entry: { date: string }) => isOnDay(entry, selectedDate);
+  const onSelectedDay = (entry: { date: string }) => now !== null && isOnDay(entry, selectedDate);
   const countsByDate = selectedClass
     ? new Map(
         days.map((day) => [
@@ -418,7 +431,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             />
           ) : null}
 
-          {headerStatus === "waiting" ? (
+          {headerStatus === "waiting" && !showsPendingDay ? (
             <p className="rounded-[1.4rem] border border-line bg-card px-4 py-3 text-sm leading-6 text-muted">
               Der nächste Plan ist noch nicht online. Bis die Schule ihn hochlädt, siehst du hier
               den letzten Plan.

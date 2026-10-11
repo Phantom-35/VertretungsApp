@@ -169,3 +169,12 @@ export function nextSchoolDay(date: string, holidays: readonly Holiday[] = NRW_H
   }
   return day;
 }
+
+/**
+ * The last free day to name: the end of the holidays, or on the weekend
+ * after them (e.g. Sunday after holidays ending on Saturday) that weekend's
+ * last day, so the text never names a day that is already over.
+ */
+export function freeUntil(holiday: HolidayBreak, today: string | null) {
+  return today !== null && today > holiday.to ? addDays(holiday.backOn, -1) : holiday.to;
+}

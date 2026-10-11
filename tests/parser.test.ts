@@ -86,6 +86,18 @@ describe("parseSubstitutionPage", () => {
       "Unterrichtsfrei – 7-11 Std.",
     ]);
   });
+
+  it("keeps the lines of a notice and of a cell apart", () => {
+    const html = loadFixture(7)
+      .replace(
+        "<td class='info'>Unterrichtsfrei&nbsp;</td><td class='info'>7-11 Std.</td>",
+        "<td class='info' colspan='2'><b>Revision Fr. Azzam</b><br>09:20-10:05 Mathe, 10B, R. E39<br></td>",
+      )
+      .replace('align="center">133</td>', 'align="center">SWI<br>TU3</td>');
+    const { meta, entries } = parseSubstitutionPage(html, 7);
+    expect(meta.notices).toEqual(["Revision Fr. Azzam · 09:20-10:05 Mathe, 10B, R. E39"]);
+    expect(entries.find((entry) => entry.className === "07D")?.room).toBe("SWI TU3");
+  });
 });
 
 describe("checkParsedPages (self-check)", () => {

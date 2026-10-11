@@ -111,8 +111,14 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
 
     const hasChanges = !diff.initial && diff.added.length + diff.removed.length > 0;
     const summary = summaryRun(plan, now);
+    // Entries of its day missing since this check may be an upload in
+    // progress: the summary waits for the next check instead of leaving
+    // them out (nothing would correct it later).
+    const summaryWaits =
+      summary !== null && diff.state.missing.some((key) => key.startsWith(`${summary.day}|`));
     // Once per day; recorded before sending, like the plan state.
-    const summaryDue = summary !== null && (await store.getMeta(summary.meta)) !== summary.day;
+    const summaryDue =
+      summary !== null && !summaryWaits && (await store.getMeta(summary.meta)) !== summary.day;
     if (summaryDue) {
       await store.setMeta(summary.meta, summary.day);
     }
@@ -124,11 +130,12 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
       const result = await send(subscriber.subscription, payload);
       if (result === "gone") {
         stats.expired += 1;
-        await store.deleteSubscriber(subscriber.id);
+        // Not worth stopping the run for: the next send finds it gone again.
+        await store.deleteSubscriber(subscriber.id).catch(() => undefined);
       } else if (result === "failed") {
         stats.failed += 1;
       }
-      return result === "sent";
+      return result;
     };
 
     const notify = async (subscriber: Subscriber) => {
@@ -139,20 +146,31 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
         (change) => !getsSummary || change.kind === "removed" || change.entry.date !== summary.day,
       );
       if (changes.length > 0) {
-        if (!(await deliver(subscriber, buildNotification(subscriber.schoolClass, changes, now)))) {
+        const result = await deliver(subscriber, buildNotification(subscriber.schoolClass, changes, now));
+        if (result === "gone") {
           return;
         }
-        stats.notified += 1;
+        if (result === "sent") {
+          stats.notified += 1;
+        }
       }
+      // Also after a failed change: the summary is sent only once per day.
       if (getsSummary) {
-        if (await deliver(subscriber, buildSummary(subscriber, plan.entries, summary.day, now))) {
+        if ((await deliver(subscriber, buildSummary(subscriber, plan.entries, summary.day, now))) === "sent") {
           stats.summaries += 1;
         }
       }
     };
 
+    // One device's error must not cost the others their notification: the
+    // plan state is already saved, so a retry would not send it again.
+    const notifySafely = (subscriber: Subscriber) =>
+      notify(subscriber).catch(() => {
+        stats.failed += 1;
+      });
+
     for (let index = 0; index < subscribers.length; index += PARALLEL_SENDS) {
-      await Promise.all(subscribers.slice(index, index + PARALLEL_SENDS).map(notify));
+      await Promise.all(subscribers.slice(index, index + PARALLEL_SENDS).map(notifySafely));
     }
     // Something to send, but nothing arrived anywhere: worth a warning.
     if (stats.failed > 0 && stats.notified + stats.summaries === 0) {

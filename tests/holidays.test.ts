@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NRW_HOLIDAYS, easterSunday, holidayBreak, nextSchoolDay, publicHolidayName } from "@/lib/holidays";
+import { NRW_HOLIDAYS, easterSunday, freeUntil, holidayBreak, nextSchoolDay, publicHolidayName } from "@/lib/holidays";
 
 describe("holidayBreak", () => {
   it("covers the autumn holidays 2026 and the weekend after them", () => {
@@ -103,5 +103,14 @@ describe("nextSchoolDay", () => {
     expect(nextSchoolDay("2026-10-09")).toBe("2026-10-12"); // Friday -> Monday
     expect(nextSchoolDay("2026-10-16")).toBe("2026-11-02"); // before the autumn holidays
     expect(nextSchoolDay("2027-05-05")).toBe("2027-05-07"); // over Christi Himmelfahrt
+  });
+});
+
+describe("freeUntil", () => {
+  it("never names a day that is already over", () => {
+    const autumn = holidayBreak("2026-10-20")!;
+    expect(freeUntil(autumn, "2026-10-20")).toBe("2026-10-31");
+    // Sunday after holidays that end on Saturday.
+    expect(freeUntil(holidayBreak("2026-11-01")!, "2026-11-01")).toBe("2026-11-01");
   });
 });

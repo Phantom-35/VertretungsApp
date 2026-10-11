@@ -163,6 +163,22 @@ describe("runPushCheck", () => {
     expect(await store.countSubscribers()).toBe(1);
   });
 
+  it("keeps notifying the others when forgetting an expired device fails", async () => {
+    const store = new MemoryStore();
+    const gone = await addSubscriber(store, "gone", "5A");
+    for (let index = 0; index < 30; index += 1) {
+      await addSubscriber(store, `ok-${index}`, "5A");
+    }
+    const { sent, send } = fakeSender({ [gone.endpoint]: "gone" });
+    await runPushCheck({ store, send, loadPlan: async () => plan([]), now: NOW });
+    store.deleteSubscriber = async () => {
+      throw new Error("Redis nicht erreichbar");
+    };
+    const result = await runPushCheck({ store, send, loadPlan: async () => plan([entry({})]), now: NOW });
+    expect(result).toMatchObject({ status: "checked", notified: 30, expired: 1 });
+    expect(sent).toHaveLength(31);
+  });
+
   it("records every call and warns when nothing could be delivered", async () => {
     const webhook: string[] = [];
     vi.stubEnv("ALERT_WEBHOOK_URL", "https://ntfy.sh/kag-test");
@@ -231,6 +247,45 @@ describe("evening summary in the check", () => {
     // Later the same evening: not again.
     await runPushCheck({ store, send, loadPlan, now: EVENING + 30 * 60_000 });
     expect(sent).toHaveLength(1);
+  });
+
+  it("waits while entries of tomorrow are missing, as during an upload", async () => {
+    const store = new MemoryStore();
+    const sub = await addSubscriber(store, "wants", "5A");
+    await store.saveSubscriber({ ...(await store.getSubscriber(subscriberId(sub.endpoint)))!, eveningSummary: true });
+    const { sent, send } = fakeSender();
+    const days = ["2026-10-08", "2026-10-09"];
+    const first = entry({ lesson: "3" });
+    const second = entry({ lesson: "5", type: "Vertretung", substitute: "DEF" });
+    await runPushCheck({ store, send, loadPlan: async () => withDays([first, second], days), now: Date.parse("2026-10-08T18:50:00+02:00") });
+    // 19:00: half uploaded, the 5th lesson is missing for the moment.
+    await runPushCheck({ store, send, loadPlan: async () => withDays([first], days), now: Date.parse("2026-10-08T19:00:00+02:00") });
+    expect(sent).toHaveLength(0);
+    // 19:10: complete again; the summary names both.
+    await runPushCheck({ store, send, loadPlan: async () => withDays([first, second], days), now: Date.parse("2026-10-08T19:10:00+02:00") });
+    expect(sent.map((item) => item.payload.title)).toEqual(["5A · Morgen: 2 Änderungen"]);
+  });
+
+  it("still sends the summary when a change could not be delivered", async () => {
+    const store = new MemoryStore();
+    const sub = await addSubscriber(store, "wants", "5A");
+    await store.saveSubscriber({ ...(await store.getSubscriber(subscriberId(sub.endpoint)))!, eveningSummary: true });
+    const sent: PushPayload[] = [];
+    const send = vi.fn(async (_sub: PushSubscriptionData, payload: PushPayload) => {
+      sent.push(payload);
+      // The change (for Monday) fails, the summary for tomorrow arrives.
+      return payload.tag?.startsWith("kag-summary") ? ("sent" as const) : ("failed" as const);
+    });
+    const days = ["2026-10-08", "2026-10-09", "2026-10-12"];
+    await runPushCheck({ store, send, loadPlan: async () => withDays([entry({})], days), now: Date.parse("2026-10-08T18:50:00+02:00") });
+    const result = await runPushCheck({
+      store,
+      send,
+      loadPlan: async () => withDays([entry({}), entry({ date: "2026-10-12" })], days),
+      now: EVENING,
+    });
+    expect(result).toMatchObject({ failed: 1, summaries: 1 });
+    expect(sent.map((payload) => payload.title)).toContain("5A · Morgen: 1 Änderung");
   });
 
   it("waits while tomorrow's plan is not published", async () => {

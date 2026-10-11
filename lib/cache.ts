@@ -60,7 +60,8 @@ async function refreshCache() {
   if (payload.success) {
     cache.lastSuccess = payload;
     cache.lastFailure = null;
-    cache.expiresAt = Date.now() + CACHE_TTL_MS;
+    // Pages missing (e.g. one timed out): try again soon, not in 5 minutes.
+    cache.expiresAt = Date.now() + (payload.error ? FAILURE_BACKOFF_MS : CACHE_TTL_MS);
     return payload;
   }
 
@@ -93,5 +94,18 @@ export async function getCachedSubstitutionData(options?: { force?: boolean }) {
     cache.inFlight = null;
   });
 
+  return cache.inFlight;
+}
+
+/**
+ * Always asks the school website (for the push check) and keeps the result:
+ * the app opened from a notification then shows the change it announced.
+ */
+export function fetchFreshSubstitutionData() {
+  if (!cache.inFlight) {
+    cache.inFlight = refreshCache().finally(() => {
+      cache.inFlight = null;
+    });
+  }
   return cache.inFlight;
 }

@@ -144,9 +144,16 @@ describe("displayed data", () => {
     expect(result.error).toBe("down");
   });
 
+  it("keeps a newer copy when a cached answer is a few minutes older", () => {
+    const shown = payload("2026-10-08T10:05:00.000Z");
+    expect(pickDisplayedPayload(payload("2026-10-08T10:01:00.000Z"), shown)).toBe(shown);
+  });
+
   it("takes the server's answer otherwise", () => {
     const fresh = payload("2026-10-08T08:00:00.000Z");
     expect(pickDisplayedPayload(fresh, payload("2026-10-08T10:00:00.000Z"))).toBe(fresh);
+    const newer = payload("2026-10-08T10:06:00.000Z");
+    expect(pickDisplayedPayload(newer, payload("2026-10-08T10:05:00.000Z"))).toBe(newer);
     const newerStale = payload("2026-10-08T12:00:00.000Z", true);
     expect(pickDisplayedPayload(newerStale, payload("2026-10-08T10:00:00.000Z"))).toBe(newerStale);
   });

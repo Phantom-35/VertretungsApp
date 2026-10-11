@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { runPushCheck } from "@/lib/push/check";
 import { json, notConfigured } from "@/lib/push/http";
 import { getPushService } from "@/lib/push/service";
-import { fetchSubstitutionData } from "@/lib/scraper";
+import { fetchFreshSubstitutionData } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -53,7 +53,7 @@ async function handle(request: Request) {
     store: service.store,
     send: service.send,
     // Always fresh from the school website, not from the app's 5-minute cache.
-    loadPlan: fetchSubstitutionData,
+    loadPlan: fetchFreshSubstitutionData,
     now: testNow(request) ?? Date.now(),
   });
   return json(result);

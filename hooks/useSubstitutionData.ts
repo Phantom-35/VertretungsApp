@@ -68,10 +68,21 @@ function isNewer(
 }
 
 /**
+ * Cached answers (CDN, server instance) lag behind by a few minutes at most;
+ * a copy far ahead of the server's is not trusted to win forever.
+ */
+const MAX_CACHED_LAG_MS = 15 * 60_000;
+
+function ageGap(newer: SubstitutionPayload, older: SubstitutionPayload) {
+  return Date.parse(newer.lastUpdated ?? "") - Date.parse(older.lastUpdated ?? "");
+}
+
+/**
  * The data to show after a successful answer. When the school website is down,
  * the server falls back to its own last copy, which can be older than the one
  * already on screen (e.g. a freshly started server instance). Then the newer
- * copy stays, marked as stale.
+ * copy stays, marked as stale. An older copy from the CDN (e.g. right after a
+ * pull to refresh) never replaces a newer one either.
  */
 export function pickDisplayedPayload(
   payload: SubstitutionPayload,
@@ -79,6 +90,9 @@ export function pickDisplayedPayload(
 ): SubstitutionPayload {
   if (payload.stale && current && !isNewer(payload, current)) {
     return { ...current, stale: true, error: payload.error };
+  }
+  if (current && isNewer(current, payload) && ageGap(current, payload) < MAX_CACHED_LAG_MS) {
+    return current;
   }
   return payload;
 }
@@ -158,7 +172,7 @@ export function useSubstitutionData(initialData: SubstitutionPayload | null) {
               status: "idle",
               connectionError: null,
             }));
-            if (!payload.stale) {
+            if (!payload.stale && pickDisplayedPayload(payload, readStoredPayload()) === payload) {
               storePayload(payload);
             }
           } else {
@@ -205,8 +219,11 @@ export function useSubstitutionData(initialData: SubstitutionPayload | null) {
     const initialAge = initialData?.lastUpdated
       ? Date.now() - new Date(initialData.lastUpdated).getTime()
       : Number.POSITIVE_INFINITY;
-    if (initialAge > INITIAL_DATA_MAX_AGE_MS) {
-      void refresh();
+    // Opened from a notification ("?day="): the change it announced may be
+    // newer than any cached copy, so ask the school website itself.
+    const fromNotification = new URLSearchParams(window.location.search).has("day");
+    if (fromNotification || initialAge > INITIAL_DATA_MAX_AGE_MS) {
+      void refresh(fromNotification);
     } else {
       lastAttemptRef.current = Date.now();
     }

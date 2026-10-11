@@ -18,13 +18,15 @@ export function Segmented<T extends string | number>({
   return (
     <fieldset className="min-w-0">
       <legend className="sr-only">{label}</legend>
-      <div className="flex w-full rounded-full border border-line bg-card p-1">
+      {/* Wraps onto a second row when the labels do not fit (large text on a
+          small phone) instead of cutting them off. */}
+      <div className="flex w-full flex-wrap gap-y-1 rounded-[1.4rem] border border-line bg-card p-1">
         {options.map((option) => {
           const active = option.value === value;
           return (
             <label
               key={String(option.value)}
-              className={`min-w-0 flex-1 cursor-pointer whitespace-nowrap rounded-full px-1 py-1.5 text-center text-xs font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 ${
+              className={`flex-auto cursor-pointer whitespace-nowrap rounded-full px-2 py-1.5 text-center text-xs font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 ${
                 active ? "bg-accent text-white" : "text-muted"
               }`}
             >

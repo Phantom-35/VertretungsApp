@@ -83,6 +83,10 @@ vergleicht ihn mit dem letzten Stand und schickt die Mitteilungen.
 Vercel deployt **automatisch bei jedem Push auf `main`**. Jeder Push ist also sofort
 ein Release für alle Nutzer.
 
+Die Serverfunktionen laufen in **Frankfurt** (`fra1`, festgelegt in `vercel.json`): nah an
+der Schulseite und an Redis, und so steht es in der Datenschutzerklärung. Wer die Region
+ändert, muss auch die Datenschutzerklärung anpassen.
+
 ### Einrichten (einmalig)
 
 1. **Redis:** In Vercel unter *Storage* (bzw. *Marketplace*) „Upstash for Redis“ anlegen

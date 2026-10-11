@@ -117,7 +117,16 @@ function extractNotices($: cheerio.CheerioAPI) {
       $(row)
         .find("td")
         .toArray()
-        .map((cell) => normalizeWhitespace($(cell).text()))
+        .map((cell) => {
+          // "<b>Revision</b><br>09:20 Mathe": the lines of a notice stay apart.
+          $(cell).find("br").replaceWith("\n");
+          return $(cell)
+            .text()
+            .split("\n")
+            .map(normalizeWhitespace)
+            .filter(Boolean)
+            .join(" · ");
+        })
         .filter(Boolean)
         .join(" – "),
     )
@@ -230,6 +239,8 @@ function countDataRows($: cheerio.CheerioAPI) {
 export function parseSubstitutionPage(html: string, pageNumber: number): ParsedPage {
   const $ = cheerio.load(html);
   const meta = extractMetadata($, pageNumber);
+  // A line break in a cell ("SWI<br>TU3") separates words like a space.
+  $("br").replaceWith(" ");
   const parsedEntries: SubstitutionEntry[] = [];
   let headerFound = false;
   const unknownColumns = new Set<string>();

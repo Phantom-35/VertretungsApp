@@ -94,6 +94,12 @@ test("shows the NRW holidays instead of an old plan", async ({ page }) => {
   await expect(card).toHaveCount(0);
   await expect(page.getByRole("tab")).toHaveCount(2);
   await expect(page.locator("article").first()).toBeVisible();
+
+  // Sunday after the holidays (they end on Saturday): no day that is over.
+  await page.clock.setFixedTime(new Date("2026-11-01T19:00:00+02:00"));
+  await page.reload();
+  await expect(header).toContainText("Herbstferien bis So., 01.11.");
+  await expect(card).toContainText("Frei bis So., 01.11. Der Plan für Mo., 02.11. erscheint hier");
 });
 
 test("says when the next plan is not online yet, and marks past days", async ({ page }) => {
@@ -101,11 +107,44 @@ test("says when the next plan is not online yet, and marks past days", async ({ 
   await page.clock.setFixedTime(new Date("2026-10-10T11:00:00+02:00"));
   await page.goto("/");
   await chooseClass(page, "5A");
-  await expect(page.locator("header")).toContainText("Letzter Plan");
-  await expect(page.getByText("Der nächste Plan ist noch nicht online.")).toBeVisible();
+  // Monday is shown as not online yet, as on Friday evening.
+  await expect(page.getByRole("tab", { selected: true })).toContainText("noch nicht da");
+  await expect(page.getByText("Plan für Montag noch nicht online")).toBeVisible();
   // A past day is not mistaken for the coming one.
   await expect(page.getByRole("tab").nth(0)).toContainText("vorbei, 08.10.");
   await expect(page.getByRole("tab").nth(1)).toContainText("Gestern");
+  await page.getByRole("tab").nth(1).click();
+  await expect(page.locator("header")).toContainText("Letzter Plan");
+});
+
+test("keeps the day across midnight and starts the next day fresh", async ({ page }) => {
+  // Friday night with the app open: Monday (not online yet) is shown.
+  await page.clock.install({ time: new Date("2026-10-09T23:58:00+02:00") });
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const selected = page.getByRole("tab", { selected: true });
+  await expect(selected).toContainText("noch nicht da");
+  // Saturday 00:01: nothing jumps.
+  await page.clock.runFor(3 * 60_000);
+  await expect(selected).toContainText("noch nicht da");
+
+  // Thursday 13:00, left on screen overnight (e.g. a tablet): on Friday
+  // morning it shows Friday, not yesterday.
+  await page.clock.setSystemTime(new Date("2026-10-08T13:00:00+02:00"));
+  await page.reload();
+  await expect(selected).toContainText("Heute");
+  await page.clock.runFor(60_000);
+  await page.clock.setSystemTime(new Date("2026-10-09T07:00:00+02:00"));
+  await page.clock.runFor(60_000);
+  await expect(selected).toContainText("Heute");
+  await expect(selected).toContainText("09.10.");
+});
+
+test("does not show a day or status before it knows the time", async ({ request }) => {
+  const html = await (await request.get("/")).text();
+  expect(html).toContain("Wird geladen");
+  expect(html).not.toContain(">Aktuell<");
+  expect(html).not.toContain('aria-selected="true"');
 });
 
 test("shows the next school day as not online yet, instead of no changes", async ({ page }) => {
@@ -174,6 +213,15 @@ test("keeps the settings button on screen with large text on a small phone", asy
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   // Short hint on self-study cards: one line, not three.
   await expect(page.getByText("Aufgaben selbst bearbeiten").first()).toBeVisible();
+  // No choice in the settings is cut off ("16 Uh").
+  await gear.click();
+  await settled(page.getByRole("dialog"));
+  const cutOff = await page.evaluate(() =>
+    [...document.querySelectorAll("fieldset label")]
+      .filter((label) => label.scrollWidth > label.clientWidth + 1)
+      .map((label) => label.textContent),
+  );
+  expect(cutOff).toEqual([]);
 });
 
 test("shows the install steps of the browser in use", async ({ browser }) => {

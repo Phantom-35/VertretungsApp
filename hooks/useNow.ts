@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { schoolToday } from "@/lib/time";
 
 const TICK_MS = 30_000;
 
@@ -63,10 +64,28 @@ type Opened = {
 let opened: Opened | null = null;
 const openedListeners = new Set<() => void>();
 
-function onOpenedVisibility() {
-  if (document.visibilityState === "visible" && opened) {
+let dayTimerId: number | undefined;
+
+function reopen() {
+  if (opened) {
     opened = { ...opened, last: Date.now() };
     openedListeners.forEach((listener) => listener());
+  }
+}
+
+function onOpenedVisibility() {
+  if (document.visibilityState === "visible") {
+    reopen();
+  }
+}
+
+/**
+ * An app left on screen overnight (tablet, computer) counts as opened anew
+ * on the next day, so it does not keep showing yesterday in the morning.
+ */
+function onDayCheck() {
+  if (opened && schoolToday(Date.now()) !== schoolToday(opened.last)) {
+    reopen();
   }
 }
 
@@ -74,11 +93,13 @@ function subscribeOpened(listener: () => void) {
   openedListeners.add(listener);
   if (openedListeners.size === 1) {
     document.addEventListener("visibilitychange", onOpenedVisibility);
+    dayTimerId = window.setInterval(onDayCheck, TICK_MS);
   }
   return () => {
     openedListeners.delete(listener);
     if (openedListeners.size === 0) {
       document.removeEventListener("visibilitychange", onOpenedVisibility);
+      window.clearInterval(dayTimerId);
     }
   };
 }
