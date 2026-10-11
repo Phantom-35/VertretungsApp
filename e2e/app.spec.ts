@@ -582,6 +582,109 @@ test("opens at once from the cache, also on the day of a notification", async ({
   }
 });
 
+test("shows a new version right after opening, or once the app is left", async ({ context }) => {
+  // A proxy that can pretend a new deploy: its pages then carry another
+  // deploy id (the service worker compares those).
+  let version = 0;
+  let pageDelay = 0;
+  const proxy = createServer((request, response) => {
+    const forward = () => {
+      const upstream = httpRequest(
+        {
+          host: "localhost",
+          port: APP_PORT,
+          path: request.url,
+          method: request.method,
+          // Uncompressed, so the pages can be changed.
+          headers: { ...request.headers, "accept-encoding": "identity" },
+        },
+        (answer) => {
+          const isPage = (answer.headers["content-type"] ?? "").includes("text/html");
+          if (!isPage || version === 0) {
+            response.writeHead(answer.statusCode ?? 502, answer.headers);
+            answer.pipe(response);
+            return;
+          }
+          const chunks: Buffer[] = [];
+          answer.on("data", (chunk: Buffer) => chunks.push(chunk));
+          answer.on("end", () => {
+            const html = Buffer.concat(chunks)
+              .toString()
+              .replace(/(name="kag-build" content=")/, `$1deploy-${version}-`);
+            const headers = { ...answer.headers };
+            delete headers["content-length"];
+            delete headers["content-encoding"];
+            response.writeHead(answer.statusCode ?? 502, headers);
+            response.end(html);
+          });
+        },
+      );
+      upstream.on("error", () => response.destroy());
+      request.pipe(upstream);
+    };
+    // The start page, also as fetched by the service worker (Accept: */*).
+    if (pageDelay && new URL(request.url ?? "/", "http://x").pathname === "/") {
+      setTimeout(forward, pageDelay);
+    } else {
+      forward();
+    }
+  });
+  await new Promise<void>((resolve) => proxy.listen(0, resolve));
+  const origin = `http://localhost:${(proxy.address() as AddressInfo).port}`;
+  // False while the page is just reloading.
+  const shows = (page: Page, deploy: number) =>
+    page
+      .evaluate(
+        (marker) => document.querySelector('meta[name="kag-build"]')?.getAttribute("content")?.startsWith(marker),
+        `deploy-${deploy}-`,
+      )
+      .catch(() => false);
+  try {
+    const page = await context.newPage();
+    await page.clock.setFixedTime(TODAY);
+    await page.goto(`${origin}/`);
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+
+    // No new version: no reload (a reload would drop the mark).
+    await page.goto(`${origin}/`);
+    await page.evaluate(() => {
+      (window as unknown as { kagMark?: boolean }).kagMark = true;
+    });
+    await page.waitForTimeout(3_000);
+    expect(await page.evaluate(() => (window as unknown as { kagMark?: boolean }).kagMark)).toBe(true);
+
+    // A deploy; the app is opened and not touched: it reloads by itself.
+    version = 1;
+    await page.goto(`${origin}/`);
+    expect(await shows(page, 1)).toBe(false); // the cached version first
+    await expect.poll(() => shows(page, 1), { timeout: 10_000 }).toBe(true);
+
+    // Another deploy while someone is using the app: no reload under the
+    // finger, but once the app is left.
+    const second = await context.newPage();
+    await second.clock.setFixedTime(TODAY);
+    version = 2;
+    // The new version arrives a little later, after the first tap.
+    pageDelay = 2_500;
+    await second.goto(`${origin}/`);
+    // Once the app is ready (the introduction opens), any tap counts as using it.
+    await expect(second.getByRole("dialog")).toBeVisible();
+    await second.mouse.click(5, 5);
+    await second.waitForTimeout(3_000);
+    expect(await shows(second, 2)).toBe(false);
+    await second.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await expect.poll(() => shows(second, 2), { timeout: 10_000 }).toBe(true);
+  } finally {
+    proxy.closeAllConnections();
+    proxy.close();
+  }
+});
+
 test("starts offline from the cache", async ({ page, context }) => {
   await page.goto("/");
   await page.evaluate(() => navigator.serviceWorker.ready);

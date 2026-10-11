@@ -175,24 +175,71 @@ async function cachedPageFirst(event) {
   if (!cached) {
     return networkFirst(event);
   }
-  // Its body is read by the browser; pruning needs its own copy.
-  const previous = cached.clone();
-  event.waitUntil(
-    // The page without "?day=…": a page rendered for a notification's day
-    // must not become the page every later start opens with.
-    fetch(cacheKey)
-      .then(async (response) => {
-        if (!response.ok || response.redirected) {
-          return;
-        }
-        await cache.put(cacheKey, response.clone());
-        await precacheAssets(response);
-        await pruneStaticCache(previous);
-      })
-      .catch(() => undefined),
-  );
+  // Its body is read by the browser; the update needs its own copy.
+  pageRefresh = refreshPage(cacheKey, cached.clone()).catch(() => undefined);
+  event.waitUntil(pageRefresh);
   return cached;
 }
+
+// Fetches the newest version of a cached page (without "?day=…": a page
+// rendered for a notification's day must not become the page every later
+// start opens with) and caches it with its files. A new deploy (other build
+// files) is announced to the open app, which then reloads at a moment that
+// does not disturb (see PwaRegistrar).
+async function refreshPage(cacheKey, previous) {
+  const response = await fetch(cacheKey);
+  if (!response.ok || response.redirected) {
+    return;
+  }
+  const cache = await caches.open(PAGE_CACHE);
+  const [oldBuild, newBuild] = await Promise.all([buildOf(previous.clone()), buildOf(response.clone())]);
+  await cache.put(cacheKey, response.clone());
+  await precacheAssets(response);
+  await pruneStaticCache(previous);
+
+  if (newBuild && newBuild !== oldBuild) {
+    const windows = await self.clients.matchAll({ type: "window" });
+    windows.forEach((client) => client.postMessage({ type: "app-updated" }));
+  }
+}
+
+/** The deploy a page belongs to: `<meta name="kag-build" content="…">`. */
+async function buildOf(page) {
+  const text = await page.text();
+  const tag = text.match(/<meta[^>]*name="kag-build"[^>]*>/)?.[0] ?? "";
+  return tag.match(/content="([^"]*)"/)?.[1] ?? null;
+}
+
+// The background update started by the last page load, if any.
+let pageRefresh = null;
+
+// The app asks when it has started (the update may have finished before it
+// listened) and when it comes back to the foreground (no page is loaded then,
+// so nothing else would notice a new deploy). It sends the deploy its page
+// belongs to; a cached page of another deploy is a newer version.
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "check-update" || typeof event.data.build !== "string") {
+    return;
+  }
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(PAGE_CACHE);
+      if (event.data.fetch) {
+        const cached = await cache.match("/");
+        if (cached) {
+          await refreshPage("/", cached);
+        }
+      } else {
+        await pageRefresh;
+      }
+      const latest = await cache.match("/");
+      const build = latest ? await buildOf(latest) : null;
+      if (build && build !== event.data.build) {
+        event.source?.postMessage({ type: "app-updated" });
+      }
+    })().catch(() => undefined),
+  );
+});
 
 // Pages without a cached copy: try the network first, fall back to the
 // start page when offline.

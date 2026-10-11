@@ -37,6 +37,8 @@ export default function RootLayout({
     // The theme script sets data-theme before React hydrates.
     <html lang="de" className="h-full" data-theme="light" suppressHydrationWarning>
       <head>
+        {/* The deploy this page belongs to (see public/sw.js, PwaRegistrar). */}
+        <meta name="kag-build" content={process.env.KAG_BUILD_ID} />
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="min-h-full">

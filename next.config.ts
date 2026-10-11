@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  env: {
+    // Identifies a deploy; written into every page so the service worker can
+    // tell a newer cached version from the one on screen.
+    KAG_BUILD_ID:
+      process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || String(Date.now()),
+  },
   headers() {
     return [
       {
