@@ -384,7 +384,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               push={push}
               schoolClass={myClass}
               teachers={myTeachers}
-              onOpenSummaries={() => openSettings("summaries")}
+              onOpenSettings={openSettings}
             />
           </ClassSelector>
 
@@ -521,6 +521,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         focus={settingsFocus}
+        notifications={{ push, schoolClass: myClass ?? null, teachers: myTeachers }}
         courseFilter={
           // The upper-school class on screen; otherwise the own one, whose
           // courses the notifications are about.

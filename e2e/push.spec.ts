@@ -184,20 +184,39 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     const [, , moved] = await waitForPushes(service.received, "/phone", 3);
     expect(read(phone, moved).title).toBe("7B · Morgen 5.–6. Std.");
 
+    // On the main page only a short line; it opens the settings at the
+    // notifications, with the test and switching off.
+    await expect(settings.getByRole("button", { name: "Testnachricht" })).toHaveCount(0);
+    await settings.getByRole("button", { name: /Benachrichtigungen an für 7B/ }).click();
+    const controls = page.getByRole("dialog", { name: "Einstellungen" }).getByRole("group", { name: "Benachrichtigungen ein und aus" });
+    await expect(controls).toContainText("An für 7B.");
+    await expect(controls).toBeInViewport();
+    // Not hidden under the sheet's sticky title bar.
+    await expect
+      .poll(() =>
+        controls.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return element.contains(document.elementFromPoint(box.left + 8, box.top + 8));
+        }),
+      )
+      .toBe(true);
+
     // Test button.
-    await settings.getByRole("button", { name: "Testnachricht senden" }).click();
-    await expect(settings.getByText(/^Testnachricht kommt in/)).toBeVisible();
+    await controls.getByRole("button", { name: "Testnachricht" }).click();
+    await expect(controls.getByText(/^Testnachricht kommt in/)).toBeVisible();
     const [, , , testPush] = await waitForPushes(service.received, "/phone", 4);
     expect(read(phone, testPush).title).toBe("Testnachricht");
     // The hint fades out by itself after a few seconds and gives its space back.
-    const hint = settings.getByRole("status");
+    const hint = controls.getByRole("status");
     await expect
       .poll(() => hint.evaluate((element) => element.getBoundingClientRect().height), { timeout: 10_000 })
       .toBe(0);
     expect(await hint.evaluate((element) => getComputedStyle(element.parentElement!).opacity)).toBe("0");
 
     // Switched off: no more notifications.
-    await settings.getByRole("button", { name: "Benachrichtigungen ausschalten" }).click();
+    await controls.getByRole("button", { name: "Ausschalten" }).click();
+    await expect(controls.getByRole("button", { name: "Einschalten" })).toBeVisible();
+    await page.getByRole("dialog", { name: "Einstellungen" }).getByRole("button", { name: "Fertig" }).click();
     await expect(settings.getByRole("button", { name: "Einschalten" })).toBeVisible();
     await changePlan(
       request,

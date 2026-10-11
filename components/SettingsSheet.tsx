@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import Link from "next/link";
 import { InstallGuide } from "@/components/InstallGuide";
+import { NotificationControls } from "@/components/NotificationSettings";
 import { Segmented } from "@/components/Segmented";
 import { SummarySwitches } from "@/components/SummarySwitches";
 import { Switch } from "@/components/Switch";
@@ -12,7 +13,7 @@ import { SCHOOL_CLASSES } from "@/lib/entries";
 import { NOTIFY_GROUP_LABELS, NOTIFY_GROUPS } from "@/lib/notify";
 import { resetDevice } from "@/lib/reset";
 
-export type SettingsFocus = "teachers" | "summaries" | null;
+export type SettingsFocus = "teachers" | "summaries" | "notifications" | null;
 
 type CourseFilter = {
   schoolClass: string;
@@ -28,6 +29,8 @@ type SettingsSheetProps = {
   onClose: () => void;
   /** Section to scroll to when the sheet opens. */
   focus?: SettingsFocus;
+  /** Switching notifications on/off and testing them. */
+  notifications: ComponentProps<typeof NotificationControls>;
   /** Upper school only: the course filter by teachers. */
   courseFilter: CourseFilter | null;
   /** Original plan on the school website. */
@@ -82,9 +85,14 @@ const CLOSE_DISTANCE = 90;
 const CLOSE_VELOCITY = 0.5;
 const SLIDE_MS = 180;
 
-function Setting({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+function Setting({ id, title, description, children }: {
+  id?: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
   return (
-    <section className="space-y-2.5 border-t border-line py-4 first:border-t-0 first:pt-0">
+    <section id={id} className="scroll-mt-24 space-y-2.5 border-t border-line py-4 first:border-t-0 first:pt-0">
       <div>
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         {description ? <p className="mt-0.5 text-xs leading-5 text-muted">{description}</p> : null}
@@ -150,6 +158,7 @@ export function SettingsSheet({
   open,
   onClose,
   focus = null,
+  notifications,
   courseFilter,
   sourceUrl,
   myClass,
@@ -176,7 +185,7 @@ export function SettingsSheet({
       dialog.style.transform = "";
       dialog.style.transition = "";
       dialog.showModal();
-      if (focus === "teachers" || focus === "summaries") {
+      if (focus === "teachers" || focus === "summaries" || focus === "notifications") {
         document.getElementById(`settings-${focus}`)?.scrollIntoView({ block: "start" });
       } else {
         dialog.scrollTop = 0;
@@ -380,9 +389,11 @@ export function SettingsSheet({
         </Setting>
 
         <Setting
+          id="settings-notifications"
           title="Benachrichtigungen"
-          description="Worüber du eine Nachricht bekommst. Ein- und ausschalten kannst du Benachrichtigungen auf der Startseite direkt unter deiner Klasse."
+          description="Eine Nachricht aufs Handy, sobald sich der Plan für deine Klasse ändert, auch wenn die App geschlossen ist. Darunter: worüber du eine Nachricht bekommst."
         >
+          <NotificationControls {...notifications} />
           <div className="divide-y divide-line rounded-2xl border border-line bg-card">
             {NOTIFY_GROUPS.map((group) => (
               <Switch
