@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
-import { formatShortDate, isPastDate, relativeDayLabel } from "@/lib/format";
+import { formatDayMonth, formatShortDate, formatWeekday, isPastDate, relativeDayLabel } from "@/lib/format";
 import type { PlanDay } from "@/lib/types";
 
 /** Id of the element showing the selected day's entries. */
@@ -94,12 +94,12 @@ export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySe
             }`}
           >
             <span className="block text-sm font-semibold">
-              {relative ?? day.dayLabel ?? formatShortDate(day.date)}
+              {relative ?? day.dayLabel ?? formatWeekday(day.date)}
             </span>
             <span className={`block text-xs ${selected ? "text-white/80" : "text-muted"}`}>
               {/* "vorbei": a past day is not mistaken for the coming one. */}
               {/* The weekday is on the line above; short enough for narrow tabs. */}
-              {past && !relative ? `vorbei, ${formatShortDate(day.date).replace(/^\S+\s/, "")}` : formatShortDate(day.date)}
+              {past && !relative ? `vorbei, ${formatDayMonth(day.date)}` : formatShortDate(day.date)}
             </span>
             {count !== null ? (
               <span

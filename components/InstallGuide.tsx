@@ -2,7 +2,7 @@ import { useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   BROWSERS_BY_PLATFORM,
   BROWSER_NAMES,
-  currentBrowser,
+  cachedBrowser,
   type BrowserInfo,
   type BrowserName,
 } from "@/lib/device";
@@ -10,9 +10,6 @@ import { promptInstall, useCanPromptInstall } from "@/lib/install-prompt";
 
 const noSubscribe = () => () => undefined;
 
-// The browser does not change while the page is open; one object for React.
-let browserInfo: BrowserInfo | null = null;
-const getBrowser = () => (browserInfo ??= currentBrowser());
 
 const iconProps = {
   "aria-hidden": true,
@@ -368,7 +365,7 @@ function BrowserChoice({
  * symbols to look for.
  */
 export function InstallGuide() {
-  const detected = useSyncExternalStore(noSubscribe, getBrowser, () => null);
+  const detected = useSyncExternalStore(noSubscribe, cachedBrowser, () => null);
   const [chosen, setChosen] = useState<BrowserName | null>(null);
   // Once declined, the browser does not offer it again: the steps show then.
   const canPrompt = useCanPromptInstall();

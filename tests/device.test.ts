@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeBrowser } from "@/lib/device";
+import { describeBrowser, freshStartAfterInstall } from "@/lib/device";
 
 // Typical user agents (shortened where only the markers matter).
 const UA = {
@@ -64,5 +64,20 @@ describe("describeBrowser", () => {
 
   it("recognises an iPad, which reports itself as a Mac with touch", () => {
     expect(describeBrowser(UA.ipadAsMac, { touchMac: true })).toEqual({ platform: "ios", browser: "safari" });
+  });
+});
+
+describe("freshStartAfterInstall", () => {
+  it("knows where the installed app keeps its own storage", () => {
+    expect(freshStartAfterInstall({ platform: "ios", browser: "safari" })).toBe("app");
+    expect(freshStartAfterInstall({ platform: "ios", browser: "chrome" })).toBe("app");
+    expect(freshStartAfterInstall({ platform: "desktop", browser: "safari" })).toBe("app");
+    // In-app browsers hand over to the real browser first.
+    expect(freshStartAfterInstall({ platform: "ios", browser: "in-app" })).toBe("browser");
+    expect(freshStartAfterInstall({ platform: "android", browser: "in-app" })).toBe("browser");
+    // Shared storage: the installed app takes over the browser's choice.
+    expect(freshStartAfterInstall({ platform: "android", browser: "chrome" })).toBeNull();
+    expect(freshStartAfterInstall({ platform: "desktop", browser: "chrome" })).toBeNull();
+    expect(freshStartAfterInstall({ platform: "desktop", browser: "edge" })).toBeNull();
   });
 });

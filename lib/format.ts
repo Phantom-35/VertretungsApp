@@ -9,6 +9,24 @@ const planDateFormatter = new Intl.DateTimeFormat("de-DE", {
   month: "2-digit",
 });
 
+const dayMonthFormatter = new Intl.DateTimeFormat("de-DE", {
+  timeZone: "UTC",
+  day: "2-digit",
+  month: "2-digit",
+});
+
+const weekdayFormatter = new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", weekday: "long" });
+
+/** "08.10." */
+export function formatDayMonth(date: string) {
+  return dayMonthFormatter.format(new Date(`${date}T00:00:00Z`));
+}
+
+/** "Donnerstag" */
+export function formatWeekday(date: string) {
+  return weekdayFormatter.format(new Date(`${date}T00:00:00Z`));
+}
+
 const shortDateFormatter = new Intl.DateTimeFormat("de-DE", {
   timeZone: "UTC",
   weekday: "short",

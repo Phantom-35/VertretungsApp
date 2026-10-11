@@ -319,6 +319,8 @@ test.describe("first start", () => {
     // Steps for this browser (Chrome on a computer).
     await expect(intro.getByText("Seite als App installieren", { exact: true })).toBeVisible();
     await expect(intro.getByText(/Dort wählst du deine Klasse/)).toHaveCount(0);
+    await expect(intro.getByText("Danach geht es in der installierten App mit dieser Einführung weiter.")).toBeVisible();
+    await expect(intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" })).toBeInViewport();
     await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
 
     await expect(intro.getByRole("heading", { name: "Nichts mehr verpassen" })).toBeVisible();

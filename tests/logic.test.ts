@@ -11,7 +11,7 @@ import {
   getEntryKind,
   normalizeSelectedClass,
 } from "@/lib/entries";
-import { formatPlanDateLabel, isPastDate, relativeDayLabel } from "@/lib/format";
+import { formatDayMonth, formatPlanDateLabel, formatWeekday, isPastDate, relativeDayLabel } from "@/lib/format";
 import {
   daysBetween,
   pickDefaultDate,
@@ -361,5 +361,13 @@ describe("share text", () => {
       "1. Std. · Vertretung\nLehrer FCH → noch offen · Raum TU2",
     );
     expect(formatShareLine({ ...base, substitute: "???" }, "5A")).toBe("• 1. Std.: Vertretung · noch offen");
+  });
+});
+
+describe("day labels", () => {
+  it("formats day and month, and the weekday, without the time zone shifting them", () => {
+    expect(formatDayMonth("2026-10-08")).toBe("08.10.");
+    expect(formatWeekday("2026-10-08")).toBe("Donnerstag");
+    expect(formatDayMonth("2027-01-01")).toBe("01.01.");
   });
 });

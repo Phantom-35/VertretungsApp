@@ -105,3 +105,27 @@ export const BROWSERS_BY_PLATFORM: Record<BrowserPlatform, BrowserName[]> = {
   android: ["chrome", "samsung", "firefox", "edge", "brave", "opera", "in-app", "other"],
   desktop: ["chrome", "edge", "safari", "firefox", "brave", "opera", "other"],
 };
+
+let browserInfo: BrowserInfo | null = null;
+
+/** `currentBrowser()`, determined once: the browser does not change while the page is open. */
+export function cachedBrowser() {
+  return (browserInfo ??= currentBrowser());
+}
+
+/**
+ * Where someone continues after installing from this browser: "app" when the
+ * installed app keeps its own storage (iPhone/iPad, Safari on a Mac), so it
+ * starts afresh; "browser" from an in-app browser, which cannot install and
+ * hands over to the real browser, again with its own storage; null when the
+ * installed app shares the browser's storage (Android, Chrome, Edge …).
+ */
+export function freshStartAfterInstall(info: BrowserInfo): "app" | "browser" | null {
+  if (info.browser === "in-app") {
+    return "browser";
+  }
+  if (info.platform === "ios" || (info.platform === "desktop" && info.browser === "safari")) {
+    return "app";
+  }
+  return null;
+}

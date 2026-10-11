@@ -3,7 +3,7 @@ import { FadingStatus } from "@/components/FadingStatus";
 import { InstallGuide } from "@/components/InstallGuide";
 import { TeacherChooser } from "@/components/TeacherFilter";
 import type { PushControls } from "@/hooks/usePushNotifications";
-import { isIos, isStandalone } from "@/lib/device";
+import { cachedBrowser, freshStartAfterInstall, isStandalone } from "@/lib/device";
 import { SCHOOL_CLASSES, isCourseClass } from "@/lib/entries";
 
 type OnboardingProps = {
@@ -136,22 +136,21 @@ export function Onboarding({
 }: OnboardingProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const installed = useSyncExternalStore(noSubscribe, isStandalone, () => false);
-  // Only on iPhone/iPad the app on the home screen keeps its own storage:
-  // there it asks for the class again, elsewhere it takes over the browser's.
-  const separateAppStorage = useSyncExternalStore(noSubscribe, isIos, () => false);
+  const browser = useSyncExternalStore(noSubscribe, cachedBrowser, () => null);
+  // Where installing leads to a fresh start (own storage), it comes before the
+  // class: whoever installs right away chooses the class only once.
+  const freshStart = browser ? freshStartAfterInstall(browser) : null;
   const upperSchool = Boolean(myClass && isCourseClass(myClass));
   // Only the steps that apply: installing in the browser, courses in the
   // upper school, notifications where they can be switched on right here (on
   // an iPhone only in the installed app, which starts with this introduction).
-  // On an iPhone installing comes first: the installed app keeps its own
-  // storage, so whoever installs right away chooses the class only once.
-  const installFirst = !installed && separateAppStorage;
+  const install: Step[] = installed ? [] : ["install"];
   const steps: Step[] = [
     "welcome",
-    ...(installFirst ? (["install"] as const) : []),
+    ...(freshStart ? install : []),
     "class",
     ...(upperSchool ? (["courses"] as const) : []),
-    ...(!installed && !installFirst ? (["install"] as const) : []),
+    ...(freshStart ? [] : install),
     ...(push.status === "unavailable" || push.status === "install" ? [] : (["notifications"] as const)),
     "tips",
   ];
@@ -182,7 +181,9 @@ export function Onboarding({
       // Escape (or Android's back button) skips the introduction for good; but
       // not before the class step, so nobody ends up without a class unasked.
       onCancel={(event) => {
-        if (!myClass && index < steps.indexOf("class")) {
+        // Only where the browser lets the dialog stay open (it may not, e.g.
+        // after repeated back presses): otherwise it closes, so finish.
+        if (event.cancelable && !myClass && index < steps.indexOf("class")) {
           event.preventDefault();
           setStep("class");
           return;
@@ -382,12 +383,15 @@ export function Onboarding({
               <div className="mt-6 rounded-[1.4rem] border border-line bg-card p-4">
                 <InstallGuide />
               </div>
-              {separateAppStorage ? (
-                <p className="mt-3 text-xs leading-5 text-muted">
-                  Die installierte App startet mit dieser Einführung: Dort wählst du deine Klasse
-                  {push.status === "install" ? " und kannst Benachrichtigungen einschalten" : ""}.
-                </p>
-              ) : null}
+              <p className="mt-3 text-xs leading-5 text-muted">
+                {freshStart === "app"
+                  ? `Die installierte App startet mit dieser Einführung: Dort wählst du deine Klasse${
+                      push.status === "install" ? " und kannst Benachrichtigungen einschalten" : ""
+                    }.`
+                  : freshStart === "browser"
+                    ? "Im Browser startet diese Einführung von vorn: Dort wählst du deine Klasse."
+                    : "Danach geht es in der installierten App mit dieser Einführung weiter."}
+              </p>
             </div>
             {/* Always in sight: the steps above fill the screen. */}
             <div className="sticky bottom-0 -mx-5 mt-6 border-t border-line bg-background/95 px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
