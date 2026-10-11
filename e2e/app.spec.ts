@@ -108,6 +108,24 @@ test("says when the next plan is not online yet, and marks past days", async ({ 
   await expect(page.getByRole("tab").nth(1)).toContainText("Gestern");
 });
 
+test("shows the next school day as not online yet, instead of no changes", async ({ page }) => {
+  // Friday; the saved plan has Thursday and Friday, not yet Monday.
+  await page.clock.setFixedTime(new Date("2026-10-09T10:00:00+02:00"));
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const pending = page.getByRole("tab", { name: /Montag/ });
+  await expect(pending).toContainText("noch nicht da");
+  await pending.click();
+  await expect(page.getByText("Plan für Montag noch nicht online")).toBeVisible();
+  await expect(page.getByText("Die Schule hat den Plan für Mo., 12.10. noch nicht hochgeladen.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Keine Änderungen", { exact: true })).toHaveCount(0);
+  await expect(page.locator("article")).toHaveCount(0);
+  // After school the default is the next school day: here, the pending one.
+  await page.clock.setFixedTime(new Date("2026-10-09T17:00:00+02:00"));
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("noch nicht da");
+});
+
 test("shows a public holiday instead of an old plan", async ({ page }) => {
   // Christi Himmelfahrt 2027 (Thursday); the saved plan is from 08./09.10.2026.
   await page.clock.setFixedTime(new Date("2027-05-06T09:00:00+02:00"));

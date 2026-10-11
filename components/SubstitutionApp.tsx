@@ -35,12 +35,12 @@ import {
   isCourseClass,
   normalizeTeacher,
 } from "@/lib/entries";
-import { formatAge, formatPlanDateLabel, formatShortDate, formatTimestamp, isPastDate } from "@/lib/format";
-import { holidayBreak } from "@/lib/holidays";
+import { formatAge, formatPlanDateLabel, formatShortDate, formatTimestamp, formatWeekday, isPastDate } from "@/lib/format";
+import { holidayBreak, nextSchoolDay } from "@/lib/holidays";
 import { entryKey, findNewKeys } from "@/lib/seen";
 import { buildShareText } from "@/lib/share";
 import { pickDefaultDate, schoolToday } from "@/lib/time";
-import type { SubstitutionPayload } from "@/lib/types";
+import type { PlanDay, SubstitutionPayload } from "@/lib/types";
 
 type SubstitutionAppProps = {
   initialData: SubstitutionPayload | null;
@@ -204,17 +204,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   }, [chooseDate]);
 
   const days = data?.days ?? [];
-  // Keep the user's choice while it is still part of the plan.
-  const selectedDate = days.some((day) => day.date === requestedDate)
-    ? requestedDate
-    : pickDefaultDate(
-        days.map((day) => day.date),
-        // Decided when the app is opened, not on every tick: at 16:00 the
-        // view does not jump to tomorrow while the user is reading.
-        opened?.last ?? now,
-        settings.nextDayFromHour,
-      );
-  const selectedDay = days.find((day) => day.date === selectedDate) ?? null;
   const latestDate = days.at(-1)?.date ?? null;
   const planIsPast = latestDate !== null && isPastDate(latestDate, now);
 
@@ -223,6 +212,28 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const today = now !== null ? schoolToday(now) : null;
   const holiday = today !== null ? holidayBreak(today) : null;
   const planAhead = today !== null && days.some((day) => day.date >= today);
+  // The next school day, when the school has not published it yet: shown as
+  // a pale extra tab, so "no changes" is not mistaken for "no plan yet".
+  const upcoming = today !== null ? nextSchoolDay(today) : null;
+  const pendingDate =
+    planAhead && upcoming !== null && !days.some((day) => day.date === upcoming) ? upcoming : null;
+  const tabDays: PlanDay[] = pendingDate
+    ? [...days, { date: pendingDate, dayLabel: formatWeekday(pendingDate), weekLabel: null }].sort(
+        (left, right) => left.date.localeCompare(right.date),
+      )
+    : days;
+  // Keep the user's choice while it is still part of the plan.
+  const selectedDate = tabDays.some((day) => day.date === requestedDate)
+    ? requestedDate
+    : pickDefaultDate(
+        tabDays.map((day) => day.date),
+        // Decided when the app is opened, not on every tick: at 16:00 the
+        // view does not jump to tomorrow while the user is reading.
+        opened?.last ?? now,
+        settings.nextDayFromHour,
+      );
+  const showsPendingDay = selectedDate !== null && selectedDate === pendingDate;
+  const selectedDay = days.find((day) => day.date === selectedDate) ?? null;
   const [showOldPlan, setShowOldPlan] = useState(false);
   const holidayMode = Boolean(holiday && !planAhead && !showOldPlan);
 
@@ -246,6 +257,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     ? holiday.from === holiday.to || holiday.kind === "public-holiday"
       ? holiday.name
       : `${holiday.name} bis ${formatShortDate(holiday.to)}`
+    : showsPendingDay && pendingDate
+    ? formatPlanDateLabel(pendingDate, now)
     : selectedDay
     ? formatPlanDateLabel(selectedDay.date, now)
     : isBusy
@@ -411,13 +424,14 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             </p>
           ) : null}
 
-          {!holidayMode && days.length > 1 && selectedDate ? (
+          {!holidayMode && tabDays.length > 1 && selectedDate ? (
             <DaySelector
-              days={days}
+              days={tabDays}
               selectedDate={selectedDate}
               onChange={chooseDate}
               counts={countsByDate}
               now={now}
+              pendingDate={pendingDate}
             />
           ) : null}
 
@@ -425,7 +439,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
 
           {/* Read out after switching day or class: a short summary, not the whole list. */}
           <p role="status" className="sr-only">
-            {!holidayMode && data && selectedClass && selectedDay
+            {showsPendingDay
+              ? `${dateLabel}: Plan noch nicht online`
+              : !holidayMode && data && selectedClass && selectedDay
               ? `${selectedClass}, ${dateLabel}: ${
                   visibleEntries.length === 0
                     ? "keine Änderungen"
@@ -438,7 +454,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
 
           <section
             className="space-y-4"
-            {...(days.length > 1 && selectedDate
+            {...(tabDays.length > 1 && selectedDate
               ? { id: DAY_PANEL_ID, role: "tabpanel", "aria-labelledby": dayTabId(selectedDate) }
               : {})}
           >
@@ -478,7 +494,20 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               </div>
             ) : null}
 
-            {!holidayMode && data && selectedClass ? (
+            {showsPendingDay && pendingDate ? (
+              <div className={cardClassName}>
+                <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
+                  Plan für {formatWeekday(pendingDate)} noch nicht online
+                </p>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  Die Schule hat den Plan für {formatShortDate(pendingDate)} noch nicht hochgeladen. Er
+                  erscheint hier automatisch, sobald er da ist
+                  {push.status === "on" ? " – bei Änderungen bekommst du eine Benachrichtigung." : "."}
+                </p>
+              </div>
+            ) : null}
+
+            {!holidayMode && !showsPendingDay && data && selectedClass ? (
               <DaySummary
                 entries={visibleEntries}
                 newCount={newKeys.size}
@@ -489,7 +518,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               />
             ) : null}
 
-            {!holidayMode && data && selectedClass ? (
+            {!holidayMode && !showsPendingDay && data && selectedClass ? (
               visibleEntries.length > 0 ? (
                 // Many changes (e.g. the upper school): smaller cards, closer together.
                 <div className={compactCards ? "space-y-2.5" : "space-y-4"}>

@@ -156,3 +156,16 @@ export function holidayBreak(date: string, holidays: readonly Holiday[] = NRW_HO
     backOn,
   };
 }
+
+/**
+ * The next day with school after `date`: not a weekend, not in the school
+ * holidays, not a public holiday.
+ */
+export function nextSchoolDay(date: string, holidays: readonly Holiday[] = NRW_HOLIDAYS) {
+  let day = addDays(date, 1);
+  // A year at most, in case the holiday data were ever inconsistent.
+  for (let tries = 0; tries < 366 && (isWeekend(day) || holidayBreak(day, holidays)); tries += 1) {
+    day = addDays(day, 1);
+  }
+  return day;
+}

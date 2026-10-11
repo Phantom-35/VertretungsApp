@@ -16,9 +16,11 @@ type DaySelectorProps = {
   /** Number of changes for the selected class per date; omitted without a class. */
   counts: Map<string, number> | null;
   now: number | null;
+  /** The next school day, not yet published by the school: a pale extra tab. */
+  pendingDate?: string | null;
 };
 
-export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySelectorProps) {
+export function DaySelector({ days, selectedDate, onChange, counts, now, pendingDate = null }: DaySelectorProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
   // With many days the selected one can be outside the visible strip; scroll
@@ -72,7 +74,8 @@ export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySe
       {days.map((day) => {
         const selected = day.date === selectedDate;
         const past = isPastDate(day.date, now);
-        const count = counts?.get(day.date) ?? null;
+        const pending = day.date === pendingDate;
+        const count = pending ? null : (counts?.get(day.date) ?? null);
         const relative = relativeDayLabel(day.date, now);
 
         return (
@@ -87,19 +90,27 @@ export function DaySelector({ days, selectedDate, onChange, counts, now }: DaySe
             onClick={() => onChange(day.date)}
             className={`relative rounded-[1.1rem] px-2 py-2.5 text-center transition ${
               selected
-                ? "bg-accent text-white shadow-[0_8px_20px_rgba(31,107,103,0.25)]"
-                : past
-                  ? "text-muted"
-                  : "text-foreground"
+                ? pending
+                  ? "border border-dashed border-accent bg-accent-soft text-accent-strong"
+                  : "bg-accent text-white shadow-[0_8px_20px_rgba(31,107,103,0.25)]"
+                : pending
+                  ? "border border-dashed border-line text-muted"
+                  : past
+                    ? "text-muted"
+                    : "text-foreground"
             }`}
           >
             <span className="block text-sm font-semibold">
               {relative ?? day.dayLabel ?? formatWeekday(day.date)}
             </span>
-            <span className={`block text-xs ${selected ? "text-white/80" : "text-muted"}`}>
+            <span className={`block text-xs ${selected && !pending ? "text-white/80" : "text-muted"}`}>
               {/* "vorbei": a past day is not mistaken for the coming one. */}
               {/* The weekday is on the line above; short enough for narrow tabs. */}
-              {past && !relative ? `vorbei, ${formatDayMonth(day.date)}` : formatShortDate(day.date)}
+              {pending
+                ? "noch nicht da"
+                : past && !relative
+                  ? `vorbei, ${formatDayMonth(day.date)}`
+                  : formatShortDate(day.date)}
             </span>
             {count !== null ? (
               <span

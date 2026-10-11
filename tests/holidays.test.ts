@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NRW_HOLIDAYS, easterSunday, holidayBreak, publicHolidayName } from "@/lib/holidays";
+import { NRW_HOLIDAYS, easterSunday, holidayBreak, nextSchoolDay, publicHolidayName } from "@/lib/holidays";
 
 describe("holidayBreak", () => {
   it("covers the autumn holidays 2026 and the weekend after them", () => {
@@ -94,5 +94,14 @@ describe("public holidays", () => {
     expect(holidayBreak("2027-03-29")).toMatchObject({ name: "Osterferien", kind: "holidays" });
     // Pfingstferien 2027 (Tuesday) follow Pfingstmontag and the weekend.
     expect(holidayBreak("2027-05-15")).toMatchObject({ name: "Pfingstferien", backOn: "2027-05-19" });
+  });
+});
+
+describe("nextSchoolDay", () => {
+  it("skips weekends, school holidays and public holidays", () => {
+    expect(nextSchoolDay("2026-10-08")).toBe("2026-10-09"); // Thursday -> Friday
+    expect(nextSchoolDay("2026-10-09")).toBe("2026-10-12"); // Friday -> Monday
+    expect(nextSchoolDay("2026-10-16")).toBe("2026-11-02"); // before the autumn holidays
+    expect(nextSchoolDay("2027-05-05")).toBe("2027-05-07"); // over Christi Himmelfahrt
   });
 });
