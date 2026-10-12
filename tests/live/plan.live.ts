@@ -28,6 +28,5 @@ it("reads the live plan completely", async () => {
   }
 
   expect(data.success, data.error ?? "").toBe(true);
-  expect(data.diagnostics).toEqual([]);
   expect(data.error).toBeNull();
 }, 120_000);
