@@ -1055,3 +1055,58 @@ test("smooth scrolling: no blocking touch listener, pull to refresh still works"
   await forced;
   await context.close();
 });
+
+/** Position of the two column groups and the settings dialog at one window size. */
+async function layoutAt(page: Page, width: number, height: number) {
+  await page.setViewportSize({ width, height });
+  return page.evaluate(() => {
+    const box = (selector: string) => {
+      const rect = document.querySelector(selector)!.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, right: rect.right, width: rect.width };
+    };
+    return {
+      aside: getComputedStyle(document.querySelector(".app-aside")!).display,
+      header: box("header, main h1"),
+      days: box('[role="tablist"]'),
+      cards: getComputedStyle(document.querySelector("#day-panel > div:last-child")!).display,
+    };
+  });
+}
+
+test("large screens: two columns, phones keep the single column", async ({ page }) => {
+  await page.goto("/");
+  await chooseClass(page, "Q1");
+
+  // Phones, also in landscape, and a tablet held upright: one column as before.
+  for (const [width, height] of [[390, 844], [932, 430], [820, 1180], [1366, 599]]) {
+    const layout = await layoutAt(page, width, height);
+    expect(layout.aside, `${width}x${height}`).toBe("contents");
+    expect(layout.days.top, `${width}x${height}`).toBeGreaterThan(layout.header.top);
+    expect(layout.cards, `${width}x${height}`).toBe("block");
+  }
+
+  // Tablet in landscape: the day tabs sit next to the header, cards in one column.
+  const tablet = await layoutAt(page, 1180, 820);
+  expect(tablet.aside).toBe("flex");
+  expect(tablet.days.left).toBeGreaterThan(tablet.header.right);
+  expect(tablet.cards).toBe("block");
+
+  // Computer: the same, with two columns of cards as wide as on a phone.
+  const computer = await layoutAt(page, 1440, 900);
+  expect(computer.days.left).toBeGreaterThan(computer.header.right);
+  expect(computer.cards).toBe("grid");
+  const columns = await page.locator("#day-panel > div:last-child").evaluate(
+    (element) => getComputedStyle(element).gridTemplateColumns.split(" ").map(parseFloat),
+  );
+  expect(columns).toHaveLength(2);
+  expect(Math.min(...columns)).toBeGreaterThan(300);
+
+  // The settings open as a dialog in the middle, not as a sheet at the bottom.
+  await page.getByRole("button", { name: "Einstellungen" }).click();
+  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  await settled(dialog);
+  const sheet = (await dialog.boundingBox())!;
+  expect(Math.abs(sheet.x + sheet.width / 2 - 720)).toBeLessThan(2);
+  expect(sheet.y).toBeGreaterThan(20);
+  expect(900 - (sheet.y + sheet.height)).toBeGreaterThan(20);
+});

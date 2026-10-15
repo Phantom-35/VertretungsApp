@@ -361,51 +361,54 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       <PwaRegistrar />
       <PullToRefresh onRefresh={forceRefresh}>
         <main
-          className={`${opening ? "app-enter " : ""}mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-5`}
+          className={`${opening ? "app-enter " : ""}mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-5 wide:grid wide:max-w-6xl wide:grid-cols-[22rem_minmax(0,1fr)] wide:content-start wide:items-start wide:gap-x-8 wide:px-8 wide:pb-10 wide:pt-8`}
         >
-          <Header
-            selectedClass={selectedClass}
-            dateLabel={dateLabel}
-            weekLabel={holidayMode ? null : (selectedDay?.weekLabel ?? null)}
-            dateIsPast={!holidayMode && selectedDate !== null && isPastDate(selectedDate, now)}
-            sourceUpdatedLabel={formatTimestamp(data?.sourceUpdatedAt ?? null, now)}
-            fetchedLabel={
-              data?.lastUpdated ? formatAge(data.lastUpdated, now) : "noch nie"
-            }
-            status={headerStatus}
-            onOpenSettings={() => openSettings()}
-          />
+          {/* Two columns on large screens; on phones these groups do not
+              exist for the layout (display: contents) and nothing changes. */}
+          <div className="app-group app-aside contents wide:flex wide:flex-col wide:gap-4">
+            <Header
+              selectedClass={selectedClass}
+              dateLabel={dateLabel}
+              weekLabel={holidayMode ? null : (selectedDay?.weekLabel ?? null)}
+              dateIsPast={!holidayMode && selectedDate !== null && isPastDate(selectedDate, now)}
+              sourceUpdatedLabel={formatTimestamp(data?.sourceUpdatedAt ?? null, now)}
+              fetchedLabel={
+                data?.lastUpdated ? formatAge(data.lastUpdated, now) : "noch nie"
+              }
+              status={headerStatus}
+              onOpenSettings={() => openSettings()}
+            />
 
-          {/* Not during the introduction, which has its own install step. */}
-          {onboarding.done ? <InstallReminder /> : null}
+            {/* Not during the introduction, which has its own install step. */}
+            {onboarding.done ? <InstallReminder /> : null}
 
-          <ClassSelector
-            classes={SCHOOL_CLASSES}
-            selectedClass={selectedClass}
-            onChange={chooseClass}
-            viewingOther={Boolean(viewedClass && myClass && viewedClass !== myClass)}
-          >
-            {usesCourseFilter && selectedClass ? (
-              <TeacherHint
-                schoolClass={selectedClass}
-                selected={storedTeachers}
-                onOpenSettings={() => openSettings("teachers")}
-              />
-            ) : null}
-            {viewedClass && myClass && viewedClass !== myClass ? (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
-                {/* With large text on a narrow phone the button moves below the text. */}
-                <p className="min-w-[11rem] flex-1 text-sm leading-5 text-muted">
-                  Nur angesehen. Beim nächsten Öffnen und für Benachrichtigungen gilt weiter die{" "}
-                  <span className="font-semibold text-foreground">{myClass}</span>.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => chooseClass(myClass)}
-                  className="tap-target shrink-0 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-accent-strong"
-                >
-                  Zurück zur {myClass}
-                </button>
+            <ClassSelector
+              classes={SCHOOL_CLASSES}
+              selectedClass={selectedClass}
+              onChange={chooseClass}
+              viewingOther={Boolean(viewedClass && myClass && viewedClass !== myClass)}
+            >
+              {usesCourseFilter && selectedClass ? (
+                <TeacherHint
+                  schoolClass={selectedClass}
+                  selected={storedTeachers}
+                  onOpenSettings={() => openSettings("teachers")}
+                />
+              ) : null}
+              {viewedClass && myClass && viewedClass !== myClass ? (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+                  {/* With large text on a narrow phone the button moves below the text. */}
+                  <p className="min-w-[11rem] flex-1 text-sm leading-5 text-muted">
+                    Nur angesehen. Beim nächsten Öffnen und für Benachrichtigungen gilt weiter die{" "}
+                    <span className="font-semibold text-foreground">{myClass}</span>.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => chooseClass(myClass)}
+                    className="tap-target shrink-0 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-accent-strong"
+                  >
+                    Zurück zur {myClass}
+                  </button>
               </div>
             ) : null}
             <NotificationSettings
@@ -430,133 +433,139 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               onRetry={() => void forceRefresh()}
             />
           ) : null}
+          </div>
 
-          {headerStatus === "waiting" && !showsPendingDay ? (
-            <p className="rounded-[1.4rem] border border-line bg-card px-4 py-3 text-sm leading-6 text-muted">
-              Der nächste Plan ist noch nicht online. Bis die Schule ihn hochlädt, siehst du hier
-              den letzten Plan.
-            </p>
-          ) : null}
-
-          {!holidayMode && tabDays.length > 1 && selectedDate ? (
-            <DaySelector
-              days={tabDays}
-              selectedDate={selectedDate}
-              onChange={chooseDate}
-              counts={countsByDate}
-              now={now}
-              pendingDate={pendingDate}
-            />
-          ) : null}
-
-          {!holidayMode ? <NoticesCard notices={visibleNotices} /> : null}
-
-          {/* Read out after switching day or class: a short summary, not the whole list. */}
-          <p role="status" className="sr-only">
-            {showsPendingDay
-              ? `${dateLabel}: Plan noch nicht online`
-              : !holidayMode && data && selectedClass && selectedDay
-              ? `${selectedClass}, ${dateLabel}: ${
-                  visibleEntries.length === 0
-                    ? "keine Änderungen"
-                    : visibleEntries.length === 1
-                      ? "1 Änderung"
-                      : `${visibleEntries.length} Änderungen`
-                }`
-              : ""}
-          </p>
-
-          <section
-            className="space-y-4"
-            {...(tabDays.length > 1 && selectedDate
-              ? { id: DAY_PANEL_ID, role: "tabpanel", "aria-labelledby": dayTabId(selectedDate) }
-              : {})}
-          >
-            {!data && isBusy ? <LoadingState /> : null}
-
-            {holidayMode && holiday && selectedClass !== null ? (
-              <HolidayCard holiday={holiday} today={today} hasOldPlan={days.length > 0} onShowOldPlan={() => setShowOldPlan(true)} />
+          <div className="app-group app-content contents wide:flex wide:min-w-0 wide:flex-col wide:gap-4">
+            {headerStatus === "waiting" && !showsPendingDay ? (
+              <p className="rounded-[1.4rem] border border-line bg-card px-4 py-3 text-sm leading-6 text-muted">
+                Der nächste Plan ist noch nicht online. Bis die Schule ihn hochlädt, siehst du hier
+                den letzten Plan.
+              </p>
             ) : null}
 
-            {!data && !isBusy ? (
-              <div className="rounded-[1.75rem] border border-warn/15 bg-warn-soft p-6 text-center">
-                <p className="text-lg font-semibold text-warn">
-                  Vertretungsplan momentan nicht erreichbar.
-                </p>
-                <p className="mt-2 text-sm leading-6 text-warn">
-                  {connectionError ?? "Bitte versuche es in ein paar Minuten erneut."}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void forceRefresh()}
-                  className="mt-4 rounded-full bg-warn px-5 py-2 text-sm font-semibold text-on-warn"
-                >
-                  Erneut versuchen
-                </button>
-              </div>
-            ) : null}
-
-            {data && selectedClass === null ? (
-              <div className={cardClassName}>
-                <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
-                  Wähle deine Klasse
-                </p>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  Dann siehst du hier nur die Vertretungen, die dich betreffen.
-                  Die Auswahl wird auf diesem Gerät gespeichert.
-                </p>
-              </div>
-            ) : null}
-
-            {showsPendingDay && pendingDate ? (
-              <div className={cardClassName}>
-                <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
-                  Plan für {formatWeekday(pendingDate)} noch nicht online
-                </p>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  Die Schule hat den Plan für {formatShortDate(pendingDate)} noch nicht hochgeladen. Er
-                  erscheint hier automatisch, sobald er da ist
-                  {push.status === "on" ? " – bei Änderungen bekommst du eine Benachrichtigung." : "."}
-                </p>
-              </div>
-            ) : null}
-
-            {!holidayMode && !showsPendingDay && data && selectedClass ? (
-              <DaySummary
-                entries={visibleEntries}
-                newCount={newKeys.size}
-                otherCourses={otherCourseCount}
-                showingOtherCourses={showOtherCourses}
-                onToggleOtherCourses={() => setShowOtherCourses((value) => !value)}
-                getShareText={getShareText}
+            {!holidayMode && tabDays.length > 1 && selectedDate ? (
+              <DaySelector
+                days={tabDays}
+                selectedDate={selectedDate}
+                onChange={chooseDate}
+                counts={countsByDate}
+                now={now}
+                pendingDate={pendingDate}
               />
             ) : null}
 
-            {!holidayMode && !showsPendingDay && data && selectedClass ? (
-              visibleEntries.length > 0 ? (
-                // Many changes (e.g. the upper school): smaller cards, closer together.
-                <div className={compactCards ? "space-y-2.5" : "space-y-4"}>
-                  {visibleEntries.map((entry, index) => (
-                    <SubstitutionCard
-                      key={cardKeys[index]}
-                      entry={entry}
-                      isNew={newKeys.has(entryKey(entry))}
-                      onNewSeen={() => acknowledgeNewEntry(entryKey(entry))}
-                      showClassName={formatClassName(entry.className) !== selectedClass}
-                      compact={compactCards}
-                    />
-                  ))}
+            {!holidayMode ? <NoticesCard notices={visibleNotices} /> : null}
+
+            {/* Read out after switching day or class: a short summary, not the whole list. */}
+            <p role="status" className="sr-only">
+              {showsPendingDay
+                ? `${dateLabel}: Plan noch nicht online`
+                : !holidayMode && data && selectedClass && selectedDay
+                ? `${selectedClass}, ${dateLabel}: ${
+                    visibleEntries.length === 0
+                      ? "keine Änderungen"
+                      : visibleEntries.length === 1
+                        ? "1 Änderung"
+                        : `${visibleEntries.length} Änderungen`
+                  }`
+                : ""}
+            </p>
+
+            <section
+              className="space-y-4"
+              {...(tabDays.length > 1 && selectedDate
+                ? { id: DAY_PANEL_ID, role: "tabpanel", "aria-labelledby": dayTabId(selectedDate) }
+                : {})}
+            >
+              {!data && isBusy ? <LoadingState /> : null}
+
+              {holidayMode && holiday && selectedClass !== null ? (
+                <HolidayCard holiday={holiday} today={today} hasOldPlan={days.length > 0} onShowOldPlan={() => setShowOldPlan(true)} />
+              ) : null}
+
+              {!data && !isBusy ? (
+                <div className="rounded-[1.75rem] border border-warn/15 bg-warn-soft p-6 text-center">
+                  <p className="text-lg font-semibold text-warn">
+                    Vertretungsplan momentan nicht erreichbar.
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-warn">
+                    {connectionError ?? "Bitte versuche es in ein paar Minuten erneut."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void forceRefresh()}
+                    className="mt-4 rounded-full bg-warn px-5 py-2 text-sm font-semibold text-on-warn"
+                  >
+                    Erneut versuchen
+                  </button>
                 </div>
-              ) : (
-                <EmptyDay
-                  selectedClass={selectedClass}
-                  dayLabel={emptyDayLabel}
-                  filtered={teachers.length > 0 && !showOtherCourses}
+              ) : null}
+
+              {data && selectedClass === null ? (
+                <div className={cardClassName}>
+                  <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
+                    Wähle deine Klasse
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted">
+                    Dann siehst du hier nur die Vertretungen, die dich betreffen.
+                    Die Auswahl wird auf diesem Gerät gespeichert.
+                  </p>
+                </div>
+              ) : null}
+
+              {showsPendingDay && pendingDate ? (
+                <div className={cardClassName}>
+                  <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
+                    Plan für {formatWeekday(pendingDate)} noch nicht online
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted">
+                    Die Schule hat den Plan für {formatShortDate(pendingDate)} noch nicht hochgeladen. Er
+                    erscheint hier automatisch, sobald er da ist
+                    {push.status === "on" ? " – bei Änderungen bekommst du eine Benachrichtigung." : "."}
+                  </p>
+                </div>
+              ) : null}
+
+              {!holidayMode && !showsPendingDay && data && selectedClass ? (
+                <DaySummary
+                  entries={visibleEntries}
+                  newCount={newKeys.size}
+                  otherCourses={otherCourseCount}
+                  showingOtherCourses={showOtherCourses}
+                  onToggleOtherCourses={() => setShowOtherCourses((value) => !value)}
                   getShareText={getShareText}
                 />
-              )
-            ) : null}
-          </section>
+              ) : null}
+
+              {!holidayMode && !showsPendingDay && data && selectedClass ? (
+                visibleEntries.length > 0 ? (
+                  // Many changes (e.g. the upper school): smaller cards, closer together.
+                  // Very large screens: two columns of cards, each as wide as on a phone.
+                  <div
+                    className={`${compactCards ? "space-y-2.5 wide-xl:gap-2.5" : "space-y-4 wide-xl:gap-4"} wide-xl:grid wide-xl:grid-cols-2 wide-xl:space-y-0`}
+                  >
+                    {visibleEntries.map((entry, index) => (
+                      <SubstitutionCard
+                        key={cardKeys[index]}
+                        entry={entry}
+                        isNew={newKeys.has(entryKey(entry))}
+                        onNewSeen={() => acknowledgeNewEntry(entryKey(entry))}
+                        showClassName={formatClassName(entry.className) !== selectedClass}
+                        compact={compactCards}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyDay
+                    selectedClass={selectedClass}
+                    dayLabel={emptyDayLabel}
+                    filtered={teachers.length > 0 && !showOtherCourses}
+                    getShareText={getShareText}
+                  />
+                )
+              ) : null}
+            </section>
+          </div>
 
         </main>
       </PullToRefresh>

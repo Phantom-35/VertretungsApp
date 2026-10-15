@@ -288,12 +288,13 @@ export function SettingsSheet({
           onClose();
         }
       }}
-      className="settings-sheet fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[85dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-b-0 border-line bg-background p-0 text-foreground shadow-[0_-18px_45px_rgba(18,41,39,0.18)] backdrop:bg-black/40"
+      className="settings-sheet fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[85dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-b-0 border-line bg-background p-0 text-foreground shadow-[0_-18px_45px_rgba(18,41,39,0.18)] backdrop:bg-black/40 wide:inset-0 wide:m-auto wide:h-fit wide:max-w-lg wide:rounded-[1.75rem] wide:border-b wide:shadow-[0_24px_60px_rgba(18,41,39,0.25)]"
     >
       <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         {/* Stays visible while scrolling; swiping it down always closes the sheet. */}
         <div data-sheet-header className="sticky top-0 z-10 -mx-5 mb-1 bg-background px-5 pb-3 pt-3">
-          <div aria-hidden className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line" />
+          {/* The handle belongs to the sheet on phones, not to the dialog on large screens. */}
+          <div aria-hidden className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line wide:hidden" />
           <div className="flex items-center justify-between gap-3">
             <h2 id="settings-title" className="text-xl font-semibold tracking-[-0.03em]">
               Einstellungen

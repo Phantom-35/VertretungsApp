@@ -201,9 +201,10 @@ export function Onboarding({
         }
         onFinish();
       }}
-      className="onboarding fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto border-0 outline-none overscroll-contain bg-background p-0 text-foreground backdrop:bg-background"
+      className="onboarding fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto border-0 outline-none overscroll-contain bg-background p-0 text-foreground backdrop:bg-background wide:open:flex wide:open:flex-col wide:px-8 wide:py-8"
     >
-      <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
+      {/* Large screens: a card in the middle instead of a strip over the whole height. */}
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] wide:my-auto wide:min-h-[min(44rem,100%)] wide:max-w-lg wide:shrink-0 wide:rounded-[2rem] wide:border wide:border-line wide:bg-card wide:px-8 wide:py-8 wide:shadow-[0_18px_45px_rgba(18,41,39,0.1)]">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-accent-strong/85">
             KAG Vertretungsplan
