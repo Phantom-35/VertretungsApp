@@ -371,6 +371,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
           connectionError={connectionError}
           status={headerStatus}
           opening={opening}
+          showInstallReminder={onboarding.done}
           onRefresh={() => void forceRefresh()}
           onOpenSettings={openSettings}
           selectedClass={selectedClass}

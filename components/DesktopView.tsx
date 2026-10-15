@@ -55,6 +55,8 @@ export type DesktopViewProps = {
   status: HeaderStatus;
   /** Plays the opening animation (the same as on phones). */
   opening: boolean;
+  /** Not during the introduction, which has its own install step (as on phones). */
+  showInstallReminder: boolean;
   onRefresh: () => void;
   onOpenSettings: (focus?: SettingsFocus) => void;
   selectedClass: string | null | undefined;
@@ -168,7 +170,7 @@ export function DesktopView(props: DesktopViewProps) {
             onRetry={props.onRefresh}
           />
         ) : null}
-        <InstallReminder />
+        {props.showInstallReminder ? <InstallReminder /> : null}
         {props.waiting ? (
           <p className="rounded-[1.4rem] border border-line bg-card px-5 py-3 text-sm leading-6 text-muted">
             Der nächste Plan ist noch nicht online. Bis die Schule ihn hochlädt, siehst du hier den

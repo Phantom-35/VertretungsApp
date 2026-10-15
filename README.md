@@ -40,7 +40,7 @@ QR-Code zur App, der sich als Aushang drucken lässt.
 | --- | --- | --- |
 | Plan lesen | `lib/scraper.ts`, `lib/parser.ts`, `lib/cache.ts` | Lädt alle Untis-Seiten, liest Tage, Einträge und Mitteilungen, prüft das Ergebnis auf Plausibilität. Ist die Schulseite nicht erreichbar, wird der zuletzt gelesene Plan mit einem Hinweis gezeigt. |
 | Schnittstelle | `app/api/substitution` | Liefert den gelesenen Plan an die App. |
-| Oberfläche | `app/page.tsx`, `components/`, `hooks/` | Startseite mit Tagesauswahl, Einstellungen, Einführung. |
+| Oberfläche | `app/page.tsx`, `components/`, `hooks/` | Startseite mit Tagesauswahl, Einstellungen, Einführung. Auf großen Bildschirmen (PC, Mac, iPad quer) eine eigene Ansicht mit allen Tagen nebeneinander (`components/DesktopView.tsx`); die Handy-Ansicht bleibt davon unberührt. |
 | Offline und Updates | `public/sw.js`, `components/PwaRegistrar.tsx` | Der Service Worker öffnet die App sofort aus dem Speicher und lädt im Hintergrund die neue Version. Gibt es ein neues Deployment, lädt die App sich neu, sobald das nicht stört (direkt nach dem Öffnen oder beim Verlassen). |
 | Ferien und Feiertage | `lib/holidays.ts` | NRW-Ferien und Feiertage, siehe [Pflege](#pflege). |
 | Benachrichtigungen | `lib/push/`, `app/api/push/` | Vergleicht den Plan mit dem letzten Stand und schickt Mitteilungen, siehe unten. |
