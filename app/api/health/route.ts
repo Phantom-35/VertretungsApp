@@ -45,7 +45,9 @@ export async function GET() {
     if (payload.stale) {
       problems.push(`Schulseite nicht erreichbar: ${payload.error ?? "unbekannter Fehler"}`);
     }
-    problems.push(...payload.diagnostics);
+    // Only real findings of the self-check (they are also warnings); notes such
+    // as a single all-day row do not make the plan incomplete.
+    problems.push(...payload.diagnostics.filter((item) => payload.warnings.includes(item)));
     if (!payload.stale && payload.error) {
       problems.push(...payload.warnings);
     }
@@ -61,6 +63,8 @@ export async function GET() {
     {
       ok: unique.length === 0,
       problems: unique,
+      // For information only, they do not change the status.
+      notes: payload.diagnostics.filter((item) => !payload.warnings.includes(item)),
       sourceUpdatedAt: payload.sourceUpdatedAt,
       lastSuccessfulUpdate: payload.lastSuccessfulUpdate,
       fetchedPages: payload.fetchedPages,

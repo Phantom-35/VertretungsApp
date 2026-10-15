@@ -56,6 +56,28 @@ describe("GET /api/health", () => {
     expect(body.problems).toEqual([problem]);
   });
 
+  it("lists harmless notes without failing", async () => {
+    const note = "Seite 4: 1 Einträge ohne gültige Klasse oder Stunde.";
+    const { status, body } = await health(payload({ diagnostics: [note] }));
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ ok: true, problems: [], notes: [note] });
+  });
+
+  it("still reports real problems next to notes", async () => {
+    const problem = "Seite 2: Tabellenformat nicht erkannt.";
+    const note = "Seite 4: Unbekannte Spalte „x“ wird nicht angezeigt.";
+    const { status, body } = await health(
+      payload({
+        diagnostics: [problem, note],
+        warnings: [problem],
+        error: "Der Plan konnte nicht vollständig gelesen werden.",
+      }),
+    );
+    expect(status).toBe(503);
+    expect(body.problems).toEqual([problem]);
+    expect(body.notes).toEqual([note]);
+  });
+
   it("reports when the push check has not run for a while", async () => {
     const recent = await health(payload({}), new Date(Date.now() - 5 * 60_000).toISOString());
     expect(recent.status).toBe(200);
