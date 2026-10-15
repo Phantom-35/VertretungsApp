@@ -60,6 +60,16 @@ Repository arbeitet. Sie gehen allgemeinen Gewohnheiten vor.
    neue Dienste eingebunden (auch neue Felder in Push-Anmeldungen oder `localStorage`),
    den Nutzer darauf hinweisen, dass die Datenschutzerklärung auf der Support-Website
    angepasst werden muss.
+8. **Die App bleibt schlank** (Wunsch des Nutzers): Man soll kurz reinschauen können. Vor
+   jeder neuen Funktion oder Einstellung prüfen, ob sie die App überlädt. Wird es zu viel
+   (auch durch eine gewünschte Änderung), dem Nutzer **ausdrücklich Bescheid sagen** und
+   Alternativen vorschlagen, statt es still einzubauen.
+9. **Versionsnummer bei jeder Änderung anheben**: `version` in `package.json` (wird in den
+   Einstellungen angezeigt). Vor jedem Commit, der gepusht werden soll, mit
+   `npm version <x.y.z> --no-git-tag-version` setzen (ändert auch `package-lock.json`):
+   **Major** (2.0.0) bei großen Umbauten, **Minor** (1.5.0) bei neuen Funktionen oder
+   sichtbaren Änderungen, **Patch** (1.5.1) bei Fehlerkorrekturen und kleinen Anpassungen
+   (auch nur Tests oder Doku). Die neue Version im Commit und im Abschlussbericht nennen.
 
 ## Vor dem Programmieren
 

@@ -51,8 +51,9 @@ const textSizeOptions: { value: TextSize; label: string }[] = [
   { value: "large", label: "Groß" },
 ];
 
-/** Short commit of the deployed version (set by Vercel). */
-const VERSION = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null;
+/** The app version (package.json, raised with every change) and the deployed commit. */
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? null;
+const BUILD = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null;
 
 /** Support website with the legal pages; the addresses can be changed on Vercel. */
 const SUPPORT_URL = "https://support-vertretung-kag.vercel.app";
@@ -67,7 +68,7 @@ function sendFeedback(myClass: string | null) {
     "---",
     `Klasse: ${myClass ?? "–"}`,
     `Als App installiert: ${isStandalone() ? "ja" : "nein"}`,
-    `Version: ${VERSION ?? "–"}`,
+    `Version: ${APP_VERSION ?? "–"}${BUILD ? ` (${BUILD})` : ""}`,
     `Gerät: ${navigator.userAgent}`,
   ].join("\n");
   window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(
@@ -102,7 +103,117 @@ function Setting({ id, title, description, children }: {
   );
 }
 
-/** A labelled on/off switch row. */
+/** The pages of the sheet: the overview and a few subpages, to keep each one short. */
+type Page = "main" | "notifications" | "display" | "teachers" | "install" | "about";
+
+const PAGE_TITLES: Record<Exclude<Page, "main">, string> = {
+  notifications: "Benachrichtigungen",
+  display: "Anzeige",
+  teachers: "Meine Lehrkräfte",
+  install: "Als App installieren",
+  about: "Über die App",
+};
+
+/** The page a section to open the sheet at belongs to. */
+function pageFor(focus: SettingsFocus): Page {
+  if (focus === "notifications" || focus === "summaries") {
+    return "notifications";
+  }
+  return focus === "teachers" ? "teachers" : "main";
+}
+
+const iconProps = {
+  "aria-hidden": true,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+  className: "size-[1.1rem]",
+} as const;
+
+const ICONS: Record<string, ReactNode> = {
+  notifications: (
+    <svg {...iconProps}>
+      <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  ),
+  display: (
+    <svg {...iconProps}>
+      <path d="M4 7V5h11v2M9.5 5v14M7 19h5M14 13v-1h6v1M17 12v7M15.5 19h3" />
+    </svg>
+  ),
+  teachers: (
+    <svg {...iconProps}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14a6.5 6.5 0 0 1 3 6" />
+    </svg>
+  ),
+  install: (
+    <svg {...iconProps}>
+      <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+    </svg>
+  ),
+  share: (
+    <svg {...iconProps}>
+      <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2" />
+    </svg>
+  ),
+  about: (
+    <svg {...iconProps}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </svg>
+  ),
+};
+
+const chevron = (
+  <svg {...iconProps} className="size-4 shrink-0 text-muted">
+    <path d="m9 6 6 6-6 6" />
+  </svg>
+);
+
+const rowClass =
+  "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-surface-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40";
+
+/** A row in the overview that opens a subpage (or another page of the app). */
+function NavRow({ icon, title, value, ...rest }: {
+  icon: ReactNode;
+  title: string;
+  /** Short state on the right, e.g. "An". */
+  value?: string;
+} & ({ onClick: () => void; page: Page; href?: never } | { href: string; onClick?: never; page?: never })) {
+  const content = (
+    <>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-strong">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1 text-sm font-medium text-foreground">{title}</span>
+      {value ? <span className="shrink-0 text-sm text-muted">{value}</span> : null}
+      {chevron}
+    </>
+  );
+  return rest.href ? (
+    <Link href={rest.href} className={rowClass}>
+      {content}
+    </Link>
+  ) : (
+    <button type="button" onClick={rest.onClick} data-settings-row={rest.page} className={rowClass}>
+      {content}
+    </button>
+  );
+}
+
+/** Short state of notifications for the overview. */
+const notificationStates: Partial<Record<string, string>> = {
+  on: "An",
+  off: "Aus",
+  denied: "Blockiert",
+  install: "Nur in der App",
+  unsupported: "Nicht möglich",
+};
+
 /** A separate card further down the sheet. */
 function Card({ id, title, description, tone = "normal", children }: {
   id?: string;
@@ -175,6 +286,29 @@ export function SettingsSheet({
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
   const installed = useSyncExternalStore(noSubscribe, isStandalone, () => true);
+  // The page the user went to; until then the one the sheet was opened at.
+  const [chosenPage, setChosenPage] = useState<Page | null>(null);
+  const wantedPage = chosenPage ?? pageFor(focus);
+  // Without an upper-school class there are no teachers to choose.
+  const page = wantedPage === "teachers" && !courseFilter ? "main" : wantedPage;
+
+  /** Shows another page from its top, with the keyboard focus on it. */
+  const goTo = (next: Page) => {
+    const from = page;
+    setChosenPage(next);
+    requestAnimationFrame(() => {
+      const dialog = dialogRef.current;
+      if (!dialog) {
+        return;
+      }
+      dialog.scrollTop = 0;
+      const target =
+        next === "main"
+          ? dialog.querySelector<HTMLElement>(`[data-settings-row="${from}"]`)
+          : dialog.querySelector<HTMLElement>("[data-settings-back]");
+      target?.focus();
+    });
+  };
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -277,9 +411,12 @@ export function SettingsSheet({
   return (
     <dialog
       ref={dialogRef}
-      aria-labelledby="settings-title"
+      // Stays "Einstellungen" on every page.
+      aria-label="Einstellungen"
       onClose={() => {
         setConfirmReset(false);
+        // Opens at the overview (or the section asked for) next time.
+        setChosenPage(null);
         onClose();
       }}
       // A tap on the dimmed area closes the sheet.
@@ -296,9 +433,24 @@ export function SettingsSheet({
           {/* The handle belongs to the sheet on phones, not to the dialog on large screens. */}
           <div aria-hidden className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line wide:hidden" />
           <div className="flex items-center justify-between gap-3">
-            <h2 id="settings-title" className="text-xl font-semibold tracking-[-0.03em]">
-              Einstellungen
-            </h2>
+            {page === "main" ? (
+              <h2 className="text-xl font-semibold tracking-[-0.03em]">Einstellungen</h2>
+            ) : (
+              <div className="flex min-w-0 items-center gap-1">
+                <button
+                  type="button"
+                  data-settings-back
+                  onClick={() => goTo("main")}
+                  aria-label="Zurück zu den Einstellungen"
+                  className="tap-target -ml-2 flex size-9 shrink-0 items-center justify-center rounded-full text-accent-strong"
+                >
+                  <svg {...iconProps} className="size-5">
+                    <path d="m15 6-6 6 6 6" />
+                  </svg>
+                </button>
+                <h2 className="truncate text-xl font-semibold tracking-[-0.03em]">{PAGE_TITLES[page]}</h2>
+              </div>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -309,125 +461,166 @@ export function SettingsSheet({
           </div>
         </div>
 
-        <Setting
-          title="Meine Klasse"
-          description="Mit ihr öffnet die App, und für sie kommen Benachrichtigungen. Andere Klassen kannst du auf der Startseite nur ansehen."
-        >
-          <div className="relative">
-            <label htmlFor="my-class" className="sr-only">
-              Meine Klasse
-            </label>
-            <select
-              id="my-class"
-              value={myClass ?? ""}
-              onChange={(event) => onChooseMyClass(event.target.value)}
-              className="w-full appearance-none rounded-2xl border border-line bg-card px-4 py-3 pr-11 text-base font-semibold text-foreground outline-none focus:border-accent/35 focus:ring-4 focus:ring-accent/10"
-            >
-              {!myClass ? (
-                <option value="" disabled>
-                  Klasse auswählen …
-                </option>
-              ) : null}
-              {SCHOOL_CLASSES.map((schoolClass) => (
-                <option key={schoolClass} value={schoolClass}>
-                  {schoolClass}
-                </option>
-              ))}
-            </select>
-            <svg
-              aria-hidden
-              viewBox="0 0 20 20"
-              className="pointer-events-none absolute right-4 top-1/2 size-5 -translate-y-1/2 text-muted"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m5 8 5 5 5-5" />
-            </svg>
-          </div>
-        </Setting>
-
-        <Setting title="Darstellung" description="„Automatisch“ richtet sich nach der Einstellung des Geräts.">
-          <ThemeChoice />
-        </Setting>
-
-        <Setting title="Textgröße" description="Größere Schrift in der ganzen App.">
-          <Segmented
-            name="text-size"
-            label="Textgröße"
-            options={textSizeOptions}
-            value={settings.textSize}
-            onChange={(textSize) => updateSettings({ textSize })}
-          />
-        </Setting>
-
-        <Setting
-          title="Ab wann den nächsten Schultag zeigen?"
-          description="Öffnest du die App nach dieser Uhrzeit, siehst du gleich den Plan für den nächsten Schultag. „Immer“: immer den nächsten Schultag, „Nie“: immer heute."
-        >
-          <Segmented
-            name="next-day"
-            label="Nächsten Tag anzeigen ab"
-            options={nextDayOptions}
-            value={settings.nextDayFromHour}
-            onChange={(nextDayFromHour) => updateSettings({ nextDayFromHour })}
-          />
-        </Setting>
-
-        <Setting
-          title="„Neu“-Markierungen"
-          description="Hebt Änderungen hervor, die seit dem letzten Öffnen dazugekommen sind."
-        >
-          <div className="rounded-2xl border border-line bg-card">
-            <Switch
-              label="Neue Änderungen markieren"
-              checked={settings.showNewBadges}
-              onChange={(showNewBadges) => updateSettings({ showNewBadges })}
-            />
-          </div>
-        </Setting>
-
-        <Setting
-          id="settings-notifications"
-          title="Benachrichtigungen"
-          description="Eine Nachricht aufs Handy, sobald sich der Plan für deine Klasse ändert, auch wenn die App geschlossen ist. Darunter: worüber du eine Nachricht bekommst."
-        >
-          <NotificationControls {...notifications} />
-          <div className="divide-y divide-line rounded-2xl border border-line bg-card">
-            {NOTIFY_GROUPS.map((group) => (
-              <Switch
-                key={group}
-                label={NOTIFY_GROUP_LABELS[group]}
-                checked={settings.notifyGroups.includes(group)}
-                onChange={(on) =>
-                  updateSettings({
-                    notifyGroups: NOTIFY_GROUPS.filter((item) =>
-                      item === group ? on : settings.notifyGroups.includes(item),
-                    ),
-                  })
-                }
-              />
-            ))}
-          </div>
-          <SummarySwitches id="settings-summaries" />
-        </Setting>
-
-        {courseFilter ? (
-          <Card
-            id="settings-teachers"
-            title={
-              courseFilter.own
-                ? `Oberstufe: Meine Lehrkräfte (${courseFilter.schoolClass})`
-                : `Lehrkräfte für die ${courseFilter.schoolClass} (nur angesehen)`
-            }
-            description={
-              courseFilter.own
-                ? "Wähle die Lehrkräfte deiner Kurse. Dann siehst du nur deren Änderungen und bekommst nur dafür Benachrichtigungen. Einträge ohne Lehrkraft werden immer angezeigt."
-                : "Filtert nur die Anzeige dieser Klasse, z. B. für Geschwister. Deine Benachrichtigungen bleiben bei deiner Klasse."
-            }
+        {page === "main" ? (
+          <>
+            <Setting
+              title="Meine Klasse"
+            description="Mit ihr öffnet die App, und für sie kommen Benachrichtigungen. Andere Klassen kannst du auf der Startseite nur ansehen."
           >
+            <div className="relative">
+              <label htmlFor="my-class" className="sr-only">
+                Meine Klasse
+              </label>
+              <select
+                id="my-class"
+                value={myClass ?? ""}
+                onChange={(event) => onChooseMyClass(event.target.value)}
+                className="w-full appearance-none rounded-2xl border border-line bg-card px-4 py-3 pr-11 text-base font-semibold text-foreground outline-none focus:border-accent/35 focus:ring-4 focus:ring-accent/10"
+              >
+                {!myClass ? (
+                  <option value="" disabled>
+                    Klasse auswählen …
+                  </option>
+                ) : null}
+                {SCHOOL_CLASSES.map((schoolClass) => (
+                  <option key={schoolClass} value={schoolClass}>
+                    {schoolClass}
+                  </option>
+                ))}
+              </select>
+              <svg
+                aria-hidden
+                viewBox="0 0 20 20"
+                className="pointer-events-none absolute right-4 top-1/2 size-5 -translate-y-1/2 text-muted"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="m5 8 5 5 5-5" />
+              </svg>
+            </div>
+          </Setting>
+            {courseFilter ? (
+              <div className="-mt-1 mb-4 overflow-hidden rounded-2xl border border-line bg-card">
+                <NavRow
+                  icon={ICONS.teachers}
+                  title={courseFilter.own ? `Meine Lehrkräfte (${courseFilter.schoolClass})` : `Lehrkräfte der ${courseFilter.schoolClass}`}
+                  value={courseFilter.selected.length > 0 ? String(courseFilter.selected.length) : "Alle"}
+                  page="teachers"
+                  onClick={() => goTo("teachers")}
+                />
+              </div>
+            ) : null}
+            <nav aria-label="Weitere Einstellungen" className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
+              <NavRow
+                icon={ICONS.notifications}
+                title="Benachrichtigungen"
+                value={notificationStates[notifications.push.status]}
+                page="notifications"
+                onClick={() => goTo("notifications")}
+              />
+              <NavRow icon={ICONS.display} title="Anzeige" page="display" onClick={() => goTo("display")} />
+              {!installed ? (
+                <NavRow icon={ICONS.install} title="Als App installieren" page="install" onClick={() => goTo("install")} />
+              ) : null}
+              <NavRow icon={ICONS.share} title="App weitergeben (QR-Code)" href="/teilen" />
+              <NavRow icon={ICONS.about} title="Über die App" page="about" onClick={() => goTo("about")} />
+            </nav>
+            {APP_VERSION ? (
+              <p className="pt-4 text-center text-xs text-muted">
+                Version {APP_VERSION}
+                {BUILD ? <span className="text-muted/70"> · {BUILD}</span> : null}
+              </p>
+            ) : null}
+          </>
+        ) : null}
+
+        {page === "notifications" ? (
+          <>
+            {/* Nothing to switch while unknown, or when the server has no notifications set up. */}
+            {notifications.push.status !== "checking" && notifications.push.status !== "unavailable" ? (
+              <Setting
+                id="settings-notifications"
+                title="Ein und aus"
+                description="Eine Nachricht aufs Handy, sobald sich der Plan für deine Klasse ändert, auch wenn die App geschlossen ist."
+              >
+                <NotificationControls {...notifications} />
+              </Setting>
+            ) : null}
+            <Setting title="Worüber" description="Bei welchen Änderungen du eine Nachricht bekommst.">
+              <div className="divide-y divide-line rounded-2xl border border-line bg-card">
+                {NOTIFY_GROUPS.map((group) => (
+                  <Switch
+                    key={group}
+                    label={NOTIFY_GROUP_LABELS[group]}
+                    checked={settings.notifyGroups.includes(group)}
+                    onChange={(on) =>
+                      updateSettings({
+                        notifyGroups: NOTIFY_GROUPS.filter((item) =>
+                          item === group ? on : settings.notifyGroups.includes(item),
+                        ),
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </Setting>
+            <Setting title="Tägliche Überblicke" description="Eine Nachricht mit allen Änderungen des Tages, zur Uhrzeit deiner Wahl.">
+              <SummarySwitches id="settings-summaries" name="settings" />
+            </Setting>
+          </>
+        ) : null}
+
+        {page === "display" ? (
+          <>
+            <Setting title="Darstellung" description="„Automatisch“ richtet sich nach der Einstellung des Geräts.">
+              <ThemeChoice />
+            </Setting>
+            <Setting title="Textgröße" description="Größere Schrift in der ganzen App.">
+              <Segmented
+                name="text-size"
+                label="Textgröße"
+                options={textSizeOptions}
+                value={settings.textSize}
+                onChange={(textSize) => updateSettings({ textSize })}
+              />
+            </Setting>
+            <Setting
+              title="Ab wann den nächsten Schultag zeigen?"
+              description="Öffnest du die App nach dieser Uhrzeit, siehst du gleich den Plan für den nächsten Schultag. „Immer“: immer den nächsten Schultag, „Nie“: immer heute."
+            >
+              <Segmented
+                name="next-day"
+                label="Nächsten Tag anzeigen ab"
+                options={nextDayOptions}
+                value={settings.nextDayFromHour}
+                onChange={(nextDayFromHour) => updateSettings({ nextDayFromHour })}
+              />
+            </Setting>
+            <Setting
+              title="„Neu“-Markierungen"
+              description="Hebt Änderungen hervor, die seit dem letzten Öffnen dazugekommen sind."
+            >
+              <div className="rounded-2xl border border-line bg-card">
+                <Switch
+                  label="Neue Änderungen markieren"
+                  checked={settings.showNewBadges}
+                  onChange={(showNewBadges) => updateSettings({ showNewBadges })}
+                />
+              </div>
+            </Setting>
+          </>
+        ) : null}
+
+        {page === "teachers" && courseFilter ? (
+          <div id="settings-teachers" className="scroll-mt-24 space-y-3">
+            <p className="text-xs leading-5 text-muted">
+              {courseFilter.own
+                ? `Oberstufe (${courseFilter.schoolClass}): Wähle die Lehrkräfte deiner Kurse. Dann siehst du nur deren Änderungen und bekommst nur dafür Benachrichtigungen. Einträge ohne Lehrkraft werden immer angezeigt.`
+                : `Nur angesehen: Filtert die Anzeige der ${courseFilter.schoolClass}, z. B. für Geschwister. Deine Benachrichtigungen bleiben bei deiner Klasse.`}
+            </p>
             <TeacherChooser
               key={courseFilter.schoolClass}
               schoolClass={courseFilter.schoolClass}
@@ -435,111 +628,109 @@ export function SettingsSheet({
               suggestions={courseFilter.suggestions}
               onChange={courseFilter.onChange}
             />
-          </Card>
+          </div>
         ) : null}
 
-        {!installed ? (
-          <Card
-            title="Als App installieren"
-            description="Ohne App Store, direkt aus dem Browser. Als App startet der Plan schneller, funktioniert offline und kann Benachrichtigungen schicken."
-          >
+        {page === "install" ? (
+          <div className="space-y-3">
+            <p className="text-xs leading-5 text-muted">
+              Ohne App Store, direkt aus dem Browser. Als App startet der Plan schneller,
+              funktioniert offline und kann Benachrichtigungen schicken.
+            </p>
             <InstallGuide />
-          </Card>
+          </div>
         ) : null}
 
-        <Card
-          title="App weitergeben"
-          description="Ein QR-Code zur App: zum Zeigen auf dem Handy oder als Aushang zum Ausdrucken."
-        >
-          <Link
-            href="/teilen"
-            className="inline-block rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold text-accent-strong"
-          >
-            QR-Code zeigen
-          </Link>
-        </Card>
-
-        <Card title="Über die App">
-          <p className="text-xs leading-5 text-muted">
-            Die Daten stammen vom Vertretungsplan der Schule. Deine Einstellungen werden nur auf
-            diesem Gerät gespeichert. Gezählt werden nur anonyme Aufrufe, ohne Cookies.{VERSION ? ` Version ${VERSION}.` : ""}
-          </p>
-          <button
-            type="button"
-            onClick={onShowIntroduction}
-            className="block text-sm font-semibold text-accent-strong underline underline-offset-2"
-          >
-            Einführung nochmal ansehen
-          </button>
-          <button
-            type="button"
-            onClick={() => sendFeedback(myClass)}
-            className="block text-sm font-semibold text-accent-strong underline underline-offset-2"
-          >
-            Feedback senden oder Fehler melden
-          </button>
-          {sourceUrl ? (
-            <a
-              href={sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block text-sm font-semibold text-accent-strong underline underline-offset-2"
-            >
-              Original-Plan der Schule öffnen
-            </a>
-          ) : null}
-          <p className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3 text-xs">
-            {LEGAL_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-muted underline underline-offset-2"
-              >
-                {link.label}
-              </a>
-            ))}
-          </p>
-        </Card>
-
-        <Card
-          title="Zurücksetzen"
-          tone="warn"
-          description="Löscht auf diesem Gerät Klasse, Lehrkräfte und Einstellungen und schaltet Benachrichtigungen aus."
-        >
-          {confirmReset ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold text-warn">Wirklich alles zurücksetzen?</span>
+        {page === "about" ? (
+          <>
+            <div className="space-y-3">
+              <p className="text-xs leading-5 text-muted">
+                Die Daten stammen vom Vertretungsplan der Schule. Deine Einstellungen werden nur auf
+                diesem Gerät gespeichert. Gezählt werden nur anonyme Aufrufe, ohne Cookies.
+              </p>
               <button
                 type="button"
-                disabled={resetting}
-                onClick={() => {
-                  setResetting(true);
-                  void resetDevice();
-                }}
-                className="rounded-full bg-warn px-4 py-1.5 text-sm font-semibold text-on-warn disabled:opacity-60"
+                onClick={onShowIntroduction}
+                className="block text-sm font-semibold text-accent-strong underline underline-offset-2"
               >
-                Zurücksetzen
+                Einführung nochmal ansehen
               </button>
               <button
                 type="button"
-                onClick={() => setConfirmReset(false)}
-                className="rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold"
+                onClick={() => sendFeedback(myClass)}
+                className="block text-sm font-semibold text-accent-strong underline underline-offset-2"
               >
-                Abbrechen
+                Feedback senden oder Fehler melden
               </button>
+              {sourceUrl ? (
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-sm font-semibold text-accent-strong underline underline-offset-2"
+                >
+                  Original-Plan der Schule öffnen
+                </a>
+              ) : null}
+              <p className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3 text-xs">
+                {LEGAL_LINKS.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-muted underline underline-offset-2"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </p>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmReset(true)}
-              className="rounded-full border border-warn/30 bg-surface px-4 py-1.5 text-sm font-semibold text-warn"
+            {APP_VERSION ? (
+              <p className="pt-4 text-center text-xs text-muted">
+                Version {APP_VERSION}
+                {BUILD ? <span className="text-muted/70"> · {BUILD}</span> : null}
+              </p>
+            ) : null}
+            <Card
+              title="Zurücksetzen"
+              tone="warn"
+              description="Löscht auf diesem Gerät Klasse, Lehrkräfte und Einstellungen und schaltet Benachrichtigungen aus."
             >
-              App zurücksetzen …
-            </button>
-          )}
-        </Card>
+              {confirmReset ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-warn">Wirklich alles zurücksetzen?</span>
+                  <button
+                    type="button"
+                    disabled={resetting}
+                    onClick={() => {
+                      setResetting(true);
+                      void resetDevice();
+                    }}
+                    className="rounded-full bg-warn px-4 py-1.5 text-sm font-semibold text-on-warn disabled:opacity-60"
+                  >
+                    Zurücksetzen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmReset(false)}
+                    className="rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmReset(true)}
+                  className="rounded-full border border-warn/30 bg-surface px-4 py-1.5 text-sm font-semibold text-warn"
+                >
+                  App zurücksetzen …
+                </button>
+              )}
+            </Card>
+          </>
+        ) : null}
       </div>
     </dialog>
   );

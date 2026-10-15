@@ -23,6 +23,9 @@ export type Subscriber = {
   eveningSummary?: boolean;
   /** Summary of the day in the morning. */
   morningSummary?: boolean;
+  /** Chosen times ("19:00", "06:30"); the defaults when missing (older subscribers). */
+  eveningSummaryTime?: string;
+  morningSummaryTime?: string;
 };
 
 export interface PushStore {

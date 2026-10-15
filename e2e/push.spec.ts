@@ -276,6 +276,14 @@ test("notifies only about the chosen kinds, and sends the evening summary", asyn
     await dialog.getByText("Abends Überblick für morgen", { exact: true }).click();
     const body = (await synced).postDataJSON();
     expect(body.notifyGroups).toEqual(["cancelled", "room", "exam"]);
+    expect(body.eveningSummaryTime).toBe("19:00");
+    // The time appears once the overview is on: 18 h instead of 19 h.
+    synced = page.waitForRequest(
+      (req) => req.url().endsWith("/api/push/subscribe") && req.postDataJSON().eveningSummaryTime === "18:00",
+    );
+    await dialog.getByRole("group", { name: "Uhrzeit des Überblicks am Abend" }).getByText("18 Uhr").click();
+    await synced;
+    await expect(dialog.getByText(/^Um 18 Uhr vor jedem Schultag/)).toBeVisible();
     // Chosen: no longer offered.
     await expect(offer).toHaveCount(0);
     await page.waitForTimeout(300);
@@ -289,8 +297,9 @@ test("notifies only about the chosen kinds, and sends the evening summary", asyn
     const [, cancelled] = await waitForPushes(service.received, "/choices", 2);
     expect(read(phone, cancelled).body).toBe("Jetzt: Entfall · 5AB · SVA · Raum 004 (vorher Vertretung)");
 
-    // 19:05: the summary of Friday, once.
-    expect(await check(request, "2026-10-08T19:05:00+02:00")).toMatchObject({ summaries: 1 });
+    // Not before the time chosen; at 18:05 the summary of Friday, once.
+    expect(await check(request, "2026-10-08T17:55:00+02:00")).toMatchObject({ summaries: 0 });
+    expect(await check(request, "2026-10-08T18:05:00+02:00")).toMatchObject({ summaries: 1 });
     const [, , summary] = await waitForPushes(service.received, "/choices", 3);
     const fiveA = read(phone, summary);
     expect(fiveA.title).toMatch(/^5A · Morgen: \d+ Änderung/);

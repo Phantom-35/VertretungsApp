@@ -116,6 +116,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     notifyGroups: settings.notifyGroups,
     eveningSummary: settings.eveningSummary,
     morningSummary: settings.morningSummary,
+    eveningSummaryTime: settings.eveningSummaryTime,
+    morningSummaryTime: settings.morningSummaryTime,
   });
   const onboarding = useOnboarding();
   // Computer or tablet in landscape: a view of its own (phones never get it).

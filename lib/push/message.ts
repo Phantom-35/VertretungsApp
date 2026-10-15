@@ -9,8 +9,14 @@ import {
 import { formatShortDate, relativeDayLabel } from "@/lib/format";
 import type { KeyedEntry } from "@/lib/seen";
 import { describeEntry, lessonLabel } from "@/lib/share";
-import { EVENING_SUMMARY_HOUR, MORNING_SUMMARY_HOUR, notifyGroupOf, type NotifyGroup } from "@/lib/notify";
-import { NEXT_DAY_FROM_HOUR, daysBetween, schoolHour, schoolToday } from "@/lib/time";
+import {
+  EVENING_SUMMARY_TIMES,
+  MORNING_SUMMARY_TIMES,
+  notifyGroupOf,
+  timeToMinutes,
+  type NotifyGroup,
+} from "@/lib/notify";
+import { NEXT_DAY_FROM_HOUR, daysBetween, schoolHour, schoolMinutes, schoolToday } from "@/lib/time";
 import type { PlanDiff } from "@/lib/push/diff";
 
 export type Change =
@@ -161,18 +167,23 @@ export function isQuietTime(now: number) {
   return hour >= QUIET_FROM_HOUR || hour < QUIET_UNTIL_HOUR;
 }
 
-/** Evening summaries go out between EVENING_SUMMARY_HOUR and the quiet time. */
+/** Evening summaries go out from the earliest time to choose until the quiet time. */
 export function isSummaryTime(now: number) {
-  const hour = schoolHour(now);
-  return hour >= EVENING_SUMMARY_HOUR && hour < QUIET_FROM_HOUR;
+  return schoolMinutes(now) >= timeToMinutes(EVENING_SUMMARY_TIMES[0]) && schoolHour(now) < QUIET_FROM_HOUR;
 }
 
-/** Morning summaries go out from MORNING_SUMMARY_HOUR until 8 h. */
+/** Morning summaries go out from the earliest time to choose until 8 h. */
 export const MORNING_SUMMARY_UNTIL_HOUR = 8;
 
 export function isMorningSummaryTime(now: number) {
-  const hour = schoolHour(now);
-  return hour >= MORNING_SUMMARY_HOUR && hour < MORNING_SUMMARY_UNTIL_HOUR;
+  return (
+    schoolMinutes(now) >= timeToMinutes(MORNING_SUMMARY_TIMES[0]) && schoolHour(now) < MORNING_SUMMARY_UNTIL_HOUR
+  );
+}
+
+/** The times among `times` that have come already today. */
+export function reachedTimes<T extends string>(times: readonly T[], now: number) {
+  return times.filter((time) => timeToMinutes(time) <= schoolMinutes(now));
 }
 
 /** The plan's day `offset` days from today, if it is a school day (Mon–Fri). */

@@ -8,9 +8,17 @@ import {
   isQuietTime,
   isSummaryTime,
   morningSummaryDate,
+  reachedTimes,
   summaryDate,
   type PushPayload,
 } from "@/lib/push/message";
+import {
+  DEFAULT_EVENING_SUMMARY_TIME,
+  DEFAULT_MORNING_SUMMARY_TIME,
+  EVENING_SUMMARY_TIMES,
+  MORNING_SUMMARY_TIMES,
+  parseSummaryTime,
+} from "@/lib/notify";
 import type { SendPush } from "@/lib/push/sender";
 import type { PushStore, Subscriber } from "@/lib/push/store";
 import { schoolToday } from "@/lib/time";
@@ -49,26 +57,54 @@ type CheckOptions = {
   now?: number;
 };
 
-/** Bookkeeping keys: the day the last evening / morning summary was about. */
-const SUMMARY_META = "summary-day";
-const MORNING_SUMMARY_META = "morning-summary-day";
+/**
+ * Bookkeeping key per summary time: the day that summary was last sent for.
+ * The only times of earlier versions keep their keys, so that no summary
+ * comes twice on the day of an update.
+ */
+function summaryMeta(kind: "evening" | "morning", time: string) {
+  if (kind === "evening" && time === "19:00") {
+    return "summary-day";
+  }
+  if (kind === "morning" && time === "06:00") {
+    return "morning-summary-day";
+  }
+  return `${kind}-summary-day@${time}`;
+}
 
 type SummaryRun = { meta: string; day: string; wanted: (subscriber: Subscriber) => boolean };
 
-/** The summary due now, if any: in the evening for tomorrow, in the morning for today. */
-function summaryRun(plan: SubstitutionPayload, now: number): SummaryRun | null {
-  const planDates = () => plan.days.map((day) => day.date);
+/**
+ * The summaries whose time has come: in the evening for tomorrow, in the
+ * morning for today; one per time subscribers can choose.
+ */
+function summaryRuns(plan: SubstitutionPayload, now: number): SummaryRun[] {
+  const planDates = plan.days?.map((day) => day.date) ?? [];
   if (isSummaryTime(now)) {
-    const day = summaryDate(planDates(), now);
-    return day ? { meta: SUMMARY_META, day, wanted: (subscriber) => subscriber.eveningSummary === true } : null;
+    const day = summaryDate(planDates, now);
+    return day
+      ? reachedTimes(EVENING_SUMMARY_TIMES, now).map((time) => ({
+          meta: summaryMeta("evening", time),
+          day,
+          wanted: (subscriber) =>
+            subscriber.eveningSummary === true &&
+            parseSummaryTime(subscriber.eveningSummaryTime, EVENING_SUMMARY_TIMES, DEFAULT_EVENING_SUMMARY_TIME) === time,
+        }))
+      : [];
   }
   if (isMorningSummaryTime(now)) {
-    const day = morningSummaryDate(planDates(), now);
+    const day = morningSummaryDate(planDates, now);
     return day
-      ? { meta: MORNING_SUMMARY_META, day, wanted: (subscriber) => subscriber.morningSummary === true }
-      : null;
+      ? reachedTimes(MORNING_SUMMARY_TIMES, now).map((time) => ({
+          meta: summaryMeta("morning", time),
+          day,
+          wanted: (subscriber) =>
+            subscriber.morningSummary === true &&
+            parseSummaryTime(subscriber.morningSummaryTime, MORNING_SUMMARY_TIMES, DEFAULT_MORNING_SUMMARY_TIME) === time,
+        }))
+      : [];
   }
-  return null;
+  return [];
 }
 /** Bookkeeping key: when the scheduler last called the check (see /api/health). */
 export const LAST_CHECK_META = "last-check";
@@ -110,20 +146,20 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
     await store.savePlanState(diff.state);
 
     const hasChanges = !diff.initial && diff.added.length + diff.removed.length > 0;
-    const summary = summaryRun(plan, now);
-    // Entries of its day missing since this check may be an upload in
-    // progress: the summary waits for the next check instead of leaving
-    // them out (nothing would correct it later).
-    const summaryWaits =
-      summary !== null && diff.state.missing.some((key) => key.startsWith(`${summary.day}|`));
-    // Once per day; recorded before sending, like the plan state.
-    const summaryDue =
-      summary !== null && !summaryWaits && (await store.getMeta(summary.meta)) !== summary.day;
-    if (summaryDue) {
-      await store.setMeta(summary.meta, summary.day);
+    const dueSummaries: SummaryRun[] = [];
+    for (const summary of summaryRuns(plan, now)) {
+      // Entries of its day missing since this check may be an upload in
+      // progress: the summary waits for the next check instead of leaving
+      // them out (nothing would correct it later).
+      const waits = diff.state.missing.some((key) => key.startsWith(`${summary.day}|`));
+      // Once per day and time; recorded before sending, like the plan state.
+      if (!waits && (await store.getMeta(summary.meta)) !== summary.day) {
+        await store.setMeta(summary.meta, summary.day);
+        dueSummaries.push(summary);
+      }
     }
 
-    const subscribers = hasChanges || summaryDue ? await store.listSubscribers() : [];
+    const subscribers = hasChanges || dueSummaries.length > 0 ? await store.listSubscribers() : [];
     const stats = { notified: 0, failed: 0, expired: 0, summaries: 0 };
 
     const deliver = async (subscriber: Subscriber, payload: PushPayload) => {
@@ -139,7 +175,9 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
     };
 
     const notify = async (subscriber: Subscriber) => {
-      const getsSummary = summaryDue && summary.wanted(subscriber);
+      // At most one: the evening and morning summaries never run together.
+      const summary = dueSummaries.find((run) => run.wanted(subscriber)) ?? null;
+      const getsSummary = summary !== null;
       // The summary sent with them shows its day's changes already; a
       // withdrawn change is not in it, so that one is still sent.
       const changes = (hasChanges ? changesFor(diff, subscriber, now) : []).filter(

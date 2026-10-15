@@ -34,7 +34,35 @@ export function parseNotifyGroups(value: unknown): NotifyGroup[] | null {
   return NOTIFY_GROUPS.filter((group) => value.includes(group));
 }
 
-/** The evening summary of the next school day is sent from this hour on. */
-export const EVENING_SUMMARY_HOUR = 19;
-/** The morning summary of the day is sent from this hour on (until 8 h). */
-export const MORNING_SUMMARY_HOUR = 6;
+/**
+ * Times to choose from for the evening summary of the next school day; the
+ * quiet time starts at 21 h. 19 h was the only time before, and stays the default.
+ */
+export const EVENING_SUMMARY_TIMES = ["17:00", "18:00", "19:00", "20:00"] as const;
+export type EveningSummaryTime = (typeof EVENING_SUMMARY_TIMES)[number];
+export const DEFAULT_EVENING_SUMMARY_TIME: EveningSummaryTime = "19:00";
+
+/**
+ * Times for the morning summary of the day, before school (until 8 h). 6:30
+ * by default: the school often updates the plan early in the morning.
+ */
+export const MORNING_SUMMARY_TIMES = ["06:00", "06:30", "07:00"] as const;
+export type MorningSummaryTime = (typeof MORNING_SUMMARY_TIMES)[number];
+export const DEFAULT_MORNING_SUMMARY_TIME: MorningSummaryTime = "06:30";
+
+/** A known time from untrusted input, else the fallback. */
+export function parseSummaryTime<T extends string>(value: unknown, times: readonly T[], fallback: T): T {
+  return times.find((time) => time === value) ?? fallback;
+}
+
+/** "06:30" -> 390 (minutes after midnight). */
+export function timeToMinutes(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+/** "06:30" -> "6:30 Uhr", "19:00" -> "19 Uhr". */
+export function summaryTimeLabel(time: string) {
+  const [hours, minutes] = time.split(":");
+  return `${Number(hours)}${minutes === "00" ? "" : `:${minutes}`} Uhr`;
+}

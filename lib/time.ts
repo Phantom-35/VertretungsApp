@@ -64,6 +64,13 @@ export function daysBetween(from: string, to: string) {
 /** From this hour on, the next school day is more relevant than today. */
 export const NEXT_DAY_FROM_HOUR = 16;
 
+/** Minutes after midnight (0–1439) in the school's time zone. */
+export function schoolMinutes(now: number) {
+  const parts = zonedPartsFormatter.formatToParts(new Date(now));
+  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return get("hour") * 60 + get("minute");
+}
+
 /** Current hour (0–23) in the school's time zone. */
 export function schoolHour(now: number) {
   const hour = zonedPartsFormatter

@@ -76,7 +76,7 @@ function NotificationStep({ push, myClass }: { push: PushControls; myClass: stri
             ✓ Eingeschaltet für {myClass}
           </p>
           <p className="pt-2 text-sm font-semibold text-foreground">Auch eine tägliche Übersicht?</p>
-          <SummarySwitches />
+          <SummarySwitches name="onboarding" />
         </>
       );
       break;

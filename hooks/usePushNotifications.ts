@@ -56,6 +56,8 @@ type Audience = {
   notifyGroups: readonly NotifyGroup[];
   eveningSummary: boolean;
   morningSummary: boolean;
+  eveningSummaryTime: string;
+  morningSummaryTime: string;
 };
 
 /** Checks that failed (offline, slow service worker) are repeated after this. */
@@ -72,6 +74,8 @@ export function usePushNotifications({
   notifyGroups,
   eveningSummary,
   morningSummary,
+  eveningSummaryTime,
+  morningSummaryTime,
 }: Audience) {
   const [status, setStatus] = useState<PushStatus>("checking");
   const [publicKey, setPublicKey] = useState<string | null>(null);
@@ -169,6 +173,8 @@ export function usePushNotifications({
         notifyGroups: groupsKey ? groupsKey.split(",") : [],
         eveningSummary,
         morningSummary,
+        eveningSummaryTime,
+        morningSummaryTime,
       });
       if (result.status === 410 && !cancelled) {
         await subscription.unsubscribe().catch(() => undefined);
@@ -180,7 +186,7 @@ export function usePushNotifications({
     return () => {
       cancelled = true;
     };
-  }, [status, schoolClass, teachersKey, groupsKey, eveningSummary, morningSummary]);
+  }, [status, schoolClass, teachersKey, groupsKey, eveningSummary, morningSummary, eveningSummaryTime, morningSummaryTime]);
 
   const enable = useCallback(async () => {
     const registration = registrationRef.current;
@@ -215,6 +221,8 @@ export function usePushNotifications({
         notifyGroups,
         eveningSummary,
         morningSummary,
+        eveningSummaryTime,
+        morningSummaryTime,
       });
       if (!result.ok) {
         await subscription.unsubscribe().catch(() => undefined);
@@ -231,7 +239,16 @@ export function usePushNotifications({
     } finally {
       setBusy(false);
     }
-  }, [publicKey, schoolClass, teachers, notifyGroups, eveningSummary, morningSummary]);
+  }, [
+    publicKey,
+    schoolClass,
+    teachers,
+    notifyGroups,
+    eveningSummary,
+    morningSummary,
+    eveningSummaryTime,
+    morningSummaryTime,
+  ]);
 
   const disable = useCallback(async () => {
     setBusy(true);

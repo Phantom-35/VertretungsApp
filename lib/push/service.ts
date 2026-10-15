@@ -70,6 +70,8 @@ export async function subscribe(
     notifyGroups: request.notifyGroups,
     eveningSummary: request.eveningSummary,
     morningSummary: request.morningSummary,
+    eveningSummaryTime: request.eveningSummaryTime,
+    morningSummaryTime: request.morningSummaryTime,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
   });

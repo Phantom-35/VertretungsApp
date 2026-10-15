@@ -40,7 +40,7 @@ QR-Code zur App, der sich als Aushang drucken lässt.
 | --- | --- | --- |
 | Plan lesen | `lib/scraper.ts`, `lib/parser.ts`, `lib/cache.ts` | Lädt alle Untis-Seiten, liest Tage, Einträge und Mitteilungen, prüft das Ergebnis auf Plausibilität. Ist die Schulseite nicht erreichbar, wird der zuletzt gelesene Plan mit einem Hinweis gezeigt. |
 | Schnittstelle | `app/api/substitution` | Liefert den gelesenen Plan an die App. |
-| Oberfläche | `app/page.tsx`, `components/`, `hooks/` | Startseite mit Tagesauswahl, Einstellungen, Einführung. Auf großen Bildschirmen (PC, Mac, iPad quer) eine eigene Ansicht mit allen Tagen nebeneinander (`components/DesktopView.tsx`); die Handy-Ansicht bleibt davon unberührt. |
+| Oberfläche | `app/page.tsx`, `components/`, `hooks/` | Startseite mit Tagesauswahl, Einstellungen (Übersicht mit Unterseiten), Einführung. Die Versionsnummer steht in `package.json` und wird bei jeder Änderung angehoben (siehe `AGENTS.md`). Auf großen Bildschirmen (PC, Mac, iPad quer) eine eigene Ansicht mit allen Tagen nebeneinander (`components/DesktopView.tsx`); die Handy-Ansicht bleibt davon unberührt. |
 | Offline und Updates | `public/sw.js`, `components/PwaRegistrar.tsx` | Der Service Worker öffnet die App sofort aus dem Speicher und lädt im Hintergrund die neue Version. Gibt es ein neues Deployment, lädt die App sich neu, sobald das nicht stört (direkt nach dem Öffnen oder beim Verlassen). |
 | Ferien und Feiertage | `lib/holidays.ts` | NRW-Ferien und Feiertage, siehe [Pflege](#pflege). |
 | Benachrichtigungen | `lib/push/`, `app/api/push/` | Vergleicht den Plan mit dem letzten Stand und schickt Mitteilungen, siehe unten. |
@@ -72,9 +72,10 @@ vergleicht ihn mit dem letzten Stand und schickt die Mitteilungen.
 
 - Worüber benachrichtigt wird: Ausfälle & EVA, Vertretungen & Betreuung,
   Raumänderungen & Verlegungen, Klausuren & Veranstaltungen.
-- **Überblick für morgen:** ab 19 Uhr vor jedem Schultag, sobald der Plan für den
-  nächsten Tag online ist, auch wenn sich nichts ändert.
-- **Überblick für heute:** zwischen 6 und 8 Uhr an jedem Schultag.
+- **Überblick für morgen:** vor jedem Schultag um 17, 18, 19 (Voreinstellung) oder
+  20 Uhr, sobald der Plan für den nächsten Tag online ist, auch wenn sich nichts ändert.
+  Kommt der Plan später, folgt der Überblick sofort danach (bis 21 Uhr).
+- **Überblick für heute:** an jedem Schultag um 6:00, 6:30 (Voreinstellung) oder 7:00 Uhr.
 - Änderungen für den Tag eines Überblicks, die in derselben Prüfung gefunden werden,
   stehen nur im Überblick (keine doppelte Mitteilung).
 
@@ -186,7 +187,8 @@ Ausführliche Arbeitsregeln (auch für KI-Agenten): [`AGENTS.md`](AGENTS.md).
 **Auf dem Server (Redis):**
 
 - Je Gerät mit Benachrichtigungen: die Push-Adresse des Geräts, die Klasse, die
-  Lehrkräfte-Kürzel und die Benachrichtigungs-Einstellungen. Ausschalten in der App
+  Lehrkräfte-Kürzel und die Benachrichtigungs-Einstellungen (Arten, tägliche Überblicke
+  und ihre Uhrzeiten). Ausschalten in der App
   löscht den Eintrag; ungültig gewordene Adressen löscht der Server von selbst.
 - Der zuletzt gelesene Plan (für den Vergleich), bei jeder Prüfung überschrieben, sowie
   kleine Verwaltungswerte (z. B. Zeitpunkt der letzten Prüfung).

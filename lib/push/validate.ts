@@ -1,5 +1,16 @@
 import { normalizeSelectedClass, normalizeTeacher } from "@/lib/entries";
-import { NOTIFY_GROUPS, parseNotifyGroups, type NotifyGroup } from "@/lib/notify";
+import {
+  DEFAULT_EVENING_SUMMARY_TIME,
+  DEFAULT_MORNING_SUMMARY_TIME,
+  EVENING_SUMMARY_TIMES,
+  MORNING_SUMMARY_TIMES,
+  NOTIFY_GROUPS,
+  parseNotifyGroups,
+  parseSummaryTime,
+  type EveningSummaryTime,
+  type MorningSummaryTime,
+  type NotifyGroup,
+} from "@/lib/notify";
 import { isAllowedEndpoint } from "@/lib/push/sender";
 import type { PushSubscriptionData } from "@/lib/push/store";
 
@@ -44,6 +55,8 @@ export type SubscribeRequest = {
   notifyGroups: NotifyGroup[];
   eveningSummary: boolean;
   morningSummary: boolean;
+  eveningSummaryTime: EveningSummaryTime;
+  morningSummaryTime: MorningSummaryTime;
 };
 
 export function parseSubscribeRequest(value: unknown): SubscribeRequest | string {
@@ -75,6 +88,9 @@ export function parseSubscribeRequest(value: unknown): SubscribeRequest | string
     notifyGroups: parseNotifyGroups(value.notifyGroups) ?? [...NOTIFY_GROUPS],
     eveningSummary: value.eveningSummary === true,
     morningSummary: value.morningSummary === true,
+    // Older app versions send no time: the defaults.
+    eveningSummaryTime: parseSummaryTime(value.eveningSummaryTime, EVENING_SUMMARY_TIMES, DEFAULT_EVENING_SUMMARY_TIME),
+    morningSummaryTime: parseSummaryTime(value.morningSummaryTime, MORNING_SUMMARY_TIMES, DEFAULT_MORNING_SUMMARY_TIME),
   };
 }
 

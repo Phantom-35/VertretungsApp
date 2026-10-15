@@ -27,6 +27,17 @@ async function settled(dialog: Locator) {
   await expect.poll(() => dialog.evaluate((element) => element.getAnimations().length)).toBe(0);
 }
 
+/** Opens the settings, and in them one of their pages ("Anzeige", "Über die App" …). */
+async function openSettings(page: Page, section?: string) {
+  await page.getByRole("button", { name: "Einstellungen", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  if (section) {
+    await dialog.getByRole("button", { name: new RegExp(`^${section}`) }).click();
+    await expect(dialog.getByRole("heading", { name: section })).toBeVisible();
+  }
+  return dialog;
+}
+
 async function chooseClass(page: Page, schoolClass: string) {
   await page.locator("#class-selector").selectOption(schoolClass);
   await expect(page.locator("h1")).toHaveText(schoolClass);
@@ -181,8 +192,7 @@ test("shows a public holiday instead of an old plan", async ({ page }) => {
 test("links the legal pages and offers a QR code to pass the app on", async ({ page }) => {
   await page.goto("/");
   await chooseClass(page, "5A");
-  await page.getByRole("button", { name: "Einstellungen" }).click();
-  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  const dialog = await openSettings(page, "Über die App");
   await expect(dialog.getByRole("link", { name: "Impressum" })).toHaveAttribute(
     "href",
     "https://support-vertretung-kag.vercel.app/impressum",
@@ -192,7 +202,8 @@ test("links the legal pages and offers a QR code to pass the app on", async ({ p
     "https://support-vertretung-kag.vercel.app/datenschutz",
   );
   await expect(dialog.getByRole("button", { name: "Feedback senden oder Fehler melden" })).toBeVisible();
-  await page.getByRole("link", { name: "QR-Code zeigen" }).click();
+  await dialog.getByRole("button", { name: "Zurück zu den Einstellungen" }).click();
+  await dialog.getByRole("link", { name: "App weitergeben (QR-Code)" }).click();
   await expect(page).toHaveURL(/\/teilen$/);
   const origin = new URL(page.url()).origin;
   await expect(page.getByRole("img", { name: `QR-Code für ${origin}/` })).toBeVisible();
@@ -266,8 +277,7 @@ test("shows the install steps of the browser in use", async ({ browser }) => {
     const context = await browser.newContext({ userAgent, viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
     await page.goto("/");
-    await page.getByRole("button", { name: "Einstellungen" }).click();
-    const card = page.getByRole("dialog", { name: "Einstellungen" }).locator("section", { hasText: "Als App installieren" });
+    const card = await openSettings(page, "Als App installieren");
     for (const text of expected) {
       await expect(card.getByText(text, { exact: false }).first(), `${name}: ${text}`).toBeVisible();
     }
@@ -282,8 +292,7 @@ test("shows the install steps of the browser in use", async ({ browser }) => {
   });
   const page = await context.newPage();
   await page.goto("/");
-  await page.getByRole("button", { name: "Einstellungen" }).click();
-  const card = page.getByRole("dialog", { name: "Einstellungen" }).locator("section", { hasText: "Als App installieren" });
+  const card = await openSettings(page, "Als App installieren");
   await expect(card.getByText("Anleitung für Safari")).toBeVisible();
   await card.getByRole("button", { name: "Anderer Browser?" }).click();
   await card.getByLabel("Dein Browser").selectOption("firefox");
@@ -422,7 +431,7 @@ test.describe("first start", () => {
     await expect(page.getByRole("heading", { name: "Willkommen!" })).toHaveCount(0);
 
     // Can be watched again from the settings; Escape skips it.
-    await page.getByRole("button", { name: "Einstellungen" }).click();
+    await openSettings(page, "Über die App");
     await page.getByRole("button", { name: "Einführung nochmal ansehen" }).click();
     await expect(page.getByRole("heading", { name: "Willkommen!" })).toBeVisible();
     await page.keyboard.press("Escape");
@@ -489,7 +498,8 @@ test("filters the upper school by the student's teachers", async ({ page }) => {
   await expect(dialog).toBeVisible();
   const teachers = dialog.locator("#settings-teachers");
   await expect(teachers).toBeInViewport();
-  await expect(teachers).toContainText("Oberstufe: Meine Lehrkräfte (Q1)");
+  await expect(dialog.getByRole("heading", { name: "Meine Lehrkräfte" })).toBeVisible();
+  await expect(teachers).toContainText("Oberstufe (Q1)");
 
   await teachers.locator("#teacher-input").fill("k1");
   await teachers.getByRole("button", { name: "Hinzufügen" }).click();
@@ -525,7 +535,8 @@ test("filters the upper school by the student's teachers", async ({ page }) => {
   // Not an upper-school class: the settings show the own class's courses,
   // which the notifications follow.
   await page.getByRole("button", { name: "Einstellungen" }).click();
-  await expect(dialog.locator("#settings-teachers")).toContainText("Meine Lehrkräfte (Q1)");
+  await dialog.getByRole("button", { name: /^Meine Lehrkräfte \(Q1\)/ }).click();
+  await expect(dialog.locator("#settings-teachers")).toContainText("Oberstufe (Q1)");
 });
 
 test("marks changes that are new since the last visit", async ({ page }) => {
@@ -589,7 +600,7 @@ test("switches between light and dark", async ({ page }) => {
   await expect(html).toHaveAttribute("data-theme", "light");
 
   // "Automatisch" (in the settings) follows the system setting.
-  await page.getByRole("button", { name: "Einstellungen" }).click();
+  await openSettings(page, "Anzeige");
   await page.getByRole("dialog").getByText("Automatisch", { exact: true }).click();
   await page.getByRole("button", { name: "Fertig" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
@@ -836,6 +847,33 @@ test("shares the day's changes", async ({ page, context }) => {
   expect(copied.match(/https?:\/\/\S+/g)).toEqual([`${new URL(desktop.url()).origin}/`]);
 });
 
+test("settings: an overview with a few pages, and the app version", async ({ page }) => {
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const dialog = await openSettings(page);
+  await expect(dialog.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(dialog.getByText(/^Version \d+\.\d+\.\d+/)).toBeVisible();
+  // Details only on their pages.
+  await expect(dialog.getByRole("heading", { name: "Textgröße" })).toHaveCount(0);
+
+  await dialog.getByRole("button", { name: /^Anzeige/ }).click();
+  await expect(dialog.getByRole("heading", { name: "Anzeige" })).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Textgröße" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Zurück zu den Einstellungen" })).toBeFocused();
+
+  // Back: the overview, with the focus on the row that led away.
+  await dialog.getByRole("button", { name: "Zurück zu den Einstellungen" }).click();
+  await expect(dialog.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /^Anzeige/ })).toBeFocused();
+
+  // Closed on a page, it opens at the overview again.
+  await dialog.getByRole("button", { name: /^Über die App/ }).click();
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await expect(dialog).toBeHidden();
+  await page.getByRole("button", { name: "Einstellungen", exact: true }).click();
+  await expect(dialog.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+});
+
 test("settings: next day hour and new badges", async ({ page }) => {
   // Thursday 15:30: before the default switch at 16:00 today is shown.
   await page.clock.setFixedTime(new Date("2026-10-08T15:30:00+02:00"));
@@ -843,9 +881,7 @@ test("settings: next day hour and new badges", async ({ page }) => {
   await chooseClass(page, "5A");
   await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
 
-  await page.getByRole("button", { name: "Einstellungen" }).click();
-  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
-  await expect(dialog).toBeVisible();
+  const dialog = await openSettings(page, "Anzeige");
   await dialog.getByText("15 Uhr", { exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
@@ -854,7 +890,7 @@ test("settings: next day hour and new badges", async ({ page }) => {
   // Kept after a reload; "Nie" stays on today.
   await page.reload();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
-  await page.getByRole("button", { name: "Einstellungen" }).click();
+  await openSettings(page, "Anzeige");
   await dialog.getByText("Nie", { exact: true }).click();
   await dialog.getByRole("button", { name: "Fertig" }).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
@@ -870,7 +906,7 @@ test("settings: next day hour and new badges", async ({ page }) => {
   }, unseen);
   await page.reload();
   await expect(page.getByText("Neu", { exact: true })).toHaveCount(1);
-  await page.getByRole("button", { name: "Einstellungen" }).click();
+  await openSettings(page, "Anzeige");
   const badgeSwitch = dialog.getByRole("switch", { name: "Neue Änderungen markieren" });
   await expect(badgeSwitch).toBeChecked();
   await dialog.getByText("Neue Änderungen markieren").click();
@@ -889,8 +925,7 @@ test("settings: swipe down closes the sheet without refreshing", async ({ browse
   await chooseClass(page, "5A");
 
   // "Immer" shows the next school day right away.
-  await page.getByRole("button", { name: "Einstellungen" }).click();
-  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  const dialog = await openSettings(page, "Anzeige");
   await dialog.getByText("Immer", { exact: true }).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
 
@@ -927,10 +962,12 @@ test("settings: swipe down closes the sheet without refreshing", async ({ browse
   await expect(dialog).toBeHidden();
   expect(forced).toEqual([]);
 
-  // It opens normally again.
+  // It opens normally again (at the overview, which is shorter): resting on
+  // the bottom edge, not left pushed down by the swipe.
   await page.getByRole("button", { name: "Einstellungen" }).click();
   await settled(dialog);
-  expect((await dialog.boundingBox())!.y).toBeCloseTo(box.y, 0);
+  const reopened = (await dialog.boundingBox())!;
+  expect(reopened.y + reopened.height).toBeCloseTo(box.y + box.height, 0);
   await context.close();
 });
 
@@ -967,6 +1004,7 @@ test("settings: page stays still, text size, install hint and reset", async ({ b
   expect(await page.evaluate(() => document.body.style.position)).toBe("fixed");
 
   // Larger text, kept after a reload and applied before the first paint.
+  await dialog.getByRole("button", { name: /^Anzeige/ }).click();
   await dialog.getByText("Groß", { exact: true }).click();
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe("18px");
   await dialog.getByRole("button", { name: "Fertig" }).click();
@@ -985,6 +1023,7 @@ test("settings: page stays still, text size, install hint and reset", async ({ b
   // In the browser (not installed): how to install.
   await page.getByRole("button", { name: "Einstellungen" }).click();
   await expect(dialog.getByText("Als App installieren", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: /^Über die App/ }).click();
   await expect(dialog.getByRole("link", { name: "Original-Plan der Schule öffnen" })).toBeVisible();
 
   // Reset asks first, then forgets everything.
@@ -1009,10 +1048,17 @@ test("settings: the header can be swiped even when scrolled down", async ({ brow
   const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   await page.goto("/");
+  // Both daily overviews on: their times make the page long enough to scroll.
+  await page.evaluate(() =>
+    localStorage.setItem("kag:settings", JSON.stringify({ eveningSummary: true, morningSummary: true })),
+  );
+  await page.reload();
   await chooseClass(page, "Q1");
-  await page.getByRole("button", { name: "Festlegen" }).click();
-  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
-  await expect(dialog.locator("#settings-teachers")).toBeInViewport();
+  const dialog = await openSettings(page, "Benachrichtigungen");
+  await settled(dialog);
+  await dialog.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
   expect(await dialog.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   // "Fertig" stays visible.
   await expect(dialog.getByRole("button", { name: "Fertig" })).toBeInViewport();

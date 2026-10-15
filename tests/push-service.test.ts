@@ -5,7 +5,7 @@ import { runPushCheck } from "@/lib/push/check";
 import type { PushPayload } from "@/lib/push/message";
 import { createSender, isAllowedEndpoint, subscriberId, type SendResult } from "@/lib/push/sender";
 import { prepareTest, sendTest, subscribe, type PushService } from "@/lib/push/service";
-import { MemoryStore, type PushSubscriptionData } from "@/lib/push/store";
+import { MemoryStore, type PushSubscriptionData, type Subscriber } from "@/lib/push/store";
 import { parseSubscribeRequest, parseSubscription } from "@/lib/push/validate";
 import { NOTIFY_GROUPS } from "@/lib/notify";
 import type { SubstitutionEntry, SubstitutionPayload } from "@/lib/types";
@@ -314,9 +314,83 @@ describe("evening summary in the check", () => {
   });
 });
 
+describe("summary times to choose", () => {
+  const withDays = (entries: SubstitutionEntry[], days: string[]) =>
+    ({ ...plan(entries), days: days.map((date) => ({ date, dayLabel: null, weekLabel: null })) }) as SubstitutionPayload;
+  const wants = async (store: MemoryStore, name: string, settings: Partial<Subscriber>) => {
+    const sub = await addSubscriber(store, name, "5A");
+    await store.saveSubscriber({ ...(await store.getSubscriber(subscriberId(sub.endpoint)))!, ...settings });
+    return sub.endpoint;
+  };
+  const at = (time: string) => Date.parse(`2026-10-08T${time}:00+02:00`); // Thursday
+
+  it("sends each evening summary at the time chosen, once", async () => {
+    const store = new MemoryStore();
+    const early = await wants(store, "early", { eveningSummary: true, eveningSummaryTime: "17:00" });
+    const usual = await wants(store, "usual", { eveningSummary: true }); // no time: 19 h
+    const late = await wants(store, "late", { eveningSummary: true, eveningSummaryTime: "20:00" });
+    const { sent, send } = fakeSender();
+    const loadPlan = async () => withDays([], ["2026-10-08", "2026-10-09"]);
+    const receivers = () => sent.map((item) => item.endpoint);
+
+    await runPushCheck({ store, send, loadPlan, now: at("16:55") });
+    expect(receivers()).toEqual([]);
+    await runPushCheck({ store, send, loadPlan, now: at("17:05") });
+    expect(receivers()).toEqual([early]);
+    await runPushCheck({ store, send, loadPlan, now: at("18:55") });
+    expect(receivers()).toEqual([early]);
+    await runPushCheck({ store, send, loadPlan, now: at("19:05") });
+    expect(receivers()).toEqual([early, usual]);
+    await runPushCheck({ store, send, loadPlan, now: at("20:05") });
+    await runPushCheck({ store, send, loadPlan, now: at("20:45") });
+    expect(receivers()).toEqual([early, usual, late]);
+  });
+
+  it("sends every time already past at once when the plan comes late", async () => {
+    const store = new MemoryStore();
+    const early = await wants(store, "early", { eveningSummary: true, eveningSummaryTime: "17:00" });
+    const usual = await wants(store, "usual", { eveningSummary: true, eveningSummaryTime: "19:00" });
+    const { sent, send } = fakeSender();
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-08"]), now: at("18:00") });
+    expect(sent).toHaveLength(0);
+    // Tomorrow's plan uploaded at 19:30: both, once each.
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-08", "2026-10-09"]), now: at("19:30") });
+    expect(sent.map((item) => item.endpoint).sort()).toEqual([early, usual].sort());
+  });
+
+  it("sends each morning summary at the time chosen", async () => {
+    const store = new MemoryStore();
+    const first = await wants(store, "first", { morningSummary: true, morningSummaryTime: "06:00" });
+    const usual = await wants(store, "usual", { morningSummary: true }); // no time: 6:30
+    const last = await wants(store, "last", { morningSummary: true, morningSummaryTime: "07:00" });
+    const { sent, send } = fakeSender();
+    const loadPlan = async () => withDays([], ["2026-10-09"]);
+    const friday = (time: string) => Date.parse(`2026-10-09T${time}:00+02:00`);
+    const receivers = () => sent.map((item) => item.endpoint);
+
+    await runPushCheck({ store, send, loadPlan, now: friday("06:05") });
+    expect(receivers()).toEqual([first]);
+    await runPushCheck({ store, send, loadPlan, now: friday("06:35") });
+    expect(receivers()).toEqual([first, usual]);
+    await runPushCheck({ store, send, loadPlan, now: friday("07:05") });
+    await runPushCheck({ store, send, loadPlan, now: friday("07:55") });
+    expect(receivers()).toEqual([first, usual, last]);
+  });
+
+  it("does not repeat a summary sent before the update that added the times", async () => {
+    const store = new MemoryStore();
+    await wants(store, "usual", { eveningSummary: true });
+    // Recorded by the earlier version, which only knew 19 h.
+    await store.setMeta("summary-day", "2026-10-09");
+    const { sent, send } = fakeSender();
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-08", "2026-10-09"]), now: at("19:40") });
+    expect(sent).toHaveLength(0);
+  });
+});
+
 describe("morning summary in the check", () => {
-  // Friday 09.10.2026.
-  const MORNING = Date.parse("2026-10-09T06:05:00+02:00");
+  // Friday 09.10.2026, after the default time (6:30).
+  const MORNING = Date.parse("2026-10-09T06:35:00+02:00");
   const withDays = (entries: SubstitutionEntry[], days: string[]) =>
     ({ ...plan(entries), days: days.map((date) => ({ date, dayLabel: null, weekLabel: null })) }) as SubstitutionPayload;
   const wantsMorning = async (store: MemoryStore, name: string) => {
@@ -348,8 +422,8 @@ describe("morning summary in the check", () => {
     // After 8 h: too late.
     await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-09"]), now: Date.parse("2026-10-09T08:05:00+02:00") });
     // Saturday, or a day without a plan (holidays).
-    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-10"]), now: Date.parse("2026-10-10T06:05:00+02:00") });
-    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-16"]), now: Date.parse("2026-10-13T06:05:00+02:00") });
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-10"]), now: Date.parse("2026-10-10T06:35:00+02:00") });
+    await runPushCheck({ store, send, loadPlan: async () => withDays([], ["2026-10-16"]), now: Date.parse("2026-10-13T06:35:00+02:00") });
     expect(sent).toHaveLength(0);
   });
 
@@ -397,7 +471,7 @@ describe("subscriptions", () => {
   it("confirms a new device once and keeps its settings up to date", async () => {
     const { sent, send } = fakeSender();
     const push = service(send);
-    const request = { subscription: subscription("phone"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false };
+    const request = { subscription: subscription("phone"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false, eveningSummaryTime: "19:00" as const, morningSummaryTime: "06:30" as const };
     expect(await subscribe(push, request)).toEqual({ ok: true, created: true });
     expect(sent).toHaveLength(1);
     expect(sent[0].payload.title).toBe("Benachrichtigungen sind an");
@@ -414,7 +488,7 @@ describe("subscriptions", () => {
   it("refuses a device whose push subscription does not work", async () => {
     const { send } = fakeSender({ [subscription("dead").endpoint]: "gone" });
     const push = service(send);
-    const result = await subscribe(push, { subscription: subscription("dead"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false });
+    const result = await subscribe(push, { subscription: subscription("dead"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false, eveningSummaryTime: "19:00" as const, morningSummaryTime: "06:30" as const });
     expect(result).toMatchObject({ ok: false, status: 410 });
     expect(await push.store.countSubscribers()).toBe(0);
   });
@@ -422,7 +496,7 @@ describe("subscriptions", () => {
   it("does not store a device the confirmation could not reach", async () => {
     const { send } = fakeSender({ [subscription("flaky").endpoint]: "failed" });
     const push = service(send);
-    const result = await subscribe(push, { subscription: subscription("flaky"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false });
+    const result = await subscribe(push, { subscription: subscription("flaky"), schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false, eveningSummaryTime: "19:00" as const, morningSummaryTime: "06:30" as const });
     expect(result).toMatchObject({ ok: false, status: 502 });
     expect(await push.store.countSubscribers()).toBe(0);
   });
@@ -431,7 +505,7 @@ describe("subscriptions", () => {
     const { sent, send } = fakeSender();
     const push = service(send);
     const sub = subscription("phone");
-    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false });
+    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false, eveningSummaryTime: "19:00" as const, morningSummaryTime: "06:30" as const });
     expect(await sendTest(push, sub.endpoint, NOW)).toBe("sent");
     expect(await sendTest(push, sub.endpoint, NOW + 30_000)).toBe("too-soon");
     expect(await sendTest(push, sub.endpoint, NOW + 61_000)).toBe("sent");
@@ -443,7 +517,7 @@ describe("subscriptions", () => {
     const { sent, send } = fakeSender();
     const push = service(send);
     const sub = subscription("phone");
-    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false });
+    await subscribe(push, { subscription: sub, schoolClass: "5A", teachers: [], notifyGroups: [...NOTIFY_GROUPS], eveningSummary: false, morningSummary: false, eveningSummaryTime: "19:00" as const, morningSummaryTime: "06:30" as const });
     const before = sent.length;
     const prepared = await prepareTest(push, sub.endpoint, NOW);
     expect(prepared.result).toBe("scheduled");
@@ -482,6 +556,9 @@ describe("request validation", () => {
       notifyGroups: [...NOTIFY_GROUPS],
       eveningSummary: false,
       morningSummary: false,
+      // Older app versions send no times: the defaults.
+      eveningSummaryTime: "19:00",
+      morningSummaryTime: "06:30",
     });
     expect(
       parseSubscribeRequest({
@@ -490,8 +567,25 @@ describe("request validation", () => {
         notifyGroups: ["room", "cancelled", "bogus", "room"],
         eveningSummary: true,
         morningSummary: true,
+        eveningSummaryTime: "17:00",
+        morningSummaryTime: "07:00",
       }),
-    ).toMatchObject({ notifyGroups: ["cancelled", "room"], eveningSummary: true, morningSummary: true });
+    ).toMatchObject({
+      notifyGroups: ["cancelled", "room"],
+      eveningSummary: true,
+      morningSummary: true,
+      eveningSummaryTime: "17:00",
+      morningSummaryTime: "07:00",
+    });
+    // Times nobody can choose fall back to the defaults.
+    expect(
+      parseSubscribeRequest({
+        subscription: subscription("phone"),
+        schoolClass: "5A",
+        eveningSummaryTime: "23:00",
+        morningSummaryTime: 6,
+      }),
+    ).toMatchObject({ eveningSummaryTime: "19:00", morningSummaryTime: "06:30" });
     expect(parseSubscribeRequest({ subscription: subscription("phone"), schoolClass: "11Z" })).toBe(
       "Unbekannte Klasse.",
     );

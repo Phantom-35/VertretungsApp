@@ -7,9 +7,16 @@ import {
   isQuietTime,
   isRelevant,
   isSummaryTime,
+  reachedTimes,
   summaryDate,
 } from "@/lib/push/message";
-import { notifyGroupOf, type NotifyGroup } from "@/lib/notify";
+import {
+  EVENING_SUMMARY_TIMES,
+  MORNING_SUMMARY_TIMES,
+  notifyGroupOf,
+  summaryTimeLabel,
+  type NotifyGroup,
+} from "@/lib/notify";
 import { entryKey, parseEntryKey, type KeyedEntry } from "@/lib/seen";
 
 const entry = (overrides: Partial<KeyedEntry>): KeyedEntry => ({
@@ -268,11 +275,21 @@ describe("evening summary", () => {
   const EVENING = Date.parse("2026-10-08T19:05:00+02:00"); // Thursday
   const audience = { schoolClass: "5A", teachers: [] };
 
-  it("is sent between 19 and 21 h", () => {
-    expect(isSummaryTime(Date.parse("2026-10-08T18:59:00+02:00"))).toBe(false);
+  it("is sent between the earliest time to choose (17 h) and 21 h", () => {
+    expect(isSummaryTime(Date.parse("2026-10-08T16:59:00+02:00"))).toBe(false);
+    expect(isSummaryTime(Date.parse("2026-10-08T17:00:00+02:00"))).toBe(true);
     expect(isSummaryTime(EVENING)).toBe(true);
     expect(isSummaryTime(Date.parse("2026-10-08T20:59:00+02:00"))).toBe(true);
+    expect(isSummaryTime(Date.parse("2026-10-08T21:00:00+02:00"))).toBe(false);
     expect(isSummaryTime(Date.parse("2026-12-08T19:10:00+01:00"))).toBe(true);
+  });
+
+  it("knows which of the times to choose have come", () => {
+    expect(reachedTimes(EVENING_SUMMARY_TIMES, Date.parse("2026-10-08T18:30:00+02:00"))).toEqual(["17:00", "18:00"]);
+    expect(reachedTimes(MORNING_SUMMARY_TIMES, Date.parse("2026-10-09T06:29:00+02:00"))).toEqual(["06:00"]);
+    expect(reachedTimes(MORNING_SUMMARY_TIMES, Date.parse("2026-12-09T06:30:00+01:00"))).toEqual(["06:00", "06:30"]);
+    expect(summaryTimeLabel("06:30")).toBe("6:30 Uhr");
+    expect(summaryTimeLabel("19:00")).toBe("19 Uhr");
   });
 
   it("is about tomorrow if it is a school day with a published plan", () => {

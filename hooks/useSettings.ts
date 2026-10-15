@@ -1,5 +1,16 @@
 import { useCallback, useSyncExternalStore } from "react";
-import { NOTIFY_GROUPS, parseNotifyGroups, type NotifyGroup } from "@/lib/notify";
+import {
+  DEFAULT_EVENING_SUMMARY_TIME,
+  DEFAULT_MORNING_SUMMARY_TIME,
+  EVENING_SUMMARY_TIMES,
+  MORNING_SUMMARY_TIMES,
+  NOTIFY_GROUPS,
+  parseNotifyGroups,
+  parseSummaryTime,
+  type EveningSummaryTime,
+  type MorningSummaryTime,
+  type NotifyGroup,
+} from "@/lib/notify";
 import { SETTINGS_STORAGE_KEY } from "@/lib/theme";
 import { NEXT_DAY_FROM_HOUR } from "@/lib/time";
 
@@ -11,10 +22,13 @@ export type Settings = {
   textSize: TextSize;
   /** Kinds of changes push notifications are sent for. */
   notifyGroups: NotifyGroup[];
-  /** Summary of the next school day at 19 h. */
+  /** Summary of the next school day in the evening. */
   eveningSummary: boolean;
-  /** Summary of the day at 6 h. */
+  /** Summary of the day in the morning. */
   morningSummary: boolean;
+  /** When the summaries come, e.g. "19:00" and "06:30". */
+  eveningSummaryTime: EveningSummaryTime;
+  morningSummaryTime: MorningSummaryTime;
 };
 
 export type TextSize = "normal" | "large";
@@ -31,6 +45,8 @@ const DEFAULTS: Settings = {
   notifyGroups: [...NOTIFY_GROUPS],
   eveningSummary: false,
   morningSummary: false,
+  eveningSummaryTime: DEFAULT_EVENING_SUMMARY_TIME,
+  morningSummaryTime: DEFAULT_MORNING_SUMMARY_TIME,
 };
 const STORAGE_KEY = SETTINGS_STORAGE_KEY;
 
@@ -53,6 +69,8 @@ function parse(raw: string | null): Settings {
       notifyGroups: parseNotifyGroups(stored.notifyGroups) ?? DEFAULTS.notifyGroups,
       eveningSummary: stored.eveningSummary === true,
       morningSummary: stored.morningSummary === true,
+      eveningSummaryTime: parseSummaryTime(stored.eveningSummaryTime, EVENING_SUMMARY_TIMES, DEFAULT_EVENING_SUMMARY_TIME),
+      morningSummaryTime: parseSummaryTime(stored.morningSummaryTime, MORNING_SUMMARY_TIMES, DEFAULT_MORNING_SUMMARY_TIME),
     };
   } catch {
     return DEFAULTS;
