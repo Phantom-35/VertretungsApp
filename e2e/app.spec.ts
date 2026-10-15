@@ -1073,6 +1073,8 @@ test("large screens: all days side by side, phones keep their view", async ({ pa
   await expect(page.locator("h1")).toHaveText("5A");
   const today = page.getByRole("region", { name: /Heute.*Donnerstag, 08\.10\./ });
   const tomorrow = page.getByRole("region", { name: /Morgen.*Freitag, 09\.10\./ });
+  // Measured once the opening animation has finished (it moves the columns).
+  await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0);
   const todayBox = (await today.boundingBox())!;
   const tomorrowBox = (await tomorrow.boundingBox())!;
   expect(tomorrowBox.x).toBeGreaterThan(todayBox.x + todayBox.width);
