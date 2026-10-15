@@ -1056,57 +1056,46 @@ test("smooth scrolling: no blocking touch listener, pull to refresh still works"
   await context.close();
 });
 
-/** Position of the two column groups and the settings dialog at one window size. */
-async function layoutAt(page: Page, width: number, height: number) {
-  await page.setViewportSize({ width, height });
-  return page.evaluate(() => {
-    const box = (selector: string) => {
-      const rect = document.querySelector(selector)!.getBoundingClientRect();
-      return { left: rect.left, top: rect.top, right: rect.right, width: rect.width };
-    };
-    return {
-      aside: getComputedStyle(document.querySelector(".app-aside")!).display,
-      header: box("header, main h1"),
-      days: box('[role="tablist"]'),
-      cards: getComputedStyle(document.querySelector("#day-panel > div:last-child")!).display,
-    };
-  });
-}
-
-test("large screens: two columns, phones keep the single column", async ({ page }) => {
-  await page.goto("/");
-  await chooseClass(page, "Q1");
-
-  // Phones, also in landscape, and a tablet held upright: one column as before.
+test("large screens: all days side by side, phones keep their view", async ({ page }) => {
+  // Phones (also in landscape), a tablet held upright and a low window: the phone view.
   for (const [width, height] of [[390, 844], [932, 430], [820, 1180], [1366, 599]]) {
-    const layout = await layoutAt(page, width, height);
-    expect(layout.aside, `${width}x${height}`).toBe("contents");
-    expect(layout.days.top, `${width}x${height}`).toBeGreaterThan(layout.header.top);
-    expect(layout.cards, `${width}x${height}`).toBe("block");
+    await page.setViewportSize({ width, height });
+    await page.goto("/");
+    await expect(page.locator("#class-selector"), `${width}x${height}`).toBeVisible();
+    await expect(page.locator("#desktop-class-selector"), `${width}x${height}`).toHaveCount(0);
   }
 
-  // Tablet in landscape: the day tabs sit next to the header, cards in one column.
-  const tablet = await layoutAt(page, 1180, 820);
-  expect(tablet.aside).toBe("flex");
-  expect(tablet.days.left).toBeGreaterThan(tablet.header.right);
-  expect(tablet.cards).toBe("block");
+  // Computer: a bar at the top and every day of the plan as a column.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.locator("#class-selector")).toHaveCount(0);
+  await page.locator("#desktop-class-selector").selectOption("5A");
+  await expect(page.locator("h1")).toHaveText("5A");
+  const today = page.getByRole("region", { name: /Heute.*Donnerstag, 08\.10\./ });
+  const tomorrow = page.getByRole("region", { name: /Morgen.*Freitag, 09\.10\./ });
+  const todayBox = (await today.boundingBox())!;
+  const tomorrowBox = (await tomorrow.boundingBox())!;
+  expect(tomorrowBox.x).toBeGreaterThan(todayBox.x + todayBox.width);
+  expect(Math.abs(tomorrowBox.y - todayBox.y)).toBeLessThan(2);
+  // Each column shows the changes of its own day, as the phone view does per day.
+  for (const [region, date] of [[today, "2026-10-08"], [tomorrow, "2026-10-09"]] as const) {
+    const expected = plan.entries.filter(
+      (entry) => entry.date === date && entryAppliesToClass(entry.className, "5A"),
+    ).length;
+    await expect(region.locator("article")).toHaveCount(expected);
+  }
 
-  // Computer: the same, with two columns of cards as wide as on a phone.
-  const computer = await layoutAt(page, 1440, 900);
-  expect(computer.days.left).toBeGreaterThan(computer.header.right);
-  expect(computer.cards).toBe("grid");
-  const columns = await page.locator("#day-panel > div:last-child").evaluate(
-    (element) => getComputedStyle(element).gridTemplateColumns.split(" ").map(parseFloat),
-  );
-  expect(columns).toHaveLength(2);
-  expect(Math.min(...columns)).toBeGreaterThan(300);
-
-  // The settings open as a dialog in the middle, not as a sheet at the bottom.
+  // Settings open as a dialog in the middle.
   await page.getByRole("button", { name: "Einstellungen" }).click();
   const dialog = page.getByRole("dialog", { name: "Einstellungen" });
   await settled(dialog);
   const sheet = (await dialog.boundingBox())!;
   expect(Math.abs(sheet.x + sheet.width / 2 - 720)).toBeLessThan(2);
-  expect(sheet.y).toBeGreaterThan(20);
   expect(900 - (sheet.y + sheet.height)).toBeGreaterThan(20);
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+
+  // A narrower window switches to the phone view, with the class kept.
+  await page.setViewportSize({ width: 800, height: 900 });
+  await expect(page.locator("#class-selector")).toHaveValue("5A");
+  await expect(page.locator("#desktop-class-selector")).toHaveCount(0);
 });

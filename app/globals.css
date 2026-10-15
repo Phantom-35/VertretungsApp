@@ -68,12 +68,12 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /*
- * Large screens (computer, tablet in landscape): a wider layout. The height
- * keeps every phone out, also in landscape (at most ~480 px high there), so
- * the phone layout stays exactly as it is. Only ever add styles with these.
+ * Large screens (computer, tablet in landscape) get their own view (see
+ * components/DesktopView.tsx and hooks/useWideScreen.ts, same query). The
+ * height keeps every phone out, also in landscape (at most ~480 px high
+ * there), so the phone view stays exactly as it is.
  */
 @custom-variant wide (@media (min-width: 1024px) and (min-height: 600px));
-@custom-variant wide-xl (@media (min-width: 1280px) and (min-height: 600px));
 
 @theme inline {
   --color-background: var(--background);
@@ -185,10 +185,7 @@ body {
 }
 
 /* Opening the app: the sections glide in one after another. "backwards"
-   only, so no transform stays behind once they have arrived.
-   The sections sit in two groups (the columns on large screens; on phones
-   the groups are invisible, `display: contents`). Each section keeps the
-   delay of its place in the whole list: 0, 70, 140, 200, then 250 ms. */
+   only, so no transform stays behind once they have arrived. */
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -200,38 +197,26 @@ body {
   }
 }
 
-.app-enter > :not(.app-group),
-.app-enter > .app-group > * {
+.app-enter > * {
   animation: rise-in 600ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
-.app-enter > .app-aside > :nth-child(2) {
+.app-enter > :nth-child(2) {
   animation-delay: 70ms;
 }
-.app-enter > .app-aside > :nth-child(3) {
+.app-enter > :nth-child(3) {
   animation-delay: 140ms;
 }
-.app-enter > .app-aside > :nth-child(4) {
+.app-enter > :nth-child(4) {
   animation-delay: 200ms;
 }
-.app-enter > .app-aside > :nth-child(n + 5),
-.app-enter > .app-content > * {
+.app-enter > :nth-child(n + 5) {
   animation-delay: 250ms;
-}
-/* The first group has at least two sections; with only two or three, the
-   second group starts at place 3 or 4. */
-.app-enter:has(> .app-aside > :nth-child(2):last-child) > .app-content > :nth-child(1) {
-  animation-delay: 140ms;
-}
-.app-enter:has(> .app-aside > :nth-child(2):last-child) > .app-content > :nth-child(2),
-.app-enter:has(> .app-aside > :nth-child(3):last-child) > .app-content > :nth-child(1) {
-  animation-delay: 200ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .settings-sheet[open],
   .onboarding[open],
-  .app-enter > :not(.app-group),
-  .app-enter > .app-group > * {
+  .app-enter > * {
     animation: none;
   }
 }

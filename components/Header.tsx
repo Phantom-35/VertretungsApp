@@ -14,7 +14,7 @@ type HeaderProps = {
   onOpenSettings: () => void;
 };
 
-const statusBadges: Record<HeaderStatus, { label: string; className: string }> = {
+export const statusBadges: Record<HeaderStatus, { label: string; className: string }> = {
   current: {
     label: "Aktuell",
     className: "border-accent/10 bg-accent-soft text-accent-strong",

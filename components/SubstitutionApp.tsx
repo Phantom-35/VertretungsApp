@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { ClassSelector } from "@/components/ClassSelector";
 import { DAY_PANEL_ID, DaySelector, dayTabId } from "@/components/DaySelector";
 import { DaySummary } from "@/components/DaySummary";
+import { DesktopView } from "@/components/DesktopView";
 import { Header, type HeaderStatus } from "@/components/Header";
 import { HolidayCard } from "@/components/HolidayCard";
 import { LoadingState } from "@/components/LoadingState";
@@ -26,6 +27,7 @@ import { useMyClass, useViewedClass } from "@/hooks/useSelectedClass";
 import { useSettings } from "@/hooks/useSettings";
 import { useStoredList } from "@/hooks/useStoredList";
 import { useSubstitutionData } from "@/hooks/useSubstitutionData";
+import { useWideScreen } from "@/hooks/useWideScreen";
 import {
   SCHOOL_CLASSES,
   compareEntries,
@@ -116,6 +118,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     morningSummary: settings.morningSummary,
   });
   const onboarding = useOnboarding();
+  // Computer or tablet in landscape: a view of its own (phones never get it).
+  const wide = useWideScreen();
   // The sections glide in when the app opens, not when one appears later.
   const [opening, setOpening] = useState(true);
   useEffect(() => {
@@ -359,13 +363,51 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   return (
     <>
       <PwaRegistrar />
-      <PullToRefresh onRefresh={forceRefresh}>
-        <main
-          className={`${opening ? "app-enter " : ""}mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-5 wide:grid wide:max-w-6xl wide:grid-cols-[22rem_minmax(0,1fr)] wide:content-start wide:items-start wide:gap-x-8 wide:px-8 wide:pb-10 wide:pt-8`}
-        >
-          {/* Two columns on large screens; on phones these groups do not
-              exist for the layout (display: contents) and nothing changes. */}
-          <div className="app-group app-aside contents wide:flex wide:flex-col wide:gap-4">
+      {wide ? (
+        <DesktopView
+          data={data}
+          now={now}
+          isBusy={isBusy}
+          connectionError={connectionError}
+          status={headerStatus}
+          opening={opening}
+          onRefresh={() => void forceRefresh()}
+          onOpenSettings={openSettings}
+          selectedClass={selectedClass}
+          myClass={myClass}
+          viewingOther={Boolean(viewedClass && myClass && viewedClass !== myClass)}
+          onChooseClass={chooseClass}
+          classes={SCHOOL_CLASSES}
+          courseFilter={
+            usesCourseFilter && selectedClass ? { selected: storedTeachers, active: teachers.length > 0 } : null
+          }
+          showOtherCourses={showOtherCourses}
+          onToggleOtherCourses={() => setShowOtherCourses((value) => !value)}
+          classEntries={classEntries}
+          ownEntries={ownEntries}
+          shownEntries={shownEntries}
+          push={push}
+          notificationAudience={
+            myClass ? `${myClass}${myTeachers.length > 0 ? ` (${myTeachers.join(", ")})` : ""}` : null
+          }
+          days={tabDays}
+          pendingDate={pendingDate}
+          focusDate={selectedDate}
+          holiday={holiday}
+          holidayMode={holidayMode}
+          today={today}
+          onShowOldPlan={() => setShowOldPlan(true)}
+          waiting={headerStatus === "waiting"}
+          findNew={(entries) =>
+            settings.showNewBadges ? findNewKeys(seenBaseline, entries, acknowledgedNew) : new Set<string>()
+          }
+          onNewSeen={acknowledgeNewEntry}
+        />
+      ) : (
+        <PullToRefresh onRefresh={forceRefresh}>
+          <main
+            className={`${opening ? "app-enter " : ""}mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-5 wide:invisible`}
+          >
             <Header
               selectedClass={selectedClass}
               dateLabel={dateLabel}
@@ -409,33 +451,31 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                   >
                     Zurück zur {myClass}
                   </button>
-              </div>
+                </div>
+              ) : null}
+              <NotificationSettings
+                push={push}
+                schoolClass={myClass}
+                teachers={myTeachers}
+                onOpenSettings={openSettings}
+              />
+            </ClassSelector>
+
+            {data ? (
+              <RefreshStatus
+                connectionError={connectionError}
+                stale={data.stale}
+                error={data.error}
+                warnings={data.warnings}
+                lastSuccessLabel={formatAge(
+                  data.lastSuccessfulUpdate ?? data.lastUpdated,
+                  now,
+                )}
+                sourceUrl={data.sourceUrl}
+                onRetry={() => void forceRefresh()}
+              />
             ) : null}
-            <NotificationSettings
-              push={push}
-              schoolClass={myClass}
-              teachers={myTeachers}
-              onOpenSettings={openSettings}
-            />
-          </ClassSelector>
 
-          {data ? (
-            <RefreshStatus
-              connectionError={connectionError}
-              stale={data.stale}
-              error={data.error}
-              warnings={data.warnings}
-              lastSuccessLabel={formatAge(
-                data.lastSuccessfulUpdate ?? data.lastUpdated,
-                now,
-              )}
-              sourceUrl={data.sourceUrl}
-              onRetry={() => void forceRefresh()}
-            />
-          ) : null}
-          </div>
-
-          <div className="app-group app-content contents wide:flex wide:min-w-0 wide:flex-col wide:gap-4">
             {headerStatus === "waiting" && !showsPendingDay ? (
               <p className="rounded-[1.4rem] border border-line bg-card px-4 py-3 text-sm leading-6 text-muted">
                 Der nächste Plan ist noch nicht online. Bis die Schule ihn hochlädt, siehst du hier
@@ -540,10 +580,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               {!holidayMode && !showsPendingDay && data && selectedClass ? (
                 visibleEntries.length > 0 ? (
                   // Many changes (e.g. the upper school): smaller cards, closer together.
-                  // Very large screens: two columns of cards, each as wide as on a phone.
-                  <div
-                    className={`${compactCards ? "space-y-2.5 wide-xl:gap-2.5" : "space-y-4 wide-xl:gap-4"} wide-xl:grid wide-xl:grid-cols-2 wide-xl:space-y-0`}
-                  >
+                  <div className={compactCards ? "space-y-2.5" : "space-y-4"}>
                     {visibleEntries.map((entry, index) => (
                       <SubstitutionCard
                         key={cardKeys[index]}
@@ -565,10 +602,10 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                 )
               ) : null}
             </section>
-          </div>
 
-        </main>
-      </PullToRefresh>
+          </main>
+        </PullToRefresh>
+      )}
 
       <SettingsSheet
         open={settingsOpen}

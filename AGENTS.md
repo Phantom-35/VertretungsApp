@@ -72,13 +72,13 @@ Repository arbeitet. Sie gehen allgemeinen Gewohnheiten vor.
 - Farben nur über die CSS-Variablen/Tailwind-Tokens aus `app/globals.css`; Dunkelmodus
   läuft über `[data-theme="dark"]`, nicht nur `prefers-color-scheme`. Kontrast ≥ 4,5:1.
 - **Die Handy-Darstellung darf sich nicht ändern** (Wunsch des Nutzers). Große Bildschirme
-  (PC, Mac, iPad quer) haben eine eigene Ansicht, die nur über die Varianten `wide:`
-  (ab 1024 px Breite **und** 600 px Höhe) und `wide-xl:` (ab 1280 px) aus `app/globals.css`
-  läuft; Handys fallen auch quer nie darunter. Die Startseite steht dafür in zwei Gruppen
-  (`app-aside`, `app-content`), die auf dem Handy `display: contents` sind; die
-  Verzögerungen der Einblend-Animation (`.app-enter` in `app/globals.css`) hängen an der
-  Position in beiden Gruppen zusammen. Bei Änderungen an der Startseite die Handy-Ansicht
-  vorher/nachher per Screenshot vergleichen.
+  (PC, Mac, iPad quer: ab 1024 px Breite **und** 600 px Höhe; Handys fallen auch quer nie
+  darunter) haben eine eigene Ansicht: `components/DesktopView.tsx` (Leiste oben, alle Tage
+  als Spalten nebeneinander). Umgeschaltet wird in `components/SubstitutionApp.tsx` über
+  `hooks/useWideScreen.ts`; dieselbe Abfrage gibt es als Tailwind-Variante `wide:` in
+  `app/globals.css` (z. B. Einstellungen als Dialog in der Mitte). Der Handy-Zweig bleibt
+  dabei unberührt. Bei Änderungen an der Startseite die Handy-Ansicht vorher/nachher per
+  Screenshot vergleichen.
 - Gerätespeicher-Schlüssel beginnen mit `kag:` (`lib/reset.ts` löscht alle).
 - Ändert sich das Cache-Verhalten des Service Workers grundlegend, `VERSION` in
   `public/sw.js` erhöhen.
