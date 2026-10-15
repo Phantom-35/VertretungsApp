@@ -32,9 +32,8 @@ function authorized(request: Request, secret: string) {
 }
 
 /**
- * Called every few minutes by a scheduler (GitHub Actions, see
- * .github/workflows/push-check.yml, or Vercel Cron) with
- * `Authorization: Bearer $CRON_SECRET`.
+ * Called every 10 minutes by cron-job.org (as a backup also by
+ * .github/workflows/push-check.yml) with `Authorization: Bearer $CRON_SECRET`.
  */
 async function handle(request: Request) {
   const secret = cronSecret();

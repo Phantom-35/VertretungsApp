@@ -1,11 +1,12 @@
 name: Push-Check
 
-# Asks the app every few minutes whether the plan changed; the app then sends
-# the notifications. Vercel's own cron jobs run only once a day on the free
-# plan, so GitHub Actions does the timing.
+# Backup schedule: asks the app every few minutes whether the plan changed;
+# the app then sends the notifications. The main schedule is cron-job.org
+# (see README); GitHub often starts these runs late. Duplicate calls do no
+# harm, the check is locked against overlapping runs.
 #
 # Setup (GitHub → Settings → Secrets and variables → Actions):
-# - Variable APP_URL: e.g. https://kag-vertretungsplan.vercel.app
+# - Variable APP_URL: https://vertretung-kag.vercel.app
 # - Secret CRON_SECRET: the same value as CRON_SECRET on Vercel
 on:
   schedule:
