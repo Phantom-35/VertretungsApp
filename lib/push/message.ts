@@ -2,13 +2,15 @@ import {
   displayType,
   entryAppliesToClass,
   entryMatchesTeachers,
+  getEntryKind,
   isCourseClass,
+  isOpenSubstitute,
   lessonStart,
   timetableSlot,
 } from "@/lib/entries";
 import { formatShortDate, relativeDayLabel } from "@/lib/format";
 import type { KeyedEntry } from "@/lib/seen";
-import { describeEntry, lessonLabel } from "@/lib/share";
+import { entrySymbol, lessonLabel, teacherLabel } from "@/lib/share";
 import {
   EVENING_SUMMARY_TIMES,
   MORNING_SUMMARY_TIMES,
@@ -114,14 +116,58 @@ function dayLabel(date: string, now: number) {
   return relativeDayLabel(date, now) ?? formatShortDate(date);
 }
 
-function describeChange(change: Change, schoolClass: string) {
+/** Texts from the plan are cut here: a notification has room for a few short lines. */
+const MAX_TEXT = 40;
+
+function shorten(text: string) {
+  return text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT - 1).trimEnd()}…` : text;
+}
+
+/**
+ * The details that matter for a kind of change, not everything the plan
+ * says: whose lesson is cancelled, who substitutes, the new room, what the
+ * event is. Combined classes ("9AB") are left out, they only add noise.
+ */
+function details(entry: KeyedEntry) {
+  const kind = getEntryKind(entry.type);
+  const text = entry.text ? shorten(entry.text) : "";
+  if (isOpenSubstitute(entry.substitute)) {
+    return [entry.teacher, "Vertretung noch offen"];
+  }
+  switch (kind) {
+    case "cancelled":
+    case "self-study":
+      return [entry.subject || entry.teacher, text];
+    case "substitution":
+    case "supervision":
+      return [teacherLabel(entry)];
+    case "room":
+      return [entry.room ? `Raum ${entry.room}` : "", entry.subject || entry.teacher];
+    case "exam":
+      return [text || entry.subject || entry.teacher, entry.room ? `Raum ${entry.room}` : ""];
+    case "moved":
+    case "event":
+      return [text || entry.subject || entry.teacher];
+  }
+}
+
+/** "🔄 Vertretung · ROE → JUB" */
+function describeShort(entry: KeyedEntry, type = displayType(entry.type)) {
+  return [type, ...details(entry)].filter(Boolean).join(" · ");
+}
+
+/** A change without lesson and day, e.g. ["❌", "Entfall statt Vertretung · RUK"]. */
+function describeChange(change: Change): [symbol: string, text: string] {
   switch (change.kind) {
     case "added":
-      return describeEntry(change.entry, schoolClass);
+      return [entrySymbol(change.entry), describeShort(change.entry)];
     case "changed":
-      return `Jetzt: ${describeEntry(change.entry, schoolClass)} (vorher ${displayType(change.previous.type)})`;
+      return [
+        entrySymbol(change.entry),
+        describeShort(change.entry, `${displayType(change.entry.type)} statt ${displayType(change.previous.type)}`),
+      ];
     case "removed":
-      return `Gilt nicht mehr: ${describeEntry(change.entry, schoolClass)}`;
+      return ["✅", `Wieder nach Plan (${displayType(change.entry.type)} gestrichen)`];
   }
 }
 
@@ -137,21 +183,24 @@ export function buildNotification(
   if (changes.length === 1) {
     return {
       title: `${schoolClass} · ${dayLabel(first.date, now)} ${lessonLabel(first.lesson)}`,
-      body: describeChange(changes[0], schoolClass),
+      body: describeChange(changes[0]).join(" "),
       url,
       badgeCount: 1,
     };
   }
 
-  const lines = changes
-    .slice(0, MAX_LINES)
-    .map(
-      (change) =>
-        `${dayLabel(change.entry.date, now)} ${lessonLabel(change.entry.lesson)}: ${describeChange(change, schoolClass)}`,
-    );
+  // All on one day: the day goes into the title instead of every line.
+  const oneDay = changes.every((change) => change.entry.date === first.date);
+  const lines = changes.slice(0, MAX_LINES).map((change) => {
+    const [symbol, text] = describeChange(change);
+    const lesson = lessonLabel(change.entry.lesson);
+    return `${symbol} ${oneDay ? lesson : `${dayLabel(change.entry.date, now)} ${lesson}`}: ${text}`;
+  });
   const rest = changes.length - MAX_LINES;
   return {
-    title: `${schoolClass}: ${changes.length} Änderungen`,
+    title: oneDay
+      ? `${schoolClass} · ${dayLabel(first.date, now)}: ${changes.length} Änderungen`
+      : `${schoolClass}: ${changes.length} Änderungen`,
     body: [...lines, ...(rest > 0 ? [`… und ${rest} weitere`] : [])].join("\n"),
     url,
     badgeCount: changes.length,
@@ -239,7 +288,7 @@ export function buildSummary(
 
   const lines = own
     .slice(0, MAX_LINES)
-    .map((entry) => `${lessonLabel(entry.lesson)}: ${describeEntry(entry, audience.schoolClass)}`);
+    .map((entry) => `${entrySymbol(entry)} ${lessonLabel(entry.lesson)}: ${describeShort(entry)}`);
   const rest = own.length - MAX_LINES;
   return {
     title: `${audience.schoolClass} · ${day}: ${own.length === 1 ? "1 Änderung" : `${own.length} Änderungen`}`,

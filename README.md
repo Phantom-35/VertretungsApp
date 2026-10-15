@@ -58,8 +58,12 @@ vergleicht ihn mit dem letzten Stand und schickt die Mitteilungen.
 
 **Was gemeldet wird**
 
-- Neue, geänderte („Jetzt: Entfall (vorher Vertretung)“) und zurückgenommene Einträge
-  („Gilt nicht mehr: …“), für heute (bis 16 Uhr) und die kommenden Tage.
+- Neue, geänderte („❌ Entfall statt Vertretung“) und zurückgenommene Einträge
+  („✅ Wieder nach Plan“), für heute (bis 16 Uhr) und die kommenden Tage. Jede Zeile
+  beginnt mit einem Symbol für die Art und nennt nur das Wichtige: bei Ausfall und EVA
+  wessen Stunde, bei Vertretungen die Lehrkräfte, bei Raumänderungen und Klausuren den
+  Raum, bei Veranstaltungen, was stattfindet. Betreffen alle Änderungen einen Tag, steht
+  er in der Überschrift.
 - Mehrere Änderungen auf einmal kommen als eine Mitteilung. Lädt die Schule später
   erneut hoch, wird nur gemeldet, was sich seitdem geändert hat.
 - **Ruhezeit 21–6 Uhr:** Es wird nichts gesendet; was nachts dazukommt, kommt um 6 Uhr

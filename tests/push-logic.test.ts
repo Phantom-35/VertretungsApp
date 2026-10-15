@@ -188,7 +188,7 @@ describe("notification text", () => {
     const changes = changesFor({ added: [entry({ lesson: "3 - 4" })], removed: [] }, audience, MORNING);
     expect(buildNotification("5A", changes, MORNING)).toEqual({
       title: "5A · Morgen 3.–4. Std.",
-      body: "Entfall · ABC · Raum 101",
+      body: "❌ Entfall · ABC",
       url: "/?day=2026-10-09",
       badgeCount: 1,
     });
@@ -204,11 +204,25 @@ describe("notification text", () => {
       MORNING,
     );
     expect(buildNotification("5A", changed, MORNING).body).toBe(
-      "Jetzt: Vertretung · ABC → DEF · Raum 101 (vorher Entfall)",
+      "🔄 Vertretung statt Entfall · ABC → DEF",
     );
     const withdrawn = changesFor({ added: [], removed: [entry({})] }, audience, MORNING);
     expect(buildNotification("5A", withdrawn, MORNING).body).toBe(
-      "Gilt nicht mehr: Entfall · ABC · Raum 101",
+      "✅ Wieder nach Plan (Entfall gestrichen)",
+    );
+  });
+
+  it("names only what matters for each kind, with a symbol", () => {
+    const one = (overrides: Partial<KeyedEntry>) =>
+      buildNotification("5A", changesFor({ added: [entry(overrides)], removed: [] }, audience, MORNING), MORNING).body;
+    expect(one({ type: "Raum-Vtr.", room: "218" })).toBe("🚪 Raumänderung · Raum 218 · ABC");
+    expect(one({ type: "Klausur", teacher: "", room: "217", text: "Q1 S GK RUK" })).toBe("📝 Klausur · Q1 S GK RUK · Raum 217");
+    expect(one({ type: "Veranst.", text: "Praktikumsmesse" })).toBe("📌 Veranstaltung · Praktikumsmesse");
+    expect(one({ type: "Betreuung", substitute: "DEF" })).toBe("🧑‍🏫 Betreuung · ABC → DEF");
+    expect(one({ type: "Vertretung", substitute: "???" })).toBe("❓ Vertretung · ABC · Vertretung noch offen");
+    // Combined classes are left out, long texts shortened.
+    expect(one({ className: "05AB", type: "EVA", text: "Aufgaben stehen im Lernraum, bitte bis Freitag bearbeiten" })).toBe(
+      "📚 EVA · ABC · Aufgaben stehen im Lernraum, bitte bis…",
     );
   });
 
@@ -219,14 +233,21 @@ describe("notification text", () => {
     const notification = buildNotification("5A", changesFor({ added, removed: [] }, audience, MORNING), MORNING);
     expect(notification.title).toBe("5A: 6 Änderungen");
     expect(notification.body.split("\n")).toEqual([
-      "Heute 1. Std.: Entfall · ABC · Raum 101",
-      "Heute 2. Std.: Entfall · ABC · Raum 101",
-      "Heute 3. Std.: Entfall · ABC · Raum 101",
-      "Mo., 12.10. 4. Std.: Entfall · ABC · Raum 101",
+      "❌ Heute 1. Std.: Entfall · ABC",
+      "❌ Heute 2. Std.: Entfall · ABC",
+      "❌ Heute 3. Std.: Entfall · ABC",
+      "❌ Mo., 12.10. 4. Std.: Entfall · ABC",
       "… und 2 weitere",
     ]);
     expect(notification.url).toBe("/?day=2026-10-08");
     expect(notification.badgeCount).toBe(6);
+  });
+
+  it("puts the day into the title when all changes are on one day", () => {
+    const added = ["1", "2"].map((lesson) => entry({ lesson }));
+    const notification = buildNotification("5A", changesFor({ added, removed: [] }, audience, MORNING), MORNING);
+    expect(notification.title).toBe("5A · Morgen: 2 Änderungen");
+    expect(notification.body).toBe("❌ 1. Std.: Entfall · ABC\n❌ 2. Std.: Entfall · ABC");
   });
 
   it("stays quiet at night, in summer and winter time", () => {
@@ -311,7 +332,7 @@ describe("evening summary", () => {
     ];
     expect(buildSummary(audience, entries, "2026-10-09", EVENING)).toEqual({
       title: "5A · Morgen: 2 Änderungen",
-      body: "1. Std.: Entfall · ABC · Raum 101\n5. Std.: Vertretung · ABC → DEF · Raum 101",
+      body: "❌ 1. Std.: Entfall · ABC\n🔄 5. Std.: Vertretung · ABC → DEF",
       url: "/?day=2026-10-09",
       tag: "kag-summary-evening-2026-10-09",
       badgeCount: 2,

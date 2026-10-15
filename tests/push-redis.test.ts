@@ -87,7 +87,7 @@ describe("Redis push store (Upstash REST)", () => {
 
       expect(await runPushCheck({ store, send, loadPlan: async () => plan([entry("Vertretung")]), now })).toMatchObject({ status: "initialized" });
       expect(await runPushCheck({ store, send, loadPlan: async () => plan([entry("Entfall")]), now })).toMatchObject({ status: "checked", notified: 1 });
-      expect(sent.map((item) => item.body)).toEqual(["Jetzt: Entfall · ABC (vorher Vertretung)"]);
+      expect(sent.map((item) => item.body)).toEqual(["❌ Entfall statt Vertretung · ABC"]);
       // The lock was released after each run.
       expect(await store.acquireLock("check", 1)).toBe(true);
       expect(upstash.commands.some(([name]) => name.toUpperCase() === "SET")).toBe(true);

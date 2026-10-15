@@ -141,7 +141,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     const [, change] = await waitForPushes(service.received, "/phone", 2);
     expect(read(phone, change)).toEqual({
       title: "5A · Morgen 3.–4. Std.",
-      body: "Jetzt: Entfall · 5AB · SVA · Raum 004 (vorher Vertretung)",
+      body: "❌ Entfall statt Vertretung · SVA",
       url: "/?day=2026-10-09",
       badgeCount: 1,
     });
@@ -295,7 +295,7 @@ test("notifies only about the chosen kinds, and sends the evening summary", asyn
     await changePlan(request, 4, row("05AB", "3 - 4", "Vertretung", "KER"), row("05AB", "3 - 4", "Entfall", "---"));
     expect(await check(request)).toMatchObject({ status: "checked", notified: 1 });
     const [, cancelled] = await waitForPushes(service.received, "/choices", 2);
-    expect(read(phone, cancelled).body).toBe("Jetzt: Entfall · 5AB · SVA · Raum 004 (vorher Vertretung)");
+    expect(read(phone, cancelled).body).toBe("❌ Entfall statt Vertretung · SVA");
 
     // Not before the time chosen; at 18:05 the summary of Friday, once.
     expect(await check(request, "2026-10-08T17:55:00+02:00")).toMatchObject({ summaries: 0 });
@@ -304,7 +304,7 @@ test("notifies only about the chosen kinds, and sends the evening summary", asyn
     const fiveA = read(phone, summary);
     expect(fiveA.title).toMatch(/^5A · Morgen: \d+ Änderung/);
     expect(fiveA.url).toBe("/?day=2026-10-09");
-    expect(fiveA.body).toContain("3.–4. Std.: Entfall · 5AB");
+    expect(fiveA.body).toContain("❌ 3.–4. Std.: Entfall · SVA");
     expect(await check(request, "2026-10-08T19:35:00+02:00")).toMatchObject({ summaries: 0 });
   } finally {
     await service.close();

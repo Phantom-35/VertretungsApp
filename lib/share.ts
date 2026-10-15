@@ -35,12 +35,17 @@ const KIND_SYMBOLS: Record<EntryKind, string> = {
   event: "📌",
 };
 
+/** The symbol of an entry: its kind, or "❓" while nobody has been found to substitute. */
+export function entrySymbol(entry: Pick<SubstitutionEntry, "type" | "substitute">) {
+  return isOpenSubstitute(entry.substitute) ? "❓" : KIND_SYMBOLS[getEntryKind(entry.type)];
+}
+
 /** "3 - 4" -> "3.–4. Std.", "5" -> "5. Std." */
 export function lessonLabel(lesson: string) {
   return lesson ? `${formatLesson(lesson).replace(/(\d+)/g, "$1.")} Std.` : "Std. ?";
 }
 
-function teacherLabel({ teacher, substitute }: Pick<SubstitutionEntry, "teacher" | "substitute">) {
+export function teacherLabel({ teacher, substitute }: Pick<SubstitutionEntry, "teacher" | "substitute">) {
   if (isOpenSubstitute(substitute)) {
     return teacher ? `${teacher} → noch offen` : "noch offen";
   }
@@ -85,7 +90,7 @@ export function formatShareLine(entry: DescribedEntry, schoolClass: string) {
 export function formatShareBlock(entry: DescribedEntry, schoolClass: string) {
   const className = formatClassName(entry.className);
   const teacher = teacherLabel(entry);
-  const symbol = isOpenSubstitute(entry.substitute) ? "❓" : KIND_SYMBOLS[getEntryKind(entry.type)];
+  const symbol = entrySymbol(entry);
   const details = [
     entry.subject ? `Fach ${entry.subject}` : "",
     teacher ? `Lehrer ${teacher}` : "",

@@ -110,7 +110,7 @@ describe("runPushCheck", () => {
     expect(sent.map((item) => item.endpoint).sort()).toEqual([fiveA.endpoint, q1Own.endpoint].sort());
     expect(sent.find((item) => item.endpoint === fiveA.endpoint)!.payload).toMatchObject({
       title: "5A · Morgen 5. Std.",
-      body: "Vertretung · ABC → DEF · Raum 101",
+      body: "🔄 Vertretung · ABC → DEF",
     });
 
     // The same plan again: nothing new.
@@ -129,7 +129,7 @@ describe("runPushCheck", () => {
     expect(sent).toHaveLength(0);
     await runPushCheck({ store, send, loadPlan: async () => plan([]), now: NOW + 1_200_000 });
     expect(sent).toHaveLength(1);
-    expect(sent[0].payload.body).toBe("Gilt nicht mehr: Entfall · ABC · Raum 101");
+    expect(sent[0].payload.body).toBe("✅ Wieder nach Plan (Entfall gestrichen)");
   });
 
   it("does not compare an incomplete plan", async () => {
@@ -459,7 +459,7 @@ describe("withdrawn changes on a summary day", () => {
     await runPushCheck({ store, send, loadPlan: async () => withDays([]), now: Date.parse("2026-10-08T18:40:00+02:00") });
     await runPushCheck({ store, send, loadPlan: async () => withDays([]), now: Date.parse("2026-10-08T19:05:00+02:00") });
     expect(sent.map((item) => item.payload.body)).toEqual([
-      "Gilt nicht mehr: Entfall · ABC · Raum 101",
+      "✅ Wieder nach Plan (Entfall gestrichen)",
       "Keine Änderungen eingetragen.",
     ]);
   });
