@@ -87,8 +87,9 @@ Repository arbeitet. Sie gehen allgemeinen Gewohnheiten vor.
   als Spalten nebeneinander). Umgeschaltet wird in `components/SubstitutionApp.tsx` über
   `hooks/useWideScreen.ts`; dieselbe Abfrage gibt es als Tailwind-Variante `wide:` in
   `app/globals.css` (z. B. Einstellungen als Dialog in der Mitte). Der Handy-Zweig bleibt
-  dabei unberührt. Bei Änderungen an der Startseite die Handy-Ansicht vorher/nachher per
-  Screenshot vergleichen.
+  dabei unberührt. Einen aufwendigen Pixel-Vergleich vorher/nachher (viele Größen und
+  Zustände) **nur auf ausdrücklichen Wunsch** des Nutzers machen – er dauert zu lange.
+  Sonst genügen die kurzen Screenshots aus „Bei UI-Änderungen zusätzlich ansehen“.
 - Gerätespeicher-Schlüssel beginnen mit `kag:` (`lib/reset.ts` löscht alle).
 - Ändert sich das Cache-Verhalten des Service Workers grundlegend, `VERSION` in
   `public/sw.js` erhöhen.
