@@ -21,7 +21,8 @@ export const config = {
   // The pages only; data, icons and build files need no policy.
   matcher: [
     {
-      source: "/((?!api|_next|_vercel|icon|apple-icon|manifest|sw\\.js|favicon\\.ico).*)",
+      // Whole path segments only: a page like /icons-info still gets its policy.
+      source: "/((?!(?:api|_next|_vercel|icon|apple-icon|manifest\\.webmanifest|sw\\.js|favicon\\.ico)(?:/|$)).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

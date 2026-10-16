@@ -147,6 +147,10 @@ describe("runPushCheck", () => {
     // Not twice.
     await runPushCheck({ store, send, loadPlan: async () => plan(after), now: NOW + 50 * 60_000 });
     expect(sent).toHaveLength(1);
+    // Uploaded again in another order: nothing to write or send.
+    await runPushCheck({ store, send, loadPlan: async () => plan([...after].reverse()), now: NOW + 60 * 60_000 });
+    expect(writes).toHaveBeenCalledTimes(2);
+    expect(sent).toHaveLength(1);
   });
 
   it("reports a withdrawn change after it is missing twice", async () => {

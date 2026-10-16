@@ -107,8 +107,11 @@ function summaryRuns(plan: SubstitutionPayload, now: number): SummaryRun[] {
   return [];
 }
 
-const sameList = (left: readonly string[], right: readonly string[]) =>
-  left.length === right.length && left.every((value, index) => value === right[index]);
+/** The same keys in any order: a plan uploaded in another order is not a change. */
+function sameList(left: readonly string[], right: readonly string[]) {
+  const known = new Set(left);
+  return left.length === right.length && known.size === new Set(right).size && right.every((key) => known.has(key));
+}
 
 /** The same entries, also the same ones missing for the moment (the time of the check aside). */
 function sameState(left: PlanState, right: PlanState) {

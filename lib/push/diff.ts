@@ -14,7 +14,10 @@ export type PlanState = {
    * a lesson must not be reported as "back to normal" because of that.
    */
   missing: string[];
-  /** When the state last changed (an unchanged state is not written again). */
+  /**
+   * When this state was worked out. The push check stores it only when it
+   * changed, so the stored value is the time of the last change.
+   */
   updatedAt: string;
 };
 

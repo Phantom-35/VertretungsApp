@@ -8,10 +8,14 @@ import { SCHOOL_PLAN_URL } from "@/lib/school";
  * syntax), recognises them by features they lack (lookbehind in regular
  * expressions: Safari 16.4; AbortSignal.timeout, used to load the plan) and
  * says so plainly, with a link to the school's own plan. "Trotzdem
- * versuchen" closes it, in case a browser is wrongly recognised.
+ * versuchen" closes it for good on this device (kag:old-device-dismissed),
+ * in case a browser is wrongly recognised.
  */
+export const OLD_DEVICE_DISMISSED_KEY = "kag:old-device-dismissed";
+
 export const OLD_DEVICE_SCRIPT = `(function(){
 try{new RegExp("(?<=a)b");if(typeof AbortSignal!=="undefined"&&AbortSignal.timeout)return}catch(e){}
+try{if(localStorage.getItem("${OLD_DEVICE_DISMISSED_KEY}"))return}catch(e){}
 function show(){
 if(document.getElementById("kag-old-device"))return;
 var d=document.createElement("div");
@@ -24,9 +28,9 @@ d.innerHTML='<div style="max-width:28rem;margin:10vh auto 0">'
 +'<a href="${SCHOOL_PLAN_URL}" style="display:block;margin-top:24px;padding:12px 16px;border-radius:999px;background:var(--accent,#1f6b67);color:#fff;text-align:center;font-weight:600;text-decoration:none">Plan der Schule öffnen</a>'
 +'<button type="button" style="display:block;margin:12px auto 0;padding:8px;background:none;border:0;color:var(--muted,#56646a);text-decoration:underline;font:inherit;cursor:pointer">Trotzdem versuchen</button>'
 +'</div>';
-d.getElementsByTagName("button")[0].onclick=function(){d.parentNode.removeChild(d)};
-// Outside <body>, which React takes over: nothing to clash with there.
-document.documentElement.appendChild(d);
+d.getElementsByTagName("button")[0].onclick=function(){try{localStorage.setItem("${OLD_DEVICE_DISMISSED_KEY}","1")}catch(e){}d.parentNode.removeChild(d)};
+// At the end of <body>: React 19 skips such foreign elements when it takes over the page.
+document.body.appendChild(d);
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",show);else show();
 })()`;

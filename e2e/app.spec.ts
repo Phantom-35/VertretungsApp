@@ -1234,7 +1234,10 @@ test("too old devices get a plain hint with the school's own plan", async ({ pag
     "href",
     "https://monitor2020.meckenheim-kag.com/schueler/subst_001.htm",
   );
-  // In case a browser is wrongly taken for an old one.
+  // In case a browser is wrongly taken for an old one: closed for good.
   await hint.getByRole("button", { name: "Trotzdem versuchen" }).click();
   await expect(hint).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator("h1")).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
 });
