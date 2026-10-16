@@ -99,3 +99,15 @@ describe("GET /api/health", () => {
     expect(down.status).toBe(503);
   });
 });
+
+describe("GET /api/health and the holiday data", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("reports in time that the holidays must be extended", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2029-11-15T10:00:00+01:00"));
+    const { status, body } = await health(payload({}));
+    expect(status).toBe(503);
+    expect(body.problems).toEqual(["Ferien sind nur bis 27.04.2030 eingetragen (lib/holidays.ts ergänzen)."]);
+  });
+});

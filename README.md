@@ -145,7 +145,8 @@ GitHub-Secrets und cron-job.org, niemals im Repository.
 
 - **`GET /api/health`** antwortet mit **200**, solange der Plan vollständig gelesen wird
   und der Push-Check in den letzten 30 Minuten lief, sonst mit **503** und den Gründen
-  (`problems`). Ein kostenloser Uptime-Dienst (z. B. UptimeRobot) kann diese Adresse
+  (`problems`). Ein halbes Jahr bevor die eingetragenen Ferien enden (`lib/holidays.ts`),
+  meldet sie das ebenfalls als Problem. Ein kostenloser Uptime-Dienst (z. B. UptimeRobot) kann diese Adresse
   alle paar Minuten abfragen und meldet sich, wenn etwas nicht stimmt, auch wenn die
   Schulseite ganz ausfällt oder cron-job.org nicht mehr aufruft.
 - **`ALERT_WEBHOOK_URL`** (siehe oben) meldet Lesefehler und Zustellprobleme von selbst.

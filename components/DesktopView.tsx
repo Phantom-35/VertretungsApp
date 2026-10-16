@@ -135,7 +135,8 @@ export function DesktopView(props: DesktopViewProps) {
           holiday={holiday}
           today={props.today}
           newPlanDate={props.newPlanDate}
-          hasOldPlan={props.hasOldPlan}
+          // All days stand side by side here: one button for the plan is enough.
+          hasOldPlan={props.hasOldPlan && props.newPlanDate === null}
           onShowNewPlan={props.onShowNewPlan}
           onShowOldPlan={props.onShowOldPlan}
         />

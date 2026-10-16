@@ -5,6 +5,7 @@ import {
   freeUntil,
   holidayBreak,
   holidayBreakAt,
+  holidayDataProblem,
   nextSchoolDay,
   publicHolidayName,
 } from "@/lib/holidays";
@@ -131,5 +132,16 @@ describe("holidayBreakAt", () => {
     expect(holidayBreakAt("2027-05-06", 9)).toBeNull(); // Christi Himmelfahrt, in the morning
     expect(holidayBreakAt("2027-05-06", 11)).toMatchObject({ kind: "public-holiday" });
     expect(holidayBreakAt("2026-10-16", 20)).toBeNull(); // school day
+  });
+});
+
+describe("holidayDataProblem", () => {
+  it("reminds half a year before the known holidays run out", () => {
+    expect(holidayDataProblem("2026-10-16")).toBeNull();
+    expect(holidayDataProblem("2029-10-28")).toBeNull(); // 181 days before 27.04.2030
+    expect(holidayDataProblem("2029-10-29")).toBe(
+      "Ferien sind nur bis 27.04.2030 eingetragen (lib/holidays.ts ergänzen).",
+    );
+    expect(holidayDataProblem("2030-06-01")).toContain("27.04.2030"); // also once they are over
   });
 });

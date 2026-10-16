@@ -175,6 +175,15 @@ test("keeps the holidays in front when the plan after them is already online", a
   await expect(page.getByRole("tab", { selected: true })).toContainText("02.11.");
   await expect(card).toHaveCount(0);
   await expect(header).not.toContainText("Herbstferien");
+
+  // On a large screen all days stand side by side: one button is enough.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.clock.setFixedTime(new Date("2026-10-20T09:00:00+02:00"));
+  await page.reload();
+  await expect(card.getByRole("button")).toHaveCount(1);
+  await card.getByRole("button", { name: "Plan für Mo., 02.11. ansehen" }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.locator("main section h2")).toHaveCount(2);
   await context.close();
 });
 

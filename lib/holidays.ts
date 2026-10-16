@@ -34,6 +34,22 @@ export const NRW_HOLIDAYS: readonly Holiday[] = [
   { name: "Osterferien", from: "2030-04-15", to: "2030-04-27" },
 ];
 
+/** Warn this many days before the last known holidays are over. */
+const HOLIDAY_DATA_WARN_DAYS = 180;
+
+/**
+ * For the health check: a reminder to extend NRW_HOLIDAYS while there is
+ * time, as later holidays would otherwise look like ordinary school days.
+ */
+export function holidayDataProblem(today: string, holidays: readonly Holiday[] = NRW_HOLIDAYS) {
+  const last = holidays.reduce((latest, holiday) => (holiday.to > latest ? holiday.to : latest), "");
+  if (!last || daysBetween(today, last) > HOLIDAY_DATA_WARN_DAYS) {
+    return null;
+  }
+  const [year, month, day] = last.split("-");
+  return `Ferien sind nur bis ${day}.${month}.${year} eingetragen (lib/holidays.ts ergänzen).`;
+}
+
 function addDays(date: string, days: number) {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 }

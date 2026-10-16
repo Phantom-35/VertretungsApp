@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCachedSubstitutionData } from "@/lib/cache";
+import { holidayDataProblem } from "@/lib/holidays";
 import { LAST_CHECK_META } from "@/lib/push/check";
 import { getPushService } from "@/lib/push/service";
+import { schoolToday } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -56,6 +58,10 @@ export async function GET() {
   const pushProblem = await pushCheckProblem(Date.now());
   if (pushProblem) {
     problems.push(pushProblem);
+  }
+  const holidayProblem = holidayDataProblem(schoolToday(Date.now()));
+  if (holidayProblem) {
+    problems.push(holidayProblem);
   }
 
   const unique = Array.from(new Set(problems));
