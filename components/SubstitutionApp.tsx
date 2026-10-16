@@ -38,7 +38,7 @@ import {
   normalizeTeacher,
 } from "@/lib/entries";
 import { formatAge, formatPlanDateLabel, formatShortDate, formatTimestamp, formatWeekday, isPastDate } from "@/lib/format";
-import { freeUntil, holidayBreak, nextSchoolDay } from "@/lib/holidays";
+import { freeUntil, holidayBreakAt, nextSchoolDay } from "@/lib/holidays";
 import { entryKey, findNewKeys } from "@/lib/seen";
 import { buildShareText } from "@/lib/share";
 import { daysBetween, pickDefaultDate, schoolHour, schoolToday } from "@/lib/time";
@@ -218,7 +218,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   // School holidays or a public holiday (NRW) without a plan for the days
   // ahead yet: a friendly card instead of an old plan that looks out of date.
   const today = now !== null ? schoolToday(now) : null;
-  const holiday = today !== null ? holidayBreak(today) : null;
+  // Decided when the app is opened, like the day shown (no jump while reading).
+  const decidedAt = opened?.last ?? now;
+  const holiday = today !== null && decidedAt !== null ? holidayBreakAt(today, schoolHour(decidedAt)) : null;
   const planAhead = today !== null && days.some((day) => day.date >= today);
   // The next school day, when the school has not published it yet: shown as
   // a pale extra tab, so "no changes" is not mistaken for "no plan yet".
@@ -260,7 +262,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   // On the last free day, from the hour the next day is shown (setting), the
   // plan for the first day back comes first, as on an ordinary weekend.
   // Decided when the app is opened, like the day shown.
-  const decidedAt = opened?.last ?? now;
   const backTomorrow =
     holiday !== null &&
     today !== null &&

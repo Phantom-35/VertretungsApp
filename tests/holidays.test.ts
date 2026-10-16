@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { NRW_HOLIDAYS, easterSunday, freeUntil, holidayBreak, nextSchoolDay, publicHolidayName } from "@/lib/holidays";
+import {
+  NRW_HOLIDAYS,
+  easterSunday,
+  freeUntil,
+  holidayBreak,
+  holidayBreakAt,
+  nextSchoolDay,
+  publicHolidayName,
+} from "@/lib/holidays";
 
 describe("holidayBreak", () => {
   it("covers the autumn holidays 2026 and the weekend after them", () => {
@@ -112,5 +120,16 @@ describe("freeUntil", () => {
     expect(freeUntil(autumn, "2026-10-20")).toBe("2026-10-31");
     // Sunday after holidays that end on Saturday.
     expect(freeUntil(holidayBreak("2026-11-01")!, "2026-11-01")).toBe("2026-11-01");
+  });
+});
+
+describe("holidayBreakAt", () => {
+  it("starts the holidays at 10:00 on the first free day", () => {
+    expect(holidayBreakAt("2026-10-17", 9)).toBeNull(); // Saturday morning after the last school day
+    expect(holidayBreakAt("2026-10-17", 10)).toMatchObject({ name: "Herbstferien" });
+    expect(holidayBreakAt("2026-10-18", 0)).toMatchObject({ name: "Herbstferien" }); // Sunday: already on
+    expect(holidayBreakAt("2027-05-06", 9)).toBeNull(); // Christi Himmelfahrt, in the morning
+    expect(holidayBreakAt("2027-05-06", 11)).toMatchObject({ kind: "public-holiday" });
+    expect(holidayBreakAt("2026-10-16", 20)).toBeNull(); // school day
   });
 });

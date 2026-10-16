@@ -157,6 +157,22 @@ export function holidayBreak(date: string, holidays: readonly Holiday[] = NRW_HO
   };
 }
 
+/** On the first free day, the holiday card only shows from this hour on. */
+export const HOLIDAY_FROM_HOUR = 10;
+
+/**
+ * Like holidayBreak, but on the first free day only from HOLIDAY_FROM_HOUR
+ * on: in the morning after the last school day the plan stays, as on an
+ * ordinary Saturday. `hour` is the hour (0–23) in the school's time zone.
+ */
+export function holidayBreakAt(date: string, hour: number, holidays: readonly Holiday[] = NRW_HOLIDAYS) {
+  const holiday = holidayBreak(date, holidays);
+  if (holiday && hour < HOLIDAY_FROM_HOUR && !holidayBreak(addDays(date, -1), holidays)) {
+    return null;
+  }
+  return holiday;
+}
+
 /**
  * The next day with school after `date`: not a weekend, not in the school
  * holidays, not a public holiday.

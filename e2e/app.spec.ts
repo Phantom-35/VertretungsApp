@@ -125,14 +125,24 @@ test("keeps the holidays in front when the plan after them is already online", a
   };
   await page.route((url) => url.pathname === "/", moveFriday);
   await page.route((url) => url.pathname === "/api/substitution", moveFriday);
-  // Tuesday in the autumn holidays 2026.
-  await page.clock.setFixedTime(new Date("2026-10-20T09:00:00+02:00"));
+  // The first free day (Saturday): in the morning still the plan, as on an
+  // ordinary Saturday; the holidays from 10:00 on.
+  await page.clock.setFixedTime(new Date("2026-10-17T09:30:00+02:00"));
   await page.goto("/");
   await chooseClass(page, "5A");
   const header = page.locator("header");
+  const card = page.getByRole("region", { name: "Schöne Herbstferien!" });
+  await expect(page.getByRole("tab", { selected: true })).toContainText("02.11.");
+  await expect(card).toHaveCount(0);
+  await page.clock.setFixedTime(new Date("2026-10-17T10:00:00+02:00"));
+  await page.reload();
+  await expect(card).toBeVisible();
+
+  // Tuesday in the autumn holidays 2026.
+  await page.clock.setFixedTime(new Date("2026-10-20T09:00:00+02:00"));
+  await page.reload();
   await expect(header).toContainText("Herbstferien bis Sa., 31.10.");
   await expect(header).toContainText("Ferien");
-  const card = page.getByRole("region", { name: "Schöne Herbstferien!" });
   await expect(card).toContainText("Frei bis Sa., 31.10. Der Plan für Mo., 02.11. ist schon online.");
   await expect(page.getByRole("tab")).toHaveCount(0);
 
@@ -232,8 +242,8 @@ test("shows the next school day as not online yet, instead of no changes", async
 });
 
 test("shows a public holiday instead of an old plan", async ({ page }) => {
-  // Christi Himmelfahrt 2027 (Thursday); the saved plan is from 08./09.10.2026.
-  await page.clock.setFixedTime(new Date("2027-05-06T09:00:00+02:00"));
+  // Christi Himmelfahrt 2027 (Thursday, from 10:00); the saved plan is from 08./09.10.2026.
+  await page.clock.setFixedTime(new Date("2027-05-06T11:00:00+02:00"));
   await page.goto("/");
   await chooseClass(page, "5A");
   const header = page.locator("header");

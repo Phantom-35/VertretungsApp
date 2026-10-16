@@ -188,7 +188,8 @@ Ausführliche Arbeitsregeln (auch für KI-Agenten): [`AGENTS.md`](AGENTS.md).
 - **Ferien:** `lib/holidays.ts` enthält die NRW-Ferien laut Ferienordnung bis
   **Ostern 2030** und muss vorher ergänzt werden. Gesetzliche Feiertage in NRW berechnet
   die App selbst. Bewegliche Ferientage der Schule sind nicht enthalten. Liegt für
-  freie Tage noch kein Plan vor, zeigt die App eine Ferien- bzw. Feiertagskarte. In den
+  freie Tage noch kein Plan vor, zeigt die App eine Ferien- bzw. Feiertagskarte – am
+  ersten freien Tag erst ab 10 Uhr (vorher wie an einem normalen Samstag). In den
   Schulferien bleibt die Ferienkarte auch dann, wenn der Plan danach schon online ist;
   sie bietet ihn und den letzten Plan vor den Ferien zum Antippen an (gilt bis zum
   nächsten Tag; ein Link aus einer Benachrichtigung öffnet den Plan direkt). Am letzten
