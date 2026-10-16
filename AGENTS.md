@@ -190,3 +190,14 @@ und Einträge je Klasse vergleichen. `npm run check:live` liest den echten Plan.
   auf „Push“ wartet.
 - Nach einem Push: kurz bestätigen, dass Vercel automatisch deployt; bei Bedarf
   `/api/health` prüfen.
+- **Browser-Checks gegen die Live-Seite dürfen nicht in der Statistik landen** (Wunsch
+  des Nutzers): In jedem Playwright-Kontext, der https://vertretung-kag.vercel.app
+  öffnet, vorher Vercel Web Analytics blockieren (Skript und Meldung, eigener Pfad aus
+  16 Hex-Zeichen bzw. `/_vercel/insights`):
+
+  ```js
+  await context.route((url) => /^\/(_vercel\/insights|[a-f0-9]{16})\//.test(url.pathname), (route) => route.abort());
+  ```
+
+  `curl`-Abfragen und `/api/*` zählen nicht; die lokalen Server und die E2E-Tests
+  ebenfalls nicht.
