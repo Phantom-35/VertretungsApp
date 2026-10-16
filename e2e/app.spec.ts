@@ -154,6 +154,17 @@ test("keeps the holidays in front when the plan after them is already online", a
   await page.goto("/?day=2026-11-02");
   await expect(card).toHaveCount(0);
   await expect(page.getByRole("tab", { selected: true })).toContainText("02.11.");
+
+  // The last free day: in the morning still the holidays, from 16:00 (as on
+  // an ordinary weekend) the plan for the first day back.
+  await page.clock.setFixedTime(new Date("2026-11-01T11:00:00+01:00"));
+  await page.goto("/");
+  await expect(card).toContainText("Frei bis So., 01.11. Der Plan für Mo., 02.11. ist schon online.");
+  await page.clock.setFixedTime(new Date("2026-11-01T16:30:00+01:00"));
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("02.11.");
+  await expect(card).toHaveCount(0);
+  await expect(header).not.toContainText("Herbstferien");
   await context.close();
 });
 

@@ -41,7 +41,7 @@ import { formatAge, formatPlanDateLabel, formatShortDate, formatTimestamp, forma
 import { freeUntil, holidayBreak, nextSchoolDay } from "@/lib/holidays";
 import { entryKey, findNewKeys } from "@/lib/seen";
 import { buildShareText } from "@/lib/share";
-import { pickDefaultDate, schoolToday } from "@/lib/time";
+import { daysBetween, pickDefaultDate, schoolHour, schoolToday } from "@/lib/time";
 import type { PlanDay, SubstitutionPayload } from "@/lib/types";
 
 type SubstitutionAppProps = {
@@ -257,7 +257,20 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const newPlanDate = today !== null ? (days.find((day) => day.date >= today)?.date ?? null) : null;
   const oldPlanDate = today !== null ? (days.findLast((day) => day.date < today)?.date ?? null) : null;
   const picksPlanDay = requestedDate !== null && days.some((day) => day.date === requestedDate);
-  const holidayMode = Boolean(holiday && (!planAhead || holiday.kind === "holidays") && !picksPlanDay);
+  // On the last free day, from the hour the next day is shown (setting), the
+  // plan for the first day back comes first, as on an ordinary weekend.
+  // Decided when the app is opened, like the day shown.
+  const decidedAt = opened?.last ?? now;
+  const backTomorrow =
+    holiday !== null &&
+    today !== null &&
+    decidedAt !== null &&
+    daysBetween(today, holiday.backOn) === 1 &&
+    newPlanDate === holiday.backOn &&
+    schoolHour(decidedAt) >= settings.nextDayFromHour;
+  const holidayMode = Boolean(
+    holiday && (!planAhead || (holiday.kind === "holidays" && !backTomorrow)) && !picksPlanDay,
+  );
   const showNewPlan = () => {
     if (newPlanDate) chooseDate(newPlanDate);
   };

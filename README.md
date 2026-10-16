@@ -191,7 +191,9 @@ Ausführliche Arbeitsregeln (auch für KI-Agenten): [`AGENTS.md`](AGENTS.md).
   freie Tage noch kein Plan vor, zeigt die App eine Ferien- bzw. Feiertagskarte. In den
   Schulferien bleibt die Ferienkarte auch dann, wenn der Plan danach schon online ist;
   sie bietet ihn und den letzten Plan vor den Ferien zum Antippen an (gilt bis zum
-  nächsten Tag; ein Link aus einer Benachrichtigung öffnet den Plan direkt).
+  nächsten Tag; ein Link aus einer Benachrichtigung öffnet den Plan direkt). Am letzten
+  freien Tag zeigt die App ab der Uhrzeit aus „Ab wann den nächsten Schultag zeigen?“ (Standard
+  16 Uhr) direkt den Plan für den ersten Schultag, wie an einem normalen Wochenende.
 - **Abhängigkeiten:** `.github/dependabot.yml` öffnet wöchentlich Update-Pull-Requests,
   die die CI prüft. Für Sicherheits-Updates in GitHub unter *Settings → Code security*
   „Dependabot alerts“ und „Dependabot security updates“ einschalten.
