@@ -187,6 +187,48 @@ test("keeps the holidays in front when the plan after them is already online", a
   await context.close();
 });
 
+for (const [name, answer] of [
+  ["switched off on the server", { enabled: false }],
+  ["not reachable", null],
+] as const) {
+  test(`works without notifications (${name})`, async ({ page }) => {
+    // Many never switch them on; the app must not depend on them.
+    await page.route("**/api/push/config", (route) =>
+      answer ? route.fulfill({ json: answer }) : route.abort(),
+    );
+    await page.goto("/");
+    await chooseClass(page, "5A");
+    await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
+    await expect(page.locator("article").first()).toBeVisible();
+    await page.getByRole("tab").nth(1).click();
+    await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
+    const dialog = await openSettings(page, "Benachrichtigungen");
+    await dialog.getByRole("button", { name: "Zurück zu den Einstellungen" }).click();
+    await dialog.getByRole("button", { name: /^Anzeige/ }).click();
+    await expect(dialog.getByRole("heading", { name: "Anzeige" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+
+    // The introduction can be finished too.
+    await page.evaluate(() => localStorage.removeItem("kag:onboarded"));
+    await page.reload();
+    const intro = page.getByRole("dialog");
+    await intro.getByRole("button", { name: "Los geht’s" }).click();
+    // The class is chosen already: class, then installing.
+    await intro.getByRole("button", { name: "Weiter" }).click();
+    await intro.getByRole("button", { name: "Erst mal ohne Installieren weiter" }).click();
+    // The notifications step: skipped without them, or (status unknown yet)
+    // left with "Weiter" or "Später".
+    const done = intro.getByRole("button", { name: "Fertig" });
+    const onward = intro.getByRole("button", { name: /^(Weiter|Später)$/ });
+    await expect(onward.or(done)).toBeVisible();
+    if (await onward.isVisible()) await onward.click();
+    await done.click();
+    await expect(intro).toBeHidden();
+    await expect(page.locator("article").first()).toBeVisible();
+  });
+}
+
 test("says when the next plan is not online yet, and marks past days", async ({ page }) => {
   // Saturday after the saved plan (08./09.10.), no holidays.
   await page.clock.setFixedTime(new Date("2026-10-10T11:00:00+02:00"));

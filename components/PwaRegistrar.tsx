@@ -6,7 +6,8 @@ import { useEffect } from "react";
 const RELOAD_WINDOW_MS = 8_000;
 /** Never more often than this, whatever the service worker reports. */
 const MIN_RELOAD_GAP_MS = 60_000;
-const LAST_RELOAD_KEY = "kag:update-reload";
+/** When the app last reloaded itself for a new version (session storage). */
+export const LAST_RELOAD_KEY = "kag:update-reload";
 
 /** The deploy this page belongs to (from the page itself, see app/layout.tsx). */
 function shownBuild() {

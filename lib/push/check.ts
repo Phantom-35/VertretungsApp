@@ -39,8 +39,8 @@ export type CheckResult =
       status: "checked";
       added: number;
       removed: number;
-      /** Registered devices. */
-      devices: number;
+      /** Registered devices; only when they were loaded anyway (changes or a summary). */
+      devices?: number;
       /** Devices looked at in this run (none without changes or summary). */
       subscribers: number;
       notified: number;
@@ -170,7 +170,8 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
       }
     }
 
-    const subscribers = hasChanges || dueSummaries.length > 0 ? await store.listSubscribers() : [];
+    const needsSubscribers = hasChanges || dueSummaries.length > 0;
+    const subscribers = needsSubscribers ? await store.listSubscribers() : [];
     const stats = { notified: 0, failed: 0, expired: 0, summaries: 0 };
 
     const deliver = async (subscriber: Subscriber, payload: PushPayload) => {
@@ -233,7 +234,9 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
       status: "checked",
       added: diff.added.length,
       removed: diff.removed.length,
-      devices: await store.countSubscribers(),
+      // Counted from the list already loaded: no extra Redis command on the
+      // many checks without anything to send.
+      ...(needsSubscribers ? { devices: subscribers.length - stats.expired } : {}),
       subscribers: subscribers.length,
       ...stats,
     };

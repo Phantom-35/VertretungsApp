@@ -24,7 +24,10 @@ describe("push API", () => {
     vi.stubEnv("VAPID_PUBLIC_KEY", "public-key");
     vi.stubEnv("VAPID_PRIVATE_KEY", "private-key");
     const { GET } = await import("@/app/api/push/config/route");
-    expect(await (await GET()).json()).toEqual({ enabled: true, publicKey: "public-key" });
+    const config = await GET();
+    expect(await config.json()).toEqual({ enabled: true, publicKey: "public-key" });
+    // Kept by the CDN (the same for everyone), never by the browser.
+    expect(config.headers.get("Cache-Control")).toBe("public, max-age=0, s-maxage=86400");
     const { POST } = await import("@/app/api/push/subscribe/route");
     const response = await POST(post({ subscription: { endpoint: "https://evil.example/x" }, schoolClass: "5A" }));
     expect(response.status).toBe(400);
