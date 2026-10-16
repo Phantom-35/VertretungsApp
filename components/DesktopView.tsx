@@ -84,6 +84,9 @@ export type DesktopViewProps = {
   holiday: HolidayBreak | null;
   holidayMode: boolean;
   today: string | null;
+  newPlanDate: string | null;
+  hasOldPlan: boolean;
+  onShowNewPlan: () => void;
   onShowOldPlan: () => void;
   /** Only past days in the plan: the next one is not online yet. */
   waiting: boolean;
@@ -131,7 +134,9 @@ export function DesktopView(props: DesktopViewProps) {
         <HolidayCard
           holiday={holiday}
           today={props.today}
-          hasOldPlan={data.days.length > 0}
+          newPlanDate={props.newPlanDate}
+          hasOldPlan={props.hasOldPlan}
+          onShowNewPlan={props.onShowNewPlan}
           onShowOldPlan={props.onShowOldPlan}
         />
       </div>

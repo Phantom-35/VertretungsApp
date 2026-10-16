@@ -5,8 +5,11 @@ type HolidayCardProps = {
   holiday: HolidayBreak;
   /** YYYY-MM-DD */
   today: string | null;
+  /** The first day of the plan after the holidays, once the school has it online. */
+  newPlanDate: string | null;
   /** Whether a plan from before the holidays exists to look at. */
   hasOldPlan: boolean;
+  onShowNewPlan: () => void;
   onShowOldPlan: () => void;
 };
 
@@ -26,8 +29,11 @@ function texts(holiday: HolidayBreak, today: string | null) {
   };
 }
 
-/** In the holidays, instead of an old plan that looks out of date. */
-export function HolidayCard({ holiday, today, hasOldPlan, onShowOldPlan }: HolidayCardProps) {
+/**
+ * In the holidays, instead of a plan: also once the plan after them is
+ * online, which is then one tap away (as is the last one before them).
+ */
+export function HolidayCard({ holiday, today, newPlanDate, hasOldPlan, onShowNewPlan, onShowOldPlan }: HolidayCardProps) {
   const { title, text } = texts(holiday, today);
   return (
     <section
@@ -55,14 +61,25 @@ export function HolidayCard({ holiday, today, hasOldPlan, onShowOldPlan }: Holid
         {title}
       </h2>
       <p className="mt-2 text-sm leading-6 text-muted">
-        {text} Der Plan
-        für {formatShortDate(holiday.backOn)} erscheint hier, sobald die Schule ihn hochlädt.
+        {text}{" "}
+        {newPlanDate
+          ? `Der Plan für ${formatShortDate(newPlanDate)} ist schon online.`
+          : `Der Plan für ${formatShortDate(holiday.backOn)} erscheint hier, sobald die Schule ihn hochlädt.`}
       </p>
+      {newPlanDate ? (
+        <button
+          type="button"
+          onClick={onShowNewPlan}
+          className="mt-4 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98]"
+        >
+          Plan für {formatShortDate(newPlanDate)} ansehen
+        </button>
+      ) : null}
       {hasOldPlan ? (
         <button
           type="button"
           onClick={onShowOldPlan}
-          className="mt-4 text-sm font-semibold text-accent-strong underline underline-offset-2"
+          className={`${newPlanDate ? "mx-auto mt-3 block" : "mt-4"} text-sm font-semibold text-accent-strong underline underline-offset-2`}
         >
           Letzten Plan ansehen
         </button>

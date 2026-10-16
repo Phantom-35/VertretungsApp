@@ -251,15 +251,26 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       );
   const showsPendingDay = selectedDate !== null && selectedDate === pendingDate;
   const selectedDay = days.find((day) => day.date === selectedDate) ?? null;
-  const [showOldPlan, setShowOldPlan] = useState(false);
-  const holidayMode = Boolean(holiday && !planAhead && !showOldPlan);
+  // In the school holidays the card stays, also once the plan after them is
+  // online: it offers that plan and the last one before them. A day picked
+  // there (or opened from a notification) shows the plan, until the next day.
+  const newPlanDate = today !== null ? (days.find((day) => day.date >= today)?.date ?? null) : null;
+  const oldPlanDate = today !== null ? (days.findLast((day) => day.date < today)?.date ?? null) : null;
+  const picksPlanDay = requestedDate !== null && days.some((day) => day.date === requestedDate);
+  const holidayMode = Boolean(holiday && (!planAhead || holiday.kind === "holidays") && !picksPlanDay);
+  const showNewPlan = () => {
+    if (newPlanDate) chooseDate(newPlanDate);
+  };
+  const showOldPlan = () => {
+    if (oldPlanDate) chooseDate(oldPlanDate);
+  };
 
   let headerStatus: HeaderStatus = "current";
   if (isBusy || now === null) {
     headerStatus = "updating";
   } else if (connectionError) {
     headerStatus = "offline";
-  } else if (holiday && !planAhead) {
+  } else if (holiday && (!planAhead || holidayMode)) {
     headerStatus = holiday.kind === "holidays" ? "holiday" : "public-holiday";
   } else if (!data || data.stale || fromDevice) {
     headerStatus = "outdated";
@@ -399,7 +410,10 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
           holiday={holiday}
           holidayMode={holidayMode}
           today={today}
-          onShowOldPlan={() => setShowOldPlan(true)}
+          newPlanDate={newPlanDate}
+          hasOldPlan={oldPlanDate !== null}
+          onShowNewPlan={showNewPlan}
+          onShowOldPlan={showOldPlan}
           waiting={headerStatus === "waiting"}
           findNew={(entries) =>
             settings.showNewBadges ? findNewKeys(seenBaseline, entries, acknowledgedNew) : new Set<string>()
@@ -523,7 +537,14 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               {!data && isBusy ? <LoadingState /> : null}
 
               {holidayMode && holiday && selectedClass !== null ? (
-                <HolidayCard holiday={holiday} today={today} hasOldPlan={days.length > 0} onShowOldPlan={() => setShowOldPlan(true)} />
+                <HolidayCard
+                  holiday={holiday}
+                  today={today}
+                  newPlanDate={newPlanDate}
+                  hasOldPlan={oldPlanDate !== null}
+                  onShowNewPlan={showNewPlan}
+                  onShowOldPlan={showOldPlan}
+                />
               ) : null}
 
               {!data && !isBusy ? (

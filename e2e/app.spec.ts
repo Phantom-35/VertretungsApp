@@ -1,6 +1,6 @@
 import { createServer, request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import { SCHOOL_CLASSES, entryAppliesToClass } from "@/lib/entries";
 import { entryKey } from "@/lib/seen";
 import type { SubstitutionPayload } from "@/lib/types";
@@ -111,6 +111,50 @@ test("shows the NRW holidays instead of an old plan", async ({ page }) => {
   await page.reload();
   await expect(header).toContainText("Herbstferien bis So., 01.11.");
   await expect(card).toContainText("Frei bis So., 01.11. Der Plan für Mo., 02.11. erscheint hier");
+});
+
+test("keeps the holidays in front when the plan after them is already online", async ({ browser }) => {
+  // Without the service worker, so that the plan goes through page.route:
+  // the saved plan's Friday (09.10.) becomes the Monday after the holidays.
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("kag:onboarded", "1"));
+  const page = await context.newPage();
+  const moveFriday = async (route: Route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, body: (await response.text()).replaceAll("2026-10-09", "2026-11-02") });
+  };
+  await page.route((url) => url.pathname === "/", moveFriday);
+  await page.route((url) => url.pathname === "/api/substitution", moveFriday);
+  // Tuesday in the autumn holidays 2026.
+  await page.clock.setFixedTime(new Date("2026-10-20T09:00:00+02:00"));
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const header = page.locator("header");
+  await expect(header).toContainText("Herbstferien bis Sa., 31.10.");
+  await expect(header).toContainText("Ferien");
+  const card = page.getByRole("region", { name: "Schöne Herbstferien!" });
+  await expect(card).toContainText("Frei bis Sa., 31.10. Der Plan für Mo., 02.11. ist schon online.");
+  await expect(page.getByRole("tab")).toHaveCount(0);
+
+  // The new plan, one tap away; the header then tells its day.
+  await card.getByRole("button", { name: "Plan für Mo., 02.11. ansehen" }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("02.11.");
+  await expect(header).not.toContainText("Herbstferien");
+  await expect(page.locator("article").first()).toBeVisible();
+
+  // Opened again: the holidays first, and the last plan before them.
+  await page.reload();
+  await card.getByRole("button", { name: "Letzten Plan ansehen" }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("08.10.");
+  await expect(page.getByRole("tab")).toHaveCount(2);
+
+  // A notification for the new plan opens it directly.
+  await page.goto("/?day=2026-11-02");
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("02.11.");
+  await context.close();
 });
 
 test("says when the next plan is not online yet, and marks past days", async ({ page }) => {
