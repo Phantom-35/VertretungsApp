@@ -95,4 +95,59 @@ describe("Redis push store (Upstash REST)", () => {
       await upstash.close();
     }
   });
+
+  it("writes the plan only when it changed, and reports every change against Redis", async () => {
+    const upstash = await startFakeUpstash();
+    vi.stubEnv("KV_REST_API_URL", upstash.url);
+    vi.stubEnv("KV_REST_API_TOKEN", "token");
+    try {
+      const store = getPushStore()!;
+      await store.saveSubscriber(subscriber("five", "5A"));
+      const sent: PushPayload[] = [];
+      const send = async (_: unknown, payload: PushPayload) => {
+        sent.push(payload);
+        return "sent" as const;
+      };
+      const entry = (lesson: string, type = "Vertretung") =>
+        ({ className: "05A", lesson, type, substitute: "DEF", teacher: "ABC", room: "", subject: "", text: "", date: "2026-10-09", id: "", page: 1 }) as SubstitutionEntry;
+      const plan = (entries: SubstitutionEntry[]) =>
+        ({ success: true, stale: false, error: null, entries }) as SubstitutionPayload;
+      const planWrites = () =>
+        upstash.commands.filter(([name, key]) => name.toUpperCase() === "SET" && key === "push:plan").length;
+      let now = Date.parse("2026-10-08T10:00:00+02:00");
+      const check = (entries: SubstitutionEntry[]) => {
+        now += 10 * 60_000;
+        return runPushCheck({ store, send, loadPlan: async () => plan(entries), now });
+      };
+
+      await check([entry("1")]);
+      expect(planWrites()).toBe(1);
+      // Two hours without changes: not written again.
+      for (let index = 0; index < 12; index += 1) {
+        await check([entry("1")]);
+      }
+      expect(planWrites()).toBe(1);
+      expect(sent).toHaveLength(0);
+
+      // A new substitution: reported at once.
+      expect(await check([entry("1"), entry("4")])).toMatchObject({ added: 1, notified: 1 });
+      expect(sent.map((item) => item.body)).toEqual(["🔄 Vertretung · ABC → DEF"]);
+      expect(planWrites()).toBe(2);
+      await check([entry("1"), entry("4")]);
+      expect(sent).toHaveLength(1);
+
+      // Withdrawn: missing once (maybe an upload) is remembered, twice is reported.
+      await check([entry("1")]);
+      expect(sent).toHaveLength(1);
+      expect(await check([entry("1")])).toMatchObject({ removed: 1, notified: 1 });
+      expect(sent.at(-1)!.body).toBe("✅ Wieder nach Plan (Vertretung gestrichen)");
+      // Back to unchanged: no more writes.
+      const writes = planWrites();
+      await check([entry("1")]);
+      await check([entry("1")]);
+      expect(planWrites()).toBe(writes);
+    } finally {
+      await upstash.close();
+    }
+  });
 });

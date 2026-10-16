@@ -119,6 +119,36 @@ describe("runPushCheck", () => {
     expect(sent).toHaveLength(0);
   });
 
+  it("writes the plan state only when it changed, and still reports a new change at once", async () => {
+    const store = new MemoryStore();
+    const writes = vi.spyOn(store, "savePlanState");
+    const fiveA = await addSubscriber(store, "five-a", "5A");
+    const { sent, send } = fakeSender();
+    const before = [entry({ lesson: "1" })];
+
+    await runPushCheck({ store, send, loadPlan: async () => plan(before), now: NOW });
+    expect(writes).toHaveBeenCalledTimes(1);
+    // Unchanged for a while: nothing written, nothing sent.
+    for (let check = 1; check <= 3; check += 1) {
+      await runPushCheck({ store, send, loadPlan: async () => plan(before), now: NOW + check * 10 * 60_000 });
+    }
+    expect(writes).toHaveBeenCalledTimes(1);
+    expect(sent).toHaveLength(0);
+
+    // A new substitution: reported in the very next check, and recorded.
+    const after = [...before, entry({ lesson: "4", type: "Vertretung", substitute: "DEF" })];
+    expect(await runPushCheck({ store, send, loadPlan: async () => plan(after), now: NOW + 40 * 60_000 })).toMatchObject({
+      status: "checked",
+      added: 1,
+      notified: 1,
+    });
+    expect(sent.map((item) => item.endpoint)).toEqual([fiveA.endpoint]);
+    expect(writes).toHaveBeenCalledTimes(2);
+    // Not twice.
+    await runPushCheck({ store, send, loadPlan: async () => plan(after), now: NOW + 50 * 60_000 });
+    expect(sent).toHaveLength(1);
+  });
+
   it("reports a withdrawn change after it is missing twice", async () => {
     const store = new MemoryStore();
     await addSubscriber(store, "five-a", "5A");

@@ -60,26 +60,6 @@ type DescribedEntry = Pick<
   "className" | "lesson" | "type" | "substitute" | "teacher" | "room" | "subject" | "text"
 >;
 
-/** "Entfall · 6ABCD · ABC → DEF · Raum 204 · „Aufgaben“" */
-export function describeEntry(entry: DescribedEntry, schoolClass: string) {
-  const className = formatClassName(entry.className);
-  return [
-    displayType(entry.type),
-    className !== schoolClass ? className : "",
-    entry.subject ? `Fach ${entry.subject}` : "",
-    teacherLabel(entry),
-    entry.room ? `Raum ${entry.room}` : "",
-    entry.text ? `„${entry.text}“` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-/** One line per change, e.g. "• 3.–4. Std.: Entfall · ABC · Raum 204". */
-export function formatShareLine(entry: DescribedEntry, schoolClass: string) {
-  return `• ${lessonLabel(entry.lesson)}: ${describeEntry(entry, schoolClass)}`;
-}
-
 /**
  * One change as a short block for messengers. "*…*" is bold in WhatsApp
  * (most other messengers show the stars as they are):

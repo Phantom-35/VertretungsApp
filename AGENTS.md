@@ -90,6 +90,13 @@ Repository arbeitet. Sie gehen allgemeinen Gewohnheiten vor.
   dabei unberührt. Einen aufwendigen Pixel-Vergleich vorher/nachher (viele Größen und
   Zustände) **nur auf ausdrücklichen Wunsch** des Nutzers machen – er dauert zu lange.
   Sonst genügen die kurzen Screenshots aus „Bei UI-Änderungen zusätzlich ansehen“.
+- **Sicherheitsregeln (CSP):** `proxy.ts` setzt für jede Seite eine Content Security
+  Policy mit Nonce (`lib/csp.ts`). Neue Inline-Skripte brauchen `nonce={nonce}` (siehe
+  `app/layout.tsx`); Skripte, Bilder, Schriften oder Anfragen von **fremden** Adressen sind
+  blockiert, bis sie in `lib/csp.ts` freigegeben werden (dann auch die Datenschutzerklärung
+  prüfen). Der E2E-Test „security policy“ meldet jede Blockade.
+- Ältere Browser (unter Safari 16.4 bzw. den Vorgaben von Next.js 16) bekommen statt der
+  App einen Hinweis mit Link zum Plan der Schule (`lib/legacy.ts`, bewusst ES5).
 - Gerätespeicher-Schlüssel beginnen mit `kag:` (`lib/reset.ts` löscht alle).
 - Ändert sich das Cache-Verhalten des Service Workers grundlegend, `VERSION` in
   `public/sw.js` erhöhen.

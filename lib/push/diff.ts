@@ -14,6 +14,7 @@ export type PlanState = {
    * a lesson must not be reported as "back to normal" because of that.
    */
   missing: string[];
+  /** When the state last changed (an unchanged state is not written again). */
   updatedAt: string;
 };
 

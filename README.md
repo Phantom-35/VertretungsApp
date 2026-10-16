@@ -132,6 +132,15 @@ gegen gleichzeitige Läufe gesperrt.
 Geheime Werte (Schlüssel, `CRON_SECRET`, Webhook-Adressen) stehen nur in Vercel,
 GitHub-Secrets und cron-job.org, niemals im Repository.
 
+### Sicherheit und ältere Geräte
+
+- Jede Seite trägt eine **Content Security Policy** mit einem für jeden Aufruf neuen
+  Schlüssel (`proxy.ts`, `lib/csp.ts`): Nur die Skripte der App laufen, eingeschleuster
+  Code nicht. Dazu kommen die üblichen Schutz-Header aus `next.config.ts`.
+- Next.js 16 braucht **Safari 16.4** bzw. einen aktuellen Chrome, Firefox oder Edge.
+  Ältere Geräte (z. B. iPhone 7 mit iOS 15) sehen statt einer kaputten App einen Hinweis
+  mit Link zum Plan der Schule (`lib/legacy.ts`).
+
 ### Überwachung
 
 - **`GET /api/health`** antwortet mit **200**, solange der Plan vollständig gelesen wird

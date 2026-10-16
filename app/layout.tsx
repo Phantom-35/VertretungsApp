@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { UsageStats } from "@/components/UsageStats";
+import { OLD_DEVICE_SCRIPT } from "@/lib/legacy";
 import { THEME_COLORS, THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -30,16 +32,19 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Set by proxy.ts: the inline scripts below may only run with it (CSP).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     // The theme script sets data-theme before React hydrates.
     <html lang="de" className="h-full" data-theme="light" suppressHydrationWarning>
       <head>
         {/* The deploy this page belongs to (see public/sw.js, PwaRegistrar). */}
         <meta name="kag-build" content={process.env.KAG_BUILD_ID} />
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: OLD_DEVICE_SCRIPT }} />
       </head>
       <body className="min-h-full">
         {children}

@@ -1147,3 +1147,94 @@ test("large screens: all days side by side, phones keep their view", async ({ pa
   await expect(page.locator("#class-selector")).toHaveValue("5A");
   await expect(page.locator("#desktop-class-selector")).toHaveCount(0);
 });
+
+test("security policy: pages carry a nonce policy, and nothing in the app is blocked", async ({ page }) => {
+  // Every blocked script, style, image or request is recorded.
+  await page.addInitScript(() => {
+    const blocked: string[] = [];
+    (window as unknown as { __blocked: string[] }).__blocked = blocked;
+    document.addEventListener("securitypolicyviolation", (event) =>
+      blocked.push(`${event.violatedDirective} ${event.blockedURI}`),
+    );
+  });
+  const blocked = () => page.evaluate(() => (window as unknown as { __blocked: string[] }).__blocked);
+
+  const response = await page.goto("/");
+  const policy = response!.headers()["content-security-policy"];
+  expect(policy).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
+  expect(policy).toContain("worker-src 'self'");
+  expect(policy).toContain("frame-ancestors 'none'");
+  // A new nonce for every page view.
+  const again = (await page.request.get("/")).headers()["content-security-policy"];
+  expect(again).not.toBe(policy);
+
+  await chooseClass(page, "Q1");
+  const dialog = await openSettings(page);
+  for (const section of ["Benachrichtigungen", "Anzeige", "Meine Lehrkräfte", "Als App installieren", "Über die App"]) {
+    await dialog.getByRole("button", { name: new RegExp(`^${section}`) }).click();
+    await dialog.getByRole("button", { name: "Zurück zu den Einstellungen" }).click();
+  }
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator("#desktop-class-selector")).toBeVisible();
+  expect(await blocked()).toEqual([]);
+
+  await page.goto("/teilen");
+  await expect(page.getByRole("button", { name: "Aushang drucken" })).toBeVisible();
+  expect(await blocked()).toEqual([]);
+
+  // The introduction (also on a first start the theme script runs).
+  await page.evaluate(() => localStorage.removeItem("kag:onboarded"));
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Willkommen!" })).toBeVisible();
+  expect(await page.locator("html").getAttribute("data-theme")).toMatch(/^(light|dark)$/);
+  expect(await blocked()).toEqual([]);
+
+});
+
+test("security policy: a script smuggled into the page does not run", async ({ browser }) => {
+  // Without the service worker, so that the page goes through page.route.
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  const page = await context.newPage();
+  // As if an attacker got a script into the HTML: the real page and its real policy.
+  await page.route("**/", async (route) => {
+    const response = await route.fetch();
+    const html = (await response.text()).replace("</body>", "<script>window.__injected = true;</script></body>");
+    await route.fulfill({ response, body: html });
+  });
+  await page.addInitScript(() => {
+    const blocked: string[] = [];
+    (window as unknown as { __blocked: string[] }).__blocked = blocked;
+    document.addEventListener("securitypolicyviolation", (event) => blocked.push(event.violatedDirective));
+  });
+  await page.goto("/");
+  await expect(page.locator("h1")).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __injected?: boolean }).__injected)).toBeUndefined();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __blocked: string[] }).__blocked))
+    .toContainEqual(expect.stringMatching(/^script-src/));
+  await context.close();
+});
+
+test("too old devices get a plain hint with the school's own plan", async ({ page }) => {
+  // Current browsers: no hint.
+  await page.goto("/");
+  await expect(page.locator("h1")).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+
+  // As in Safari before 16.4 / 16.0: a feature the app needs is missing.
+  await page.addInitScript(() => {
+    Object.defineProperty(AbortSignal, "timeout", { value: undefined, configurable: true });
+  });
+  await page.reload();
+  const hint = page.getByRole("alertdialog", { name: "Dein Gerät ist zu alt für die App" });
+  await expect(hint).toBeVisible();
+  await expect(hint).toContainText("iOS 16.4");
+  await expect(hint.getByRole("link", { name: "Plan der Schule öffnen" })).toHaveAttribute(
+    "href",
+    "https://monitor2020.meckenheim-kag.com/schueler/subst_001.htm",
+  );
+  // In case a browser is wrongly taken for an old one.
+  await hint.getByRole("button", { name: "Trotzdem versuchen" }).click();
+  await expect(hint).toHaveCount(0);
+});

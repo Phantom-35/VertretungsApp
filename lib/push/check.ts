@@ -1,5 +1,5 @@
 import { reportDeliveryProblem } from "@/lib/alert";
-import { diffPlan } from "@/lib/push/diff";
+import { diffPlan, type PlanState } from "@/lib/push/diff";
 import {
   buildNotification,
   buildSummary,
@@ -106,6 +106,15 @@ function summaryRuns(plan: SubstitutionPayload, now: number): SummaryRun[] {
   }
   return [];
 }
+
+const sameList = (left: readonly string[], right: readonly string[]) =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
+/** The same entries, also the same ones missing for the moment (the time of the check aside). */
+function sameState(left: PlanState, right: PlanState) {
+  return sameList(left.keys, right.keys) && sameList(left.missing, right.missing);
+}
+
 /** Bookkeeping key: when the scheduler last called the check (see /api/health). */
 export const LAST_CHECK_META = "last-check";
 
@@ -135,15 +144,14 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
       return { status: "incomplete", reason: plan.error ?? "Plan nicht verfügbar" };
     }
 
-    const diff = diffPlan(
-      await store.getPlanState(),
-      plan.entries,
-      schoolToday(now),
-      new Date(now),
-      plan.days?.map((day) => day.date),
-    );
-    // Saved before sending: a failed run must not notify twice.
-    await store.savePlanState(diff.state);
+    const previous = await store.getPlanState();
+    const diff = diffPlan(previous, plan.entries, schoolToday(now), new Date(now), plan.days?.map((day) => day.date));
+    // Saved before sending: a failed run must not notify twice. Unchanged
+    // (most checks), nothing needs writing: the next check compares with the
+    // same state either way.
+    if (!previous || !sameState(previous, diff.state)) {
+      await store.savePlanState(diff.state);
+    }
 
     const hasChanges = !diff.initial && diff.added.length + diff.removed.length > 0;
     const dueSummaries: SummaryRun[] = [];

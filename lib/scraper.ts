@@ -1,6 +1,7 @@
 import { reportPlanProblems } from "@/lib/alert";
 import { lessonStart } from "@/lib/entries";
 import { normalizeWhitespace, parseSubstitutionPage } from "@/lib/parser";
+import { SCHOOL_PLAN_BASE_URL } from "@/lib/school";
 import type {
   DayNotice,
   ParsedPage,
@@ -10,9 +11,7 @@ import type {
   SubstitutionPayload,
 } from "@/lib/types";
 
-const BASE_URL =
-  process.env.SUBSTITUTION_BASE_URL ??
-  "https://monitor2020.meckenheim-kag.com/schueler/subst_";
+const BASE_URL = process.env.SUBSTITUTION_BASE_URL ?? SCHOOL_PLAN_BASE_URL;
 const REQUEST_TIMEOUT_MS = 6_000;
 const RETRY_DELAY_MS = 400;
 const MAX_ATTEMPTS = 2;
