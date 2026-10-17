@@ -17,18 +17,31 @@ const state =
   globalAlert.__substitutionAlert ??
   (globalAlert.__substitutionAlert = { signature: null, sentAt: 0 });
 
-async function send(url: string, message: string) {
-  const isNtfy = /(^|\.)ntfy\./i.test(new URL(url).hostname);
-  const response = await fetch(url, {
+/**
+ * Posts a message to the maintainer's webhook. Also used for the messages
+ * from the "Hilfe & Kontakt" page (app/api/feedback). Throws on failure.
+ */
+export async function send(url: string, message: string, title = TITLE) {
+  const target = new URL(url);
+  const isNtfy = /(^|\.)ntfy\./i.test(target.hostname);
+  if (isNtfy && title !== TITLE) {
+    // Headers only carry Latin-1: other titles (umlauts, emoji) go in the address.
+    target.searchParams.set("title", title);
+  }
+  const response = await fetch(target, {
     method: "POST",
     headers: isNtfy
-      ? { "content-type": "text/plain; charset=utf-8", title: TITLE }
+      ? { "content-type": "text/plain; charset=utf-8", ...(title === TITLE ? { title: TITLE } : {}) }
       : { "content-type": "application/json" },
-    // Slack reads "text", Discord "content". Text from the plan must not
-    // trigger mentions such as @everyone on Discord.
+    // Slack reads "text", Discord "content". Text from the plan (or written
+    // by a user) must not trigger mentions such as @everyone on Discord.
     body: isNtfy
       ? message
-      : JSON.stringify({ text: message, content: message, allowed_mentions: { parse: [] } }),
+      : JSON.stringify({
+          text: title === TITLE ? message : `${title}\n${message}`,
+          content: title === TITLE ? message : `${title}\n${message}`,
+          allowed_mentions: { parse: [] },
+        }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {

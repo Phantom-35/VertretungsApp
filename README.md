@@ -125,6 +125,7 @@ gegen gleichzeitige Läufe gesperrt.
 | `CRON_SECRET` | Pflicht für Benachrichtigungen; schützt `/api/push/check`. |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` (oder `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) | Redis; setzt Vercel beim Verbinden selbst. |
 | `ALERT_WEBHOOK_URL` | Optional. Bekommt eine Nachricht, wenn der Plan nicht mehr vollständig gelesen werden kann (z. B. weil Untis das Format geändert hat) und wenn es wieder geht, außerdem wenn Benachrichtigungen bei keinem Gerät ankommen. Geht mit einem [ntfy.sh](https://ntfy.sh)-Thema (Push aufs Handy ohne Konto, z. B. `https://ntfy.sh/ein-geheimer-name`), einem Discord- oder Slack-Webhook. |
+| `FEEDBACK_WEBHOOK_URL` | Optional. Bekommt die Nachrichten aus *Einstellungen → Hilfe & Kontakt* (mit Geräte-Angaben, wenn der Nutzer sie nicht abwählt). Am besten ein **geheimes** [ntfy.sh](https://ntfy.sh)-Thema mit langem Zufallsnamen (wie ein Passwort; nur hier und in der eigenen ntfy-App eintragen). Ohne diesen Wert wird `ALERT_WEBHOOK_URL` benutzt; fehlen beide, bietet die App nur E-Mail an. Die Adresse bleibt auf dem Server. |
 | `NEXT_PUBLIC_IMPRESSUM_URL`, `NEXT_PUBLIC_DATENSCHUTZ_URL` | Optional. Andere Adressen für Impressum und Datenschutz. Standard: die Seiten auf support-vertretung-kag.vercel.app. Nach dem Ändern neu deployen. |
 | `SUBSTITUTION_BASE_URL` | Nur für Tests: andere Quelle für die Untis-Seiten. Standard: die Seite der Schule. |
 | `PUSH_STORE=memory` | Nur für Tests: Anmeldungen im Arbeitsspeicher statt in Redis. |

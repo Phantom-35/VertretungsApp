@@ -53,6 +53,8 @@ export default defineConfig({
         VAPID_PRIVATE_KEY: VAPID.privateKey,
         VAPID_SUBJECT: "https://kag.example",
         CRON_SECRET,
+        // Messages from "Hilfe & Kontakt" go to the fixture server (see there).
+        FEEDBACK_WEBHOOK_URL: `http://127.0.0.1:${FIXTURE_PORT}/__feedback`,
         // The test notification comes almost at once instead of after 10 s.
         PUSH_TEST_DELAY_MS: "300",
         // The fake push service uses a self-signed certificate.

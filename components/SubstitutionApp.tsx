@@ -677,6 +677,18 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
         sourceUrl={data?.sourceUrl}
         myClass={myClass ?? null}
         onChooseMyClass={chooseMyClass}
+        planInfo={
+          data
+            ? [
+                `Stand ${formatTimestamp(data.sourceUpdatedAt ?? null, now)}`,
+                `geprüft ${formatAge(data.lastUpdated, now)}`,
+                ...(data.stale ? ["Schulseite nicht erreichbar"] : []),
+                ...(data.error && !data.stale ? ["unvollständig"] : []),
+                ...(fromDevice ? ["Kopie vom Gerät"] : []),
+                ...(connectionError ? ["keine Verbindung"] : []),
+              ].join(", ")
+            : "nicht geladen"
+        }
         onShowIntroduction={() => {
           setSettingsOpen(false);
           onboarding.restart();

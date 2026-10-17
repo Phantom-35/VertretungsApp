@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import Link from "next/link";
+import { FeedbackForm } from "@/components/FeedbackForm";
 import { InstallGuide } from "@/components/InstallGuide";
 import { NotificationControls } from "@/components/NotificationSettings";
 import { Segmented } from "@/components/Segmented";
@@ -39,6 +40,8 @@ type SettingsSheetProps = {
   myClass: string | null;
   onChooseMyClass: (value: string) => void;
   onShowIntroduction: () => void;
+  /** State of the plan for messages from "Hilfe & Kontakt". */
+  planInfo: string;
 };
 
 const nextDayOptions = NEXT_DAY_HOURS.map((hour) => ({
@@ -57,28 +60,9 @@ const BUILD = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null
 
 /** Support website with the legal pages; the addresses can be changed on Vercel. */
 const SUPPORT_URL = "https://support-vertretung-kag.vercel.app";
-const FEEDBACK_EMAIL = "phandevstudios@gmx.de";
-
-/** An e-mail with the details that help to reproduce a problem. */
-function sendFeedback(myClass: string | null) {
-  const body = [
-    "Was ist dir aufgefallen?",
-    "",
-    "",
-    "---",
-    `Klasse: ${myClass ?? "–"}`,
-    `Als App installiert: ${isStandalone() ? "ja" : "nein"}`,
-    `Version: ${APP_VERSION ?? "–"}${BUILD ? ` (${BUILD})` : ""}`,
-    `Gerät: ${navigator.userAgent}`,
-  ].join("\n");
-  window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(
-    "Feedback KAG Vertretungsplan",
-  )}&body=${encodeURIComponent(body)}`;
-}
 const LEGAL_LINKS = [
   { label: "Impressum", url: process.env.NEXT_PUBLIC_IMPRESSUM_URL?.trim() || `${SUPPORT_URL}/impressum` },
   { label: "Datenschutz", url: process.env.NEXT_PUBLIC_DATENSCHUTZ_URL?.trim() || `${SUPPORT_URL}/datenschutz` },
-  { label: "Hilfe & Kontakt", url: SUPPORT_URL },
 ];
 
 /** Dragged this far down (px) or flicked this fast (px/ms), the sheet closes. */
@@ -104,13 +88,14 @@ function Setting({ id, title, description, children }: {
 }
 
 /** The pages of the sheet: the overview and a few subpages, to keep each one short. */
-type Page = "main" | "notifications" | "display" | "teachers" | "install" | "about";
+type Page = "main" | "notifications" | "display" | "teachers" | "install" | "help" | "about";
 
 const PAGE_TITLES: Record<Exclude<Page, "main">, string> = {
   notifications: "Benachrichtigungen",
   display: "Anzeige",
   teachers: "Meine Lehrkräfte",
   install: "Als App installieren",
+  help: "Hilfe & Kontakt",
   about: "Über die App",
 };
 
@@ -158,6 +143,12 @@ const ICONS: Record<string, ReactNode> = {
   share: (
     <svg {...iconProps}>
       <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2" />
+    </svg>
+  ),
+  help: (
+    <svg {...iconProps}>
+      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />
+      <path d="M9.6 9.5a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2-2.4 3.4M12 16.5h.01" />
     </svg>
   ),
   about: (
@@ -275,6 +266,7 @@ export function SettingsSheet({
   myClass,
   onChooseMyClass,
   onShowIntroduction,
+  planInfo,
 }: SettingsSheetProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Latest onClose without re-attaching the swipe listeners on every render.
@@ -526,6 +518,7 @@ export function SettingsSheet({
                 <NavRow icon={ICONS.install} title="Als App installieren" page="install" onClick={() => goTo("install")} />
               ) : null}
               <NavRow icon={ICONS.share} title="App weitergeben (QR-Code)" href="/teilen" />
+              <NavRow icon={ICONS.help} title="Hilfe & Kontakt" page="help" onClick={() => goTo("help")} />
               <NavRow icon={ICONS.about} title="Über die App" page="about" onClick={() => goTo("about")} />
             </nav>
             {APP_VERSION ? (
@@ -641,6 +634,19 @@ export function SettingsSheet({
           </div>
         ) : null}
 
+        {page === "help" ? (
+          <FeedbackForm
+            audience={
+              notifications.schoolClass
+                ? `${notifications.schoolClass}${notifications.teachers.length > 0 ? ` (${notifications.teachers.join(", ")})` : ""}`
+                : null
+            }
+            pushStatus={notifications.push.status}
+            planInfo={planInfo}
+            supportUrl={SUPPORT_URL}
+          />
+        ) : null}
+
         {page === "about" ? (
           <>
             <div className="space-y-3">
@@ -654,13 +660,6 @@ export function SettingsSheet({
                 className="block text-sm font-semibold text-accent-strong underline underline-offset-2"
               >
                 Einführung nochmal ansehen
-              </button>
-              <button
-                type="button"
-                onClick={() => sendFeedback(myClass)}
-                className="block text-sm font-semibold text-accent-strong underline underline-offset-2"
-              >
-                Feedback senden oder Fehler melden
               </button>
               {sourceUrl ? (
                 <a

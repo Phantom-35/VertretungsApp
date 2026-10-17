@@ -4,7 +4,7 @@ import { expect, test, type Locator, type Page, type Route } from "@playwright/t
 import { SCHOOL_CLASSES, entryAppliesToClass } from "@/lib/entries";
 import { entryKey } from "@/lib/seen";
 import type { SubstitutionPayload } from "@/lib/types";
-import { APP_PORT } from "./constants";
+import { APP_PORT, FIXTURE_URL } from "./constants";
 
 // The saved plan covers Thu 08.10. and Fri 09.10.2026; "today" is the Thursday.
 const TODAY = new Date("2026-10-08T08:00:00+02:00");
@@ -317,7 +317,6 @@ test("links the legal pages and offers a QR code to pass the app on", async ({ p
     "href",
     "https://support-vertretung-kag.vercel.app/datenschutz",
   );
-  await expect(dialog.getByRole("button", { name: "Feedback senden oder Fehler melden" })).toBeVisible();
   await dialog.getByRole("button", { name: "Zurück zu den Einstellungen" }).click();
   await dialog.getByRole("link", { name: "App weitergeben (QR-Code)" }).click();
   await expect(page).toHaveURL(/\/teilen$/);
@@ -328,6 +327,68 @@ test("links the legal pages and offers a QR code to pass the app on", async ({ p
 
   await page.getByRole("link", { name: "← Zurück zur App" }).click();
   await expect(page.locator("header")).toContainText("5A");
+});
+
+test("help and contact: a message to click through, sent with the device details", async ({ page, request }) => {
+  const received = async () =>
+    (await (await request.get(`${FIXTURE_URL}/__feedback`)).json()) as { text: string }[];
+  const before = (await received()).length;
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const dialog = await openSettings(page, "Hilfe & Kontakt");
+  // Writing without the form is always possible.
+  await expect(dialog.getByRole("link", { name: "E-Mail an phandevstudios@gmx.de" })).toHaveAttribute(
+    "href",
+    /^mailto:phandevstudios@gmx\.de\?subject=/,
+  );
+  await expect(dialog.getByRole("link", { name: "Häufige Fragen ansehen" })).toHaveAttribute(
+    "href",
+    "https://support-vertretung-kag.vercel.app",
+  );
+  await expect(dialog.getByRole("button", { name: "Senden" })).toHaveCount(0);
+
+  // An error: first what is wrong, then a few words.
+  await dialog.locator("label").filter({ hasText: /Fehler melden/ }).click();
+  await expect(dialog.getByRole("button", { name: "Senden" })).toHaveCount(0);
+  await dialog.locator("label").filter({ hasText: "Benachrichtigungen kommen nicht" }).click();
+  const send = dialog.getByRole("button", { name: "Senden" });
+  await expect(send).toBeDisabled();
+  await dialog.getByRole("textbox", { name: "Kurz beschreiben" }).fill("Seit gestern kommt nichts mehr.");
+  await dialog.getByRole("textbox", { name: /Deine E-Mail/ }).fill("kein-mail");
+  await expect(dialog.getByText("Bitte prüf die Adresse.")).toBeVisible();
+  await expect(send).toBeDisabled();
+  await dialog.getByRole("textbox", { name: /Deine E-Mail/ }).fill("schueler@example.de");
+  await expect(send).toBeEnabled();
+
+  // The details are shown before they are sent.
+  await dialog.getByText("Diese Angaben ansehen").click();
+  await expect(dialog.locator("dl")).toContainText("Klasse5A");
+  await expect(dialog.locator("dl")).toContainText("Als Appnein, im Browser");
+  await expect(dialog.getByRole("link", { name: "Per E-Mail senden" })).toHaveAttribute(
+    "href",
+    /^mailto:phandevstudios@gmx\.de\?subject=KAG%20Vertretungsplan%20%E2%80%93%20Fehler%3A%20Benachrichtigungen%20kommen%20nicht&body=Seit%20gestern/,
+  );
+
+  await send.click();
+  await expect(dialog.getByRole("status")).toContainText("Danke! Deine Nachricht ist angekommen.");
+  await expect(dialog.getByRole("button", { name: "Senden" })).toHaveCount(0);
+  const messages = await received();
+  expect(messages).toHaveLength(before + 1);
+  const text = messages.at(-1)!.text;
+  expect(text).toContain("🐞 Fehler: Benachrichtigungen kommen nicht\nSeit gestern kommt nichts mehr.");
+  expect(text).toContain("Antwort an: schueler@example.de");
+  expect(text).toContain("Klasse: 5A");
+  expect(text).toContain("Benachrichtigungen: ");
+  expect(text).toContain("Kennung: Mozilla/5.0");
+
+  // A question without the details: only the words arrive.
+  await dialog.locator("label").filter({ hasText: /Frage/ }).click();
+  await dialog.getByRole("textbox", { name: "Kurz beschreiben" }).fill("Gibt es die App auch für Lehrer?");
+  await dialog.getByRole("checkbox", { name: /Geräte-Angaben mitschicken/ }).uncheck();
+  await dialog.getByRole("button", { name: "Senden" }).click();
+  await expect(dialog.getByRole("status")).toContainText("Danke!");
+  const question = (await received()).at(-1)!.text;
+  expect(question).toBe("❓ Frage\nGibt es die App auch für Lehrer?");
 });
 
 test("keeps the settings button on screen with large text on a small phone", async ({ page }) => {
