@@ -146,3 +146,45 @@ describe("fetchSubstitutionData", () => {
     expect(data.entries).toEqual([]);
   });
 });
+
+describe("the school's second website as a stand-in", () => {
+  /** monitor2020 answers with `primary`, the second copy with the saved plan. */
+  function twoSites(primary: "missing" | "down" | "ok") {
+    const requested: string[] = [];
+    const pages = allFixturePages();
+    vi.stubGlobal("fetch", async (url: string) => {
+      const address = String(url);
+      const host = new URL(address).host;
+      requested.push(`${host} ${address.match(/subst_\d+/)?.[0]}`);
+      if (host === "monitor2020.meckenheim-kag.com" && primary !== "ok") {
+        if (primary === "down") throw new TypeError("fetch failed");
+        return new Response("Not Found", { status: 404 });
+      }
+      const page = pages[Number(address.match(/subst_(\d+)\.htm/)?.[1])];
+      if (page === undefined || page === "down") return new Response("Not Found", { status: 404 });
+      const bytes = Uint8Array.from(page, (char) => (char.charCodeAt(0) < 256 ? char.charCodeAt(0) : 63));
+      return new Response(bytes, { headers: { "content-type": "text/html; charset=iso-8859-1" } });
+    });
+    return requested;
+  }
+
+  it("always takes monitor2020 when it answers, without asking the other one", async () => {
+    const requested = twoSites("ok");
+    const data = await fetchSubstitutionData();
+    expect(data.success).toBe(true);
+    expect(data.sourceUrl).toBe("https://monitor2020.meckenheim-kag.com/schueler/subst_001.htm");
+    expect(requested.every((item) => item.startsWith("monitor2020."))).toBe(true);
+  });
+
+  it("takes the second website when monitor2020 has no plan or does not answer", async () => {
+    for (const failure of ["missing", "down"] as const) {
+      const requested = twoSites(failure);
+      const data = await fetchSubstitutionData();
+      expect(data.success).toBe(true);
+      expect(data.sourceUrl).toBe("https://vertretung.meckenheim-kag.com/subst_001.htm");
+      expect(data.days.map((day) => day.date)).toEqual(["2026-10-08", "2026-10-09"]);
+      // monitor2020 first, every time.
+      expect(requested[0]).toBe("monitor2020.meckenheim-kag.com subst_001");
+    }
+  });
+});

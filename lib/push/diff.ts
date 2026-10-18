@@ -19,6 +19,12 @@ export type PlanState = {
    * changed, so the stored value is the time of the last change.
    */
   updatedAt: string;
+  /**
+   * Set while the plan comes from the school's second website (see
+   * lib/scraper.ts). It writes the same entries a little differently, so a
+   * switch must not be read as changes.
+   */
+  source?: "fallback";
 };
 
 export type PlanDiff = {

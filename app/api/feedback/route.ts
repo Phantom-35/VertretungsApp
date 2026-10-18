@@ -1,4 +1,4 @@
-import { send } from "@/lib/alert";
+import { maintainerWebhook, send } from "@/lib/alert";
 import { feedbackText, feedbackTitle, parseFeedback } from "@/lib/feedback";
 import { json, readJson } from "@/lib/push/http";
 
@@ -59,7 +59,7 @@ function sameOrigin(request: Request) {
  * warnings). The address stays on the server; nothing is stored.
  */
 export async function POST(request: Request) {
-  const url = process.env.FEEDBACK_WEBHOOK_URL?.trim() || process.env.ALERT_WEBHOOK_URL?.trim();
+  const url = maintainerWebhook();
   if (!url) {
     return json({ error: "Direktes Senden ist gerade nicht eingerichtet." }, 503);
   }

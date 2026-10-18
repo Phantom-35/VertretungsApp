@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parseSubstitutionPage } from "@/lib/parser";
 import { checkParsedPages } from "@/lib/scraper";
 import { allFixturePages, loadFixture } from "./helpers";
@@ -180,5 +182,26 @@ describe("checkParsedPages (self-check)", () => {
     const result = checkParsedPages([page]);
     expect(result.problems).toEqual([]);
     expect(result.notes).toContain("Seite 1: 1 Einträge ohne gültige Klasse oder Stunde.");
+  });
+});
+
+describe("the school's second website (other Untis export)", () => {
+  const html = readFileSync(join(__dirname, "fixtures", "vertretung-2026-10-16", "subst_003.htm"), "latin1");
+
+  it("reads its columns: class, lesson, subject, type, substitute, room, text", () => {
+    const page = parseSubstitutionPage(html, 3);
+    expect(page.meta).toMatchObject({ date: "2026-11-02", dayLabel: "Montag" });
+    expect(page.entries).toHaveLength(15);
+    expect(page.entries.find((item) => item.className === "09A")).toMatchObject({
+      lesson: "3 - 4",
+      subject: "E",
+      type: "Vertretung",
+      substitute: "???",
+      room: "204",
+      teacher: "",
+    });
+    // Break supervision is for teachers: not an entry, and no warning either.
+    expect(page.entries.some((item) => /pausenaufsicht/i.test(item.type))).toBe(false);
+    expect(checkParsedPages([page])).toEqual({ problems: [], notes: [] });
   });
 });

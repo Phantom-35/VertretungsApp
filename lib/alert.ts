@@ -5,6 +5,15 @@
  * or a Slack webhook.
  */
 
+/**
+ * The maintainer's own channel for messages meant for them alone (help
+ * messages, the switch to the school's second website): FEEDBACK_WEBHOOK_URL,
+ * otherwise the one for warnings. Server only, never sent to a browser.
+ */
+export function maintainerWebhook() {
+  return process.env.FEEDBACK_WEBHOOK_URL?.trim() || process.env.ALERT_WEBHOOK_URL?.trim() || null;
+}
+
 /** The same problem is reported again after this long at the earliest. */
 const REPEAT_AFTER_MS = 6 * 60 * 60_000;
 const REQUEST_TIMEOUT_MS = 5_000;

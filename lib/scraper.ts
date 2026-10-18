@@ -1,7 +1,8 @@
 import { reportPlanProblems } from "@/lib/alert";
 import { lessonStart } from "@/lib/entries";
 import { normalizeWhitespace, parseSubstitutionPage } from "@/lib/parser";
-import { SCHOOL_PLAN_BASE_URL } from "@/lib/school";
+import { SCHOOL_PLAN_BASE_URL, SCHOOL_PLAN_FALLBACK_BASE_URL } from "@/lib/school";
+import { reportPlanSource } from "@/lib/source-switch";
 import type {
   DayNotice,
   ParsedPage,
@@ -12,6 +13,12 @@ import type {
 } from "@/lib/types";
 
 const BASE_URL = process.env.SUBSTITUTION_BASE_URL ?? SCHOOL_PLAN_BASE_URL;
+/**
+ * Only when monitor2020 fails. Tests with their own source (SUBSTITUTION_BASE_URL)
+ * never reach the real school website, unless they name a stand-in themselves.
+ */
+const FALLBACK_BASE_URL =
+  process.env.SUBSTITUTION_FALLBACK_URL ?? (process.env.SUBSTITUTION_BASE_URL ? null : SCHOOL_PLAN_FALLBACK_BASE_URL);
 const REQUEST_TIMEOUT_MS = 6_000;
 const RETRY_DELAY_MS = 400;
 const MAX_ATTEMPTS = 2;
@@ -23,8 +30,8 @@ const MAX_PAGES = 30;
  */
 const LEFTOVER_PAGE_AGE_MS = 12 * 60 * 60_000;
 
-function buildPageUrl(pageNumber: number) {
-  return `${BASE_URL}${pageNumber.toString().padStart(3, "0")}.htm`;
+function buildPageUrl(base: string, pageNumber: number) {
+  return `${base}${pageNumber.toString().padStart(3, "0")}.htm`;
 }
 
 function wait(ms: number) {
@@ -54,12 +61,14 @@ function pageLooksValid(html: string) {
   const content = normalizeWhitespace(html);
   return (
     /Untis/i.test(content) &&
-    (/Klasse\(n\)/i.test(content) || /Seite\s+\d+\s*\/\s*\d+/i.test(content))
+    // "Klasse(n) Stunde …" on monitor2020, "Klasse Stunde …" on the second website.
+    (/Klasse(?:\(n\))?\s+Stunde/i.test(content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ")) ||
+      /Seite\s+\d+\s*\/\s*\d+/i.test(content))
   );
 }
 
-async function fetchPage(pageNumber: number, attempt = 1): Promise<FetchedPage> {
-  const url = buildPageUrl(pageNumber);
+async function fetchPage(base: string, pageNumber: number, attempt = 1): Promise<FetchedPage> {
+  const url = buildPageUrl(base, pageNumber);
 
   try {
     const response = await fetch(url, {
@@ -99,7 +108,7 @@ async function fetchPage(pageNumber: number, attempt = 1): Promise<FetchedPage> 
     // Network errors, timeouts and 5xx responses are retried once.
     if (attempt < MAX_ATTEMPTS) {
       await wait(RETRY_DELAY_MS);
-      return fetchPage(pageNumber, attempt + 1);
+      return fetchPage(base, pageNumber, attempt + 1);
     }
 
     return {
@@ -157,13 +166,13 @@ function sortEntries(entries: SubstitutionEntry[]) {
   });
 }
 
-function toFailurePayload(error: string): SubstitutionPayload {
+function toFailurePayload(base: string, error: string): SubstitutionPayload {
   return {
     success: false,
     stale: false,
     days: [],
     diagnostics: [],
-    sourceUrl: buildPageUrl(1),
+    sourceUrl: buildPageUrl(base, 1),
     pageCount: 0,
     fetchedPages: 0,
     lastUpdated: null,
@@ -213,7 +222,7 @@ function withInheritedDate(page: ParsedPage, previous: ParsedPage): ParsedPage {
  * Simply counting up until a 404 is wrong, because outdated pages from
  * earlier uploads stay on the server.
  */
-async function collectPages(firstPage: ParsedPage, warnings: string[]) {
+async function collectPages(base: string, firstPage: ParsedPage, warnings: string[]) {
   const pages = [firstPage];
   const referenceStand = firstPage.meta.sourceUpdatedAt;
   let failedPages = 0;
@@ -250,7 +259,7 @@ async function collectPages(firstPage: ParsedPage, warnings: string[]) {
     }
 
     const results = await mapWithConcurrency(candidates, PARALLEL_PAGE_LIMIT, (pageNumber) =>
-      fetchPage(pageNumber),
+      fetchPage(base, pageNumber),
     );
     current = null;
 
@@ -358,17 +367,44 @@ export function checkParsedPages(pages: ParsedPage[]) {
   return { problems, notes: Array.from(new Set(notes)) };
 }
 
+/**
+ * Always monitor2020 first; only if its first page does not come, the
+ * school's second copy, without comparing the two. The next fetch tries
+ * monitor2020 again, so it is back in use as soon as it answers. The
+ * maintainer hears about each switch (lib/source-switch.ts); users do not.
+ */
 export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
+  const primary = await fetchFrom(BASE_URL);
+  if (primary.payload.success) {
+    await reportPlanSource("primary");
+    return primary.payload;
+  }
+  if (!FALLBACK_BASE_URL) {
+    return primary.payload;
+  }
+  const fallback = await fetchFrom(FALLBACK_BASE_URL);
+  if (!fallback.payload.success) {
+    // Both down: nothing has switched; the app shows its last plan.
+    return primary.payload;
+  }
+  await reportPlanSource("fallback", primary.reason);
+  return fallback.payload;
+}
+
+/** The plan from one copy of the pages; `reason` says why its first page failed. */
+async function fetchFrom(base: string): Promise<{ payload: SubstitutionPayload; reason: string | null }> {
   const warnings: string[] = [];
-  const firstPage = await fetchPage(1);
+  const firstPage = await fetchPage(base, 1);
 
   if (firstPage.kind !== "ok") {
-    return toFailurePayload(
-      "Die erste Vertretungsplan-Seite konnte nicht geladen werden.",
-    );
+    return {
+      payload: toFailurePayload(base, "Die erste Vertretungsplan-Seite konnte nicht geladen werden."),
+      reason: firstPage.reason,
+    };
   }
 
   const { pages: fetchedPages, failedPages, pageCount } = await collectPages(
+    base,
     parseSubstitutionPage(firstPage.html, 1),
     warnings,
   );
@@ -416,12 +452,12 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
       .at(-1) ?? null;
   const now = new Date().toISOString();
 
-  return {
+  const payload: SubstitutionPayload = {
     success: true,
     stale: false,
     days,
     diagnostics,
-    sourceUrl: buildPageUrl(1),
+    sourceUrl: buildPageUrl(base, 1),
     pageCount,
     fetchedPages: fetchedPages.length,
     lastUpdated: now,
@@ -438,4 +474,5 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
           ? "Ein Teil der Seiten konnte nicht geladen werden."
           : null,
   };
+  return { payload, reason: null };
 }

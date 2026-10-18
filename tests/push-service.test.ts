@@ -76,6 +76,33 @@ afterEach(() => {
 });
 
 describe("runPushCheck", () => {
+  it("takes over a switch to the school's second website silently", async () => {
+    const store = new MemoryStore();
+    await addSubscriber(store, "five", "5A");
+    const { sent, send } = fakeSender();
+    const primary = { sourceUrl: "https://monitor2020.meckenheim-kag.com/schueler/subst_001.htm" };
+    const fallback = { sourceUrl: "https://vertretung.meckenheim-kag.com/subst_001.htm" };
+    const check = (entries: SubstitutionEntry[], source: Partial<SubstitutionPayload>, minutes: number) =>
+      runPushCheck({ store, send, loadPlan: async () => plan(entries, source), now: NOW + minutes * 60_000 });
+
+    await check([entry({})], primary, 0);
+    // The same lesson, written without the teacher but with the subject: no "changes".
+    const onFallback = entry({ teacher: "", subject: "M" });
+    expect(await check([onFallback], fallback, 10)).toMatchObject({ status: "initialized" });
+    expect(sent).toHaveLength(0);
+    expect((await store.getPlanState())?.source).toBe("fallback");
+    // A real change while on the second website is reported as usual.
+    expect(await check([onFallback, entry({ lesson: "5", teacher: "", subject: "D" })], fallback, 20)).toMatchObject({
+      status: "checked",
+      added: 1,
+      notified: 1,
+    });
+    // monitor2020 back: taken over silently again.
+    expect(await check([entry({}), entry({ lesson: "5" })], primary, 30)).toMatchObject({ status: "initialized" });
+    expect(sent).toHaveLength(1);
+    expect((await store.getPlanState())?.source).toBeUndefined();
+  });
+
   it("does nothing at night and leaves the changes for the morning", async () => {
     const store = new MemoryStore();
     const loadPlan = vi.fn();

@@ -15,6 +15,8 @@ const tableHeaderAliases: Record<string, keyof ParsedRow> = {
   fach: "subject",
   text: "text",
   hinweis: "text",
+  // The school's second website names the subject instead of the teacher.
+  "(fach)": "subject",
   "(lehrer)": "teacher",
   lehrer: "teacher",
   raum: "room",
@@ -228,7 +230,10 @@ function countDataRows($: cheerio.CheerioAPI) {
         normalizeHeader(cells[0] ?? "").startsWith("klasse") &&
         normalizeHeader(cells[1] ?? "") === "stunde";
 
-      if (cells.length >= 4 && !isHeader && cells.some(Boolean)) {
+      // Skipped by the parser as well (see there).
+      const isSupervision = !cells[0] && cells.some((cell) => normalizeHeader(cell) === "pausenaufsicht");
+
+      if (cells.length >= 4 && !isHeader && !isSupervision && cells.some(Boolean)) {
         rows.add(cells.join("|"));
       }
     });
@@ -291,6 +296,12 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
         normalizeHeader(row.className).startsWith("klasse") &&
         normalizeHeader(row.lesson) === "stunde"
       ) {
+        return;
+      }
+
+      // Break supervision (only on the school's second website) is for
+      // teachers, has no class and is no change for students.
+      if (!row.className && normalizeHeader(row.type) === "pausenaufsicht") {
         return;
       }
 

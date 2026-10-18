@@ -10,6 +10,13 @@ nur die Einträge der eigenen Klasse, in der Oberstufe die der gewählten Kurse
 (über die Kürzel der Lehrkräfte). Sie lässt sich auf den Home-Bildschirm legen, öffnet
 auch offline mit dem zuletzt geladenen Plan und meldet Änderungen per Benachrichtigung.
 
+**Quelle:** immer `monitor2020.meckenheim-kag.com/schueler/`. Nur wenn dort die erste
+Seite nicht kommt, nimmt die App als Notlösung die zweite Kopie der Schule
+(`vertretung.meckenheim-kag.com`), ohne die beiden zu vergleichen; beim nächsten Abruf
+wird wieder monitor2020 versucht. Jeden Wechsel (ausgefallen / wieder da) meldet sie nur
+dem Betreiber über `FEEDBACK_WEBHOOK_URL` (sonst `ALERT_WEBHOOK_URL`); `/api/health`
+nennt die aktive Notlösung unter `notes` (`lib/scraper.ts`, `lib/source-switch.ts`).
+
 ## Inhalt
 
 - [Für Nutzerinnen und Nutzer](#für-nutzerinnen-und-nutzer)

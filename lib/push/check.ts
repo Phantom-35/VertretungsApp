@@ -21,6 +21,7 @@ import {
 } from "@/lib/notify";
 import type { SendPush } from "@/lib/push/sender";
 import type { PushStore, Subscriber } from "@/lib/push/store";
+import { SCHOOL_PLAN_FALLBACK_BASE_URL } from "@/lib/school";
 import { schoolToday } from "@/lib/time";
 import type { SubstitutionPayload } from "@/lib/types";
 
@@ -115,7 +116,7 @@ function sameList(left: readonly string[], right: readonly string[]) {
 
 /** The same entries, also the same ones missing for the moment (the time of the check aside). */
 function sameState(left: PlanState, right: PlanState) {
-  return sameList(left.keys, right.keys) && sameList(left.missing, right.missing);
+  return sameList(left.keys, right.keys) && sameList(left.missing, right.missing) && left.source === right.source;
 }
 
 /** Bookkeeping key: when the scheduler last called the check (see /api/health). */
@@ -148,7 +149,21 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
     }
 
     const previous = await store.getPlanState();
-    const diff = diffPlan(previous, plan.entries, schoolToday(now), new Date(now), plan.days?.map((day) => day.date));
+    const source = plan.sourceUrl?.startsWith(SCHOOL_PLAN_FALLBACK_BASE_URL) ? ("fallback" as const) : undefined;
+    // The plan now comes from the other website: its entries look different
+    // (e.g. without teachers), so the new state is taken over silently, as on
+    // the very first check, instead of reporting every entry as changed.
+    const switched = previous !== null && previous.source !== source;
+    const diff = diffPlan(
+      switched ? null : previous,
+      plan.entries,
+      schoolToday(now),
+      new Date(now),
+      plan.days?.map((day) => day.date),
+    );
+    if (source) {
+      diff.state.source = source;
+    }
     // Saved before sending: a failed run must not notify twice. Unchanged
     // (most checks), nothing needs writing: the next check compares with the
     // same state either way.

@@ -18,6 +18,9 @@ Repository arbeitet. Sie gehen allgemeinen Gewohnheiten vor.
 - **KAG Vertretungsplan**: PWA für den Vertretungsplan des Konrad-Adenauer-Gymnasiums
   Meckenheim. Liest die öffentlichen Untis-Seiten der Schule (`subst_001.htm` …), filtert
   nach Klasse bzw. Oberstufen-Kursen (Lehrkräfte-Kürzel), offline nutzbar, Web-Push.
+  Quelle ist **immer monitor2020**; nur wenn dort die erste Seite fehlt, springt
+  `vertretung.meckenheim-kag.com` ein (kein Vergleich, Rückkehr beim nächsten Abruf;
+  Meldung nur an den Betreiber, `lib/source-switch.ts`). So hat es der Nutzer festgelegt.
 - Live: https://vertretung-kag.vercel.app – Vercel deployt **automatisch bei jedem Push auf
   `main`**. Ein Push ist also sofort ein Release für alle Nutzer.
 - Impressum/Datenschutz liegen auf einer **separaten** Website
