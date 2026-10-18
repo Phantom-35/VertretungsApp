@@ -1,6 +1,8 @@
 type RefreshStatusProps = {
   /** The app's own server was not reachable. */
   connectionError: string | null;
+  /** The connection works, but the school's website is down (see useSubstitutionData). */
+  schoolDown?: boolean;
   /** The server answered with the last known plan because the school site is down. */
   stale: boolean;
   /** Error reported by the server for a partial result. */
@@ -14,6 +16,7 @@ type RefreshStatusProps = {
 
 export function RefreshStatus({
   connectionError,
+  schoolDown = false,
   stale,
   error,
   warnings,
@@ -24,12 +27,12 @@ export function RefreshStatus({
   let title: string | null = null;
   let message: string | null = null;
 
-  if (connectionError) {
+  if (connectionError && !schoolDown) {
     title = connectionError;
     message = `Du siehst den Plan, der zuletzt geladen wurde (${lastSuccessLabel}).`;
-  } else if (stale) {
-    title = "Die Webseite der Schule antwortet gerade nicht.";
-    message = `Du siehst den Stand von ${lastSuccessLabel}.`;
+  } else if (schoolDown || stale) {
+    title = "Die Seite der Schule ist gerade nicht erreichbar.";
+    message = `Du siehst den Plan, der zuletzt geladen wurde (${lastSuccessLabel}). Sobald sie wieder geht, aktualisiert sich die App von selbst.`;
   } else if (error) {
     title = error;
     message = warnings.length > 0 ? warnings.join(" ") : null;
@@ -47,8 +50,8 @@ export function RefreshStatus({
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{title}</p>
         {message ? <p>{message}</p> : null}
-        {/* Without a connection the school's page cannot be opened either. */}
-        {sourceUrl && !connectionError ? (
+        {/* Without a connection, or with the school's site down, its page does not open either. */}
+        {sourceUrl && !connectionError && !stale ? (
           <a
             href={sourceUrl}
             target="_blank"

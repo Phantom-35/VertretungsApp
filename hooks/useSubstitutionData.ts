@@ -20,6 +20,7 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const RETRY_DELAYS_MS = [1_000, 3_000];
 
 const OFFLINE_MESSAGE = "Keine Verbindung. Ist das Internet an?";
+const SCHOOL_DOWN_MESSAGE = "Die Seite der Schule ist gerade nicht erreichbar.";
 
 export type LoadStatus = "idle" | "loading" | "refreshing";
 
@@ -30,6 +31,11 @@ type State = {
   status: LoadStatus;
   /** The app's own server could not be reached or had no data at all. */
   connectionError: string | null;
+  /**
+   * The server answered, but could not read the school's plan (its pages
+   * missing or down): not the device being offline.
+   */
+  schoolDown: boolean;
 };
 
 function readStoredPayload() {
@@ -126,6 +132,7 @@ export function useSubstitutionData(initialData: SubstitutionPayload | null) {
     fromDevice: false,
     status: initialData ? "idle" : "loading",
     connectionError: null,
+    schoolDown: false,
   });
   const inFlightRef = useRef<Promise<void> | null>(null);
   const inFlightForcedRef = useRef(false);
@@ -171,6 +178,7 @@ export function useSubstitutionData(initialData: SubstitutionPayload | null) {
               fromDevice: false,
               status: "idle",
               connectionError: null,
+              schoolDown: false,
             }));
             if (!payload.stale && pickDisplayedPayload(payload, readStoredPayload()) === payload) {
               storePayload(payload);
@@ -179,8 +187,9 @@ export function useSubstitutionData(initialData: SubstitutionPayload | null) {
             setState((current) => ({
               ...current,
               status: "idle",
-              connectionError:
-                payload.error ?? "Vertretungsplan momentan nicht erreichbar.",
+              // The details ("Seite 1 …") are for /api/health, not for students.
+              connectionError: SCHOOL_DOWN_MESSAGE,
+              schoolDown: true,
             }));
           }
         } catch {
@@ -188,6 +197,7 @@ export function useSubstitutionData(initialData: SubstitutionPayload | null) {
             ...current,
             status: "idle",
             connectionError: OFFLINE_MESSAGE,
+            schoolDown: false,
           }));
         } finally {
           lastAttemptRef.current = Date.now();

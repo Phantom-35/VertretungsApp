@@ -94,7 +94,7 @@ function EmptyDay({
 }
 
 export function SubstitutionApp({ initialData, initialDay = null }: SubstitutionAppProps) {
-  const { data, fromDevice, status, connectionError, refresh } =
+  const { data, fromDevice, status, connectionError, schoolDown, refresh } =
     useSubstitutionData(initialData);
   // The student's own class (opens with it, notifications are about it) and
   // another class only looked at until the app is closed.
@@ -283,10 +283,14 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   if (isBusy || now === null) {
     headerStatus = "updating";
   } else if (connectionError) {
-    headerStatus = "offline";
+    // "Offline" only when the device has no connection; the school's site
+    // being down is a disruption the user cannot fix.
+    headerStatus = schoolDown ? "disrupted" : "offline";
   } else if (holiday && (!planAhead || holidayMode)) {
     headerStatus = holiday.kind === "holidays" ? "holiday" : "public-holiday";
-  } else if (!data || data.stale || fromDevice) {
+  } else if (data?.stale) {
+    headerStatus = "disrupted";
+  } else if (!data || fromDevice) {
     headerStatus = "outdated";
   } else if (planIsPast) {
     // Up to date, but only past days: the next plan is not online yet.
@@ -396,6 +400,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
           now={now}
           isBusy={isBusy}
           connectionError={connectionError}
+          schoolDown={schoolDown}
           status={headerStatus}
           opening={opening}
           showInstallReminder={onboarding.done}
@@ -495,6 +500,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             {data ? (
               <RefreshStatus
                 connectionError={connectionError}
+                schoolDown={schoolDown}
                 stale={data.stale}
                 error={data.error}
                 warnings={data.warnings}
@@ -685,7 +691,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                 ...(data.stale ? ["Schulseite nicht erreichbar"] : []),
                 ...(data.error && !data.stale ? ["unvollständig"] : []),
                 ...(fromDevice ? ["Kopie vom Gerät"] : []),
-                ...(connectionError ? ["keine Verbindung"] : []),
+                ...(connectionError ? [schoolDown ? "Schulseite nicht erreichbar" : "keine Verbindung"] : []),
               ].join(", ")
             : "nicht geladen"
         }

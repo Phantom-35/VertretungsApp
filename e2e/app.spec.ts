@@ -229,6 +229,36 @@ for (const [name, answer] of [
   });
 }
 
+test("tells a school website that is down apart from being offline", async ({ page, context }) => {
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  // The large view has a button to reload the plan.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const header = page.locator("body");
+  // The school's pages are gone (as in the holidays): the server answers without a plan.
+  await page.route("**/api/substitution*", (route) =>
+    route.fulfill({
+      status: 503,
+      json: { success: false, error: "Die erste Vertretungsplan-Seite konnte nicht geladen werden." },
+    }),
+  );
+  await page.getByRole("button", { name: "Plan neu laden" }).click();
+  await expect(page.getByText("Störung", { exact: true })).toBeVisible();
+  await expect(page.getByText("Offline", { exact: true })).toHaveCount(0);
+  await expect(header).toContainText("Die Seite der Schule ist gerade nicht erreichbar.");
+  await expect(header).not.toContainText("Vertretungsplan-Seite konnte nicht geladen werden");
+  // The plan stays on screen.
+  await expect(page.locator("article").first()).toBeVisible();
+
+  // No internet on the device: that is "Offline".
+  await page.unroute("**/api/substitution*");
+  await context.setOffline(true);
+  await page.getByRole("button", { name: "Plan neu laden" }).click();
+  await expect(page.getByText("Offline", { exact: true })).toBeVisible();
+  await expect(header).toContainText("Keine Verbindung. Ist das Internet an?");
+  await context.setOffline(false);
+});
+
 test("says when the next plan is not online yet, and marks past days", async ({ page }) => {
   // Saturday after the saved plan (08./09.10.), no holidays.
   await page.clock.setFixedTime(new Date("2026-10-10T11:00:00+02:00"));

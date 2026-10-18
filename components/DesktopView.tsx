@@ -52,6 +52,7 @@ export type DesktopViewProps = {
   now: number | null;
   isBusy: boolean;
   connectionError: string | null;
+  schoolDown: boolean;
   status: HeaderStatus;
   /** Plays the opening animation (the same as on phones). */
   opening: boolean;
@@ -168,6 +169,7 @@ export function DesktopView(props: DesktopViewProps) {
         {data ? (
           <RefreshStatus
             connectionError={props.connectionError}
+            schoolDown={props.schoolDown}
             stale={data.stale}
             error={data.error}
             warnings={data.warnings}

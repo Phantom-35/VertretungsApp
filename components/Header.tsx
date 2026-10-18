@@ -1,6 +1,6 @@
 import { SettingsButton, ThemeToggle } from "@/components/ThemeSettings";
 
-export type HeaderStatus = "current" | "updating" | "offline" | "outdated" | "incomplete" | "holiday" | "public-holiday" | "waiting";
+export type HeaderStatus = "current" | "updating" | "offline" | "disrupted" | "outdated" | "incomplete" | "holiday" | "public-holiday" | "waiting";
 
 type HeaderProps = {
   selectedClass: string | null | undefined;
@@ -25,6 +25,11 @@ export const statusBadges: Record<HeaderStatus, { label: string; className: stri
   },
   offline: {
     label: "Offline",
+    className: "border-warn/15 bg-warn-soft text-warn",
+  },
+  // The school's website is down, the device itself is online.
+  disrupted: {
+    label: "Störung",
     className: "border-warn/15 bg-warn-soft text-warn",
   },
   outdated: {
