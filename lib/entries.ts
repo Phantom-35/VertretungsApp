@@ -239,6 +239,22 @@ export function isOpenSubstitute(substitute: string) {
   return substitute === OPEN_SUBSTITUTE;
 }
 
+/**
+ * The same "???" as room: the lesson takes place, but where is not decided
+ * yet (e.g. a room change without the room). Kept only where a room matters,
+ * not for cancelled lessons or self-study.
+ */
+export const OPEN_ROOM = "???";
+
+export function isOpenRoom(room: string) {
+  return room === OPEN_ROOM;
+}
+
+/** "Raum 204", "Raum noch offen", or "" without a room. */
+export function roomLabel(room: string) {
+  return room ? `Raum ${isOpenRoom(room) ? "noch offen" : room}` : "";
+}
+
 /** "kag" -> "KAG"; null if it does not look like a teacher abbreviation. */
 export function normalizeTeacher(value: string) {
   const normalized = value.trim().toUpperCase();

@@ -508,6 +508,30 @@ test("offers no printing in the installed app on an iPhone, where it does nothin
   await iphone.close();
 });
 
+test("says when the room is not decided yet (??? in the plan)", async ({ browser }) => {
+  // Without the service worker, so that the plan goes through page.route.
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("kag:settings", JSON.stringify({ roomPlan: true })));
+  const page = await context.newPage();
+  await page.clock.setFixedTime(TODAY);
+  // The 5A's room 004 not decided yet.
+  const openRoom = async (route: Route) => {
+    const response = await route.fetch();
+    const body = (await response.text()).replaceAll('"004"', '"???"').replaceAll('\\"004\\"', '\\"???\\"');
+    await route.fulfill({ response, body });
+  };
+  await page.route((url) => url.pathname === "/", openRoom);
+  await page.route((url) => url.pathname === "/api/substitution", openRoom);
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const card = page.locator("article").filter({ hasText: "Raum noch offen" }).first();
+  await expect(card).toBeVisible();
+  await expect(card.getByText("???")).toHaveCount(0);
+  // Nothing to find on the plan yet.
+  await expect(card.getByRole("button", { name: /auf dem Raumplan zeigen$/ })).toHaveCount(0);
+  await context.close();
+});
+
 /** Opens the app as on the first start after the update: the room plan not asked yet. */
 async function openUnasked(page: Page) {
   await page.goto("/");

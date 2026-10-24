@@ -4,6 +4,7 @@ import {
   formatLesson,
   getEntryKind,
   isOpenSubstitute,
+  roomLabel,
   type EntryKind,
 } from "@/lib/entries";
 import type { SubstitutionEntry } from "@/lib/types";
@@ -76,7 +77,7 @@ export function formatShareBlock(entry: DescribedEntry, schoolClass: string) {
   const details = [
     entry.subject ? `Fach ${entry.subject}` : "",
     teacher ? `Lehrkraft ${teacher}` : "",
-    entry.room ? `Raum ${entry.room}` : "",
+    roomLabel(entry.room),
   ].filter(Boolean);
   return [
     `${symbol} *${lessonLabel(entry.lesson)}* · ${displayType(entry.type)}${className !== schoolClass ? ` (${className})` : ""}`,

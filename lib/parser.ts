@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
-import { OPEN_SUBSTITUTE } from "@/lib/entries";
+import { OPEN_ROOM, OPEN_SUBSTITUTE, getEntryKind } from "@/lib/entries";
 import { schoolLocalToIso } from "@/lib/time";
 import type { PageMetadata, ParsedPage, SubstitutionEntry } from "@/lib/types";
 
@@ -284,6 +284,7 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
         subject: "",
         text: "",
       };
+      let openRoom = false;
 
       cells.forEach((cell, index) => {
         const key = header.mapping.get(index);
@@ -294,7 +295,15 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
         const value = normalizeWhitespace($(cell).text());
         // "???" as substitute: nobody found yet, which students should see.
         row[key] = key === "substitute" && value === OPEN_SUBSTITUTE ? value : normalizeCell(value);
+        if (key === "room" && value === OPEN_ROOM) {
+          openRoom = true;
+        }
       });
+      // "???" as room: not decided yet. It matters where the lesson takes
+      // place, not for a cancelled lesson or self-study.
+      if (openRoom && !row.room && !["cancelled", "self-study"].includes(getEntryKind(row.type))) {
+        row.room = OPEN_ROOM;
+      }
 
       // Long tables can repeat the header row.
       if (

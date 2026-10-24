@@ -6,6 +6,7 @@ import {
   formatClassName,
   formatLesson,
   getEntryKind,
+  isOpenRoom,
   isOpenSubstitute,
   spokenLesson,
   type EntryKind,
@@ -249,7 +250,12 @@ export function SubstitutionCard({
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <p className="text-sm text-foreground">
               <span className="text-muted">Raum </span>
-              <span className="font-semibold">{entry.room}</span>
+              {/* "???" in the plan: where the lesson takes place is not decided yet. */}
+              {isOpenRoom(entry.room) ? (
+                <span className="font-semibold text-warn">noch offen</span>
+              ) : (
+                <span className="font-semibold">{entry.room}</span>
+              )}
             </p>
             {roomsOnPlan.length > 0 ? <FindRoomButton rooms={roomsOnPlan} /> : null}
           </div>

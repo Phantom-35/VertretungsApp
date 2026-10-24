@@ -248,6 +248,7 @@ describe("notification text", () => {
     const one = (overrides: Partial<KeyedEntry>) =>
       buildNotification("5A", changesFor({ added: [entry(overrides)], removed: [] }, audience, MORNING), MORNING).body;
     expect(one({ type: "Raum-Vtr.", room: "218" })).toBe("🚪 Raumänderung · Raum 218 · ABC");
+    expect(one({ type: "Raum-Vtr.", room: "???" })).toBe("🚪 Raumänderung · Raum noch offen · ABC");
     expect(one({ type: "Klausur", teacher: "", room: "217", text: "Q1 S GK RUK" })).toBe("📝 Klausur · Q1 S GK RUK · Raum 217");
     expect(one({ type: "Veranst.", text: "Praktikumsmesse" })).toBe("📌 Veranstaltung · Praktikumsmesse");
     expect(one({ type: "Betreuung", substitute: "DEF" })).toBe("🧑‍🏫 Betreuung · ABC → DEF");

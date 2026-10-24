@@ -6,6 +6,7 @@ import {
   isCourseClass,
   isOpenSubstitute,
   lessonStart,
+  roomLabel,
   timetableSlot,
 } from "@/lib/entries";
 import { formatShortDate, relativeDayLabel } from "@/lib/format";
@@ -142,9 +143,9 @@ function details(entry: KeyedEntry) {
     case "supervision":
       return [teacherLabel(entry)];
     case "room":
-      return [entry.room ? `Raum ${entry.room}` : "", entry.subject || entry.teacher];
+      return [roomLabel(entry.room), entry.subject || entry.teacher];
     case "exam":
-      return [text || entry.subject || entry.teacher, entry.room ? `Raum ${entry.room}` : ""];
+      return [text || entry.subject || entry.teacher, roomLabel(entry.room)];
     case "moved":
     case "event":
       return [text || entry.subject || entry.teacher];

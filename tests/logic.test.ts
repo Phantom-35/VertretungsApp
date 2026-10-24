@@ -402,6 +402,12 @@ describe("share text", () => {
     );
     expect(formatShareBlock({ ...base, substitute: "???" }, "5A")).toBe("❓ *1. Std.* · Vertretung\nLehrkraft noch offen");
   });
+
+  it("says when the room is not decided yet", () => {
+    expect(formatShareBlock({ ...base, type: "Raum-Vtr.", teacher: "EBT", substitute: "EBT", room: "???" }, "5A")).toBe(
+      "🚪 *1. Std.* · Raumänderung\nLehrkraft EBT · Raum noch offen",
+    );
+  });
 });
 
 describe("day labels", () => {

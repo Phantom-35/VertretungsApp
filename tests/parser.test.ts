@@ -80,7 +80,22 @@ describe("parseSubstitutionPage", () => {
       `<tr class='list odd'><td class="list" align="center">05B</td><td class="list" align="center">1 - 2</td><td class="list" align="center">Vertretung</td><td class="list" align="center">???</td><td class="list">&nbsp;</td><td class="list" align="center">FCH</td><td class="list" align="center">???</td></tr>$1`,
     );
     const open = parseSubstitutionPage(html, 1).entries.find((entry) => entry.className === "05B");
-    expect(open).toMatchObject({ type: "Vertretung", substitute: "???", teacher: "FCH", room: "" });
+    expect(open).toMatchObject({ type: "Vertretung", substitute: "???", teacher: "FCH", room: "???" });
+  });
+
+  it("keeps '???' as room where the lesson takes place: the room is not decided yet", () => {
+    // Rows as on the live plan of 03.11.2026 (Q1, room change without a room).
+    const row = (className: string, type: string) =>
+      `<tr class='list odd'><td class="list" align="center">${className}</td><td class="list" align="center">5 - 6</td><td class="list" align="center">${type}</td><td class="list" align="center">EBT</td><td class="list">&nbsp;</td><td class="list" align="center">EBT</td><td class="list" align="center">???</td></tr>`;
+    const html = loadFixture(1).replace(
+      /(<tr class='list odd'>)/,
+      `${row("Q1", "Raum-Vtr.")}${row("06C", "Entfall")}${row("07C", "EVA")}$1`,
+    );
+    const entries = parseSubstitutionPage(html, 1).entries;
+    expect(entries.find((entry) => entry.className === "Q1")).toMatchObject({ type: "Raum-Vtr.", room: "???" });
+    // Not for a cancelled lesson or self-study: there "???" means no room.
+    expect(entries.find((entry) => entry.className === "06C")?.room).toBe("");
+    expect(entries.find((entry) => entry.className === "07C")?.room).toBe("");
   });
 
   it("reads 'Nachrichten zum Tag'", () => {
