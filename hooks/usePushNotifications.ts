@@ -90,6 +90,35 @@ export function usePushNotifications({
   // A failed check (offline, slow start) is repeated instead of hiding
   // notifications for the whole visit.
   const [attempt, setAttempt] = useState(0);
+  // A failed update of class or teachers (e.g. offline) is sent again.
+  const [syncRetry, setSyncRetry] = useState(0);
+
+  // Back in the app: notifications may have been switched off (or allowed)
+  // in the phone's settings meanwhile. Checked without asking the server.
+  useEffect(() => {
+    const recheck = async () => {
+      if (document.visibilityState !== "visible" || !supportsPush()) {
+        return;
+      }
+      const registration = registrationRef.current;
+      if (!registration) {
+        return;
+      }
+      const subscription = await registration.pushManager.getSubscription().catch(() => null);
+      const permission = Notification.permission;
+      setStatus((current) => {
+        if (current !== "on" && current !== "off" && current !== "denied") {
+          return current;
+        }
+        if (permission === "denied") {
+          return "denied";
+        }
+        return subscription && permission === "granted" ? "on" : "off";
+      });
+    };
+    document.addEventListener("visibilitychange", recheck);
+    return () => document.removeEventListener("visibilitychange", recheck);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,11 +211,26 @@ export function usePushNotifications({
         setMessage("Die Anmeldung war abgelaufen. Bitte Benachrichtigungen neu einschalten.");
       }
     };
-    syncChainRef.current = syncChainRef.current.then(sync).catch(() => undefined);
+    let retryTimer: number | undefined;
+    const retry = () => {
+      if (!cancelled) {
+        setSyncRetry((value) => value + 1);
+      }
+    };
+    syncChainRef.current = syncChainRef.current.then(sync).catch(() => {
+      // Not sent (offline, server away): otherwise the server would keep
+      // notifying about the old class until the next start.
+      if (!cancelled) {
+        window.addEventListener("online", retry, { once: true });
+        retryTimer = window.setTimeout(retry, RETRY_MS);
+      }
+    });
     return () => {
       cancelled = true;
+      window.clearTimeout(retryTimer);
+      window.removeEventListener("online", retry);
     };
-  }, [status, schoolClass, teachersKey, groupsKey, eveningSummary, morningSummary, eveningSummaryTime, morningSummaryTime]);
+  }, [status, schoolClass, teachersKey, groupsKey, eveningSummary, morningSummary, eveningSummaryTime, morningSummaryTime, syncRetry]);
 
   const enable = useCallback(async () => {
     const registration = registrationRef.current;

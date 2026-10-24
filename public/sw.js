@@ -400,16 +400,29 @@ async function writeBadge(count, replace) {
 // Tapping a notification opens the app on the day concerned.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  const target = new URL(event.notification.data?.url || "/", self.location.origin);
+  // Only ever the app's own pages.
+  const url = target.origin === self.location.origin ? target.href : `${self.location.origin}/`;
 
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      const open = windows.find((client) => new URL(client.url).origin === self.location.origin);
-      if (open) {
-        await open.focus();
-        open.postMessage({ type: "open-url", url });
+      const own = windows.filter((client) => new URL(client.url).origin === self.location.origin);
+      // The plan itself listens for the day; another page (e.g. the notice
+      // to print) is led to it instead, or the day would be lost.
+      const plan = own.find((client) => new URL(client.url).pathname === "/");
+      if (plan) {
+        await plan.focus();
+        plan.postMessage({ type: "open-url", url });
         return;
+      }
+      const other = own[0];
+      if (other && "navigate" in other) {
+        const navigated = await other.navigate(url).catch(() => null);
+        if (navigated) {
+          await navigated.focus();
+          return;
+        }
       }
       await self.clients.openWindow(url);
     })(),

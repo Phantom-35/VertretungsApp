@@ -147,6 +147,21 @@ describe("fetchSubstitutionData", () => {
   });
 });
 
+describe("an upload in progress", () => {
+  it("is incomplete while a page announced for a day still belongs to another one", async () => {
+    // Monday has two pages now, but page 2 is still the old Tuesday file.
+    const plan = buildPlan([
+      { date: "12.10.2026", weekday: "Montag", pages: 2 },
+      { date: "13.10.2026", weekday: "Dienstag", pages: 1 },
+    ]);
+    plan[2] = retitle(loadFixture(2), "13.10.2026 Dienstag, Woche B (Seite 1 / 1)", 1);
+    mockSchoolServer(plan);
+    const data = await fetchSubstitutionData();
+    expect(data.error).toBe("Ein Teil der Seiten konnte nicht geladen werden.");
+    expect(data.warnings).toContain("Seite 2 gehört zu einem anderen Tag (Upload läuft?).");
+  });
+});
+
 describe("the school's second website as a stand-in", () => {
   /** monitor2020 answers with `primary`, the second copy with the saved plan. */
   function twoSites(primary: "missing" | "down" | "ok") {

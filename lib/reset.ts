@@ -22,6 +22,16 @@ export async function resetDevice() {
     // Without a service worker there are no notifications to switch off.
   }
 
+  // The service worker's copies of the app and the number on its icon too:
+  // nothing of this device's use is left behind.
+  try {
+    const names = (await window.caches?.keys()) ?? [];
+    await Promise.all(names.filter((name) => name.startsWith("kag-")).map((name) => window.caches.delete(name)));
+    await navigator.clearAppBadge?.().catch(() => undefined);
+  } catch {
+    // No caches (or not allowed): nothing to delete.
+  }
+
   for (const storage of ["localStorage", "sessionStorage"] as const) {
     try {
       Object.keys(window[storage])

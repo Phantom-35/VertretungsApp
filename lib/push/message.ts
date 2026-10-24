@@ -9,7 +9,7 @@ import {
   timetableSlot,
 } from "@/lib/entries";
 import { formatShortDate, relativeDayLabel } from "@/lib/format";
-import type { KeyedEntry } from "@/lib/seen";
+import { entryKey, type KeyedEntry } from "@/lib/seen";
 import { entrySymbol, lessonLabel, teacherLabel } from "@/lib/share";
 import {
   EVENING_SUMMARY_TIMES,
@@ -274,7 +274,9 @@ export function buildSummary(
   now: number,
 ): PushPayload {
   const teachers = isCourseClass(audience.schoolClass) ? audience.teachers : [];
-  const own = entries
+  // The same row on two pages is one change (as for the notifications).
+  const unique = [...new Map(entries.map((entry) => [entryKey(entry), entry])).values()];
+  const own = unique
     .filter(
       (entry) =>
         entry.date === date &&

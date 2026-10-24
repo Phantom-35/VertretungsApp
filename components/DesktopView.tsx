@@ -2,7 +2,7 @@
 
 import { DaySummary } from "@/components/DaySummary";
 import { FadingStatus } from "@/components/FadingStatus";
-import { statusBadges, type HeaderStatus } from "@/components/Header";
+import { CheckedLabel, statusBadges, type HeaderStatus } from "@/components/Header";
 import { HolidayCard } from "@/components/HolidayCard";
 import { InstallReminder } from "@/components/InstallReminder";
 import { LoadingState } from "@/components/LoadingState";
@@ -53,6 +53,8 @@ export type DesktopViewProps = {
   isBusy: boolean;
   connectionError: string | null;
   schoolDown: boolean;
+  /** The last check is long ago although the connection works. */
+  checkStale: boolean;
   status: HeaderStatus;
   /** Plays the opening animation (the same as on phones). */
   opening: boolean;
@@ -333,14 +335,7 @@ function TopBar(props: DesktopViewProps) {
                 </span>
                 <span aria-hidden>·</span>
                 <span className="whitespace-nowrap">
-                  {fetched === "noch nie" ? (
-                    "noch nicht geprüft"
-                  ) : (
-                    <>
-                      geprüft{fetched.endsWith("Uhr") ? (fetched.includes(".,") ? " am" : " um") : ""}{" "}
-                      <span className="font-medium text-foreground/80">{fetched}</span>
-                    </>
-                  )}
+                  <CheckedLabel label={fetched} stale={props.checkStale} />
                 </span>
               </p>
             </div>

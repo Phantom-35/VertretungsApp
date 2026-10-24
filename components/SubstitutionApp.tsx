@@ -58,6 +58,9 @@ const dayInAddress = () => addressRequest().day;
 /** "?einstellungen=teilen": back from the notice to print, to the code in the settings. */
 const settingsInAddress = () => addressRequest().settings;
 
+/** Last check older than this (while online): shown in the warning colour. */
+const CHECK_STALE_MS = 30 * 60_000;
+
 /** From this many changes on a day, the cards are shown smaller. */
 const COMPACT_FROM = 6;
 
@@ -313,6 +316,15 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     if (oldPlanDate) chooseDate(oldPlanDate);
   };
 
+  // Checked long ago although online and nothing loading: something may be
+  // stuck (the app refreshes every few minutes while open).
+  const checkStale =
+    now !== null &&
+    !isBusy &&
+    !connectionError &&
+    Boolean(data?.lastUpdated) &&
+    now - Date.parse(data!.lastUpdated!) > CHECK_STALE_MS;
+
   let headerStatus: HeaderStatus = "current";
   if (isBusy || now === null) {
     headerStatus = "updating";
@@ -448,6 +460,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
           isBusy={isBusy}
           connectionError={connectionError}
           schoolDown={schoolDown}
+          checkStale={checkStale}
           status={headerStatus}
           opening={opening}
           showInstallReminder={onboarding.done}
@@ -500,6 +513,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               fetchedLabel={
                 data?.lastUpdated ? formatAge(data.lastUpdated, now) : "noch nie"
               }
+              checkStale={checkStale}
               status={headerStatus}
               onOpenSettings={() => openSettings()}
             />
@@ -684,6 +698,13 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                       />
                     ))}
                   </div>
+                ) : tabDays.length === 0 ? (
+                  // No day in the plan at all (none uploaded, or no date readable):
+                  // "no changes today" would be wrong.
+                  <div className={cardClassName}>
+                    <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">Kein Plan online</p>
+                    <p className="mt-2 text-sm leading-6 text-muted">Die Schule hat gerade keinen Plan hochgeladen.</p>
+                  </div>
                 ) : (
                   <EmptyDay
                     selectedClass={selectedClass}
@@ -738,7 +759,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
           data
             ? [
                 `Stand ${formatTimestamp(data.sourceUpdatedAt ?? null, now)}`,
-                `geprüft ${formatAge(data.lastUpdated, now)}`,
+                ((age) => (age.endsWith("Uhr") ? `geprüft ${age}` : `${age} geprüft`))(formatAge(data.lastUpdated, now)),
                 ...(data.stale ? ["Schulseite nicht erreichbar"] : []),
                 ...(data.error && !data.stale ? ["unvollständig"] : []),
                 ...(fromDevice ? ["Kopie vom Gerät"] : []),

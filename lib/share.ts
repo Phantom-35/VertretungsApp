@@ -66,7 +66,7 @@ type DescribedEntry = Pick<
  * One change as a short block for messengers. "*…*" is bold in WhatsApp
  * (most other messengers show the stars as they are):
  *   🔄 *3.–4. Std.* · Vertretung (9AB)
- *   Lehrer FER → GOT · Raum 109
+ *   Lehrkraft FER → GOT · Raum 109
  *   „Aufgaben im Lernraum“
  */
 export function formatShareBlock(entry: DescribedEntry, schoolClass: string) {
@@ -75,7 +75,7 @@ export function formatShareBlock(entry: DescribedEntry, schoolClass: string) {
   const symbol = entrySymbol(entry);
   const details = [
     entry.subject ? `Fach ${entry.subject}` : "",
-    teacher ? `Lehrer ${teacher}` : "",
+    teacher ? `Lehrkraft ${teacher}` : "",
     entry.room ? `Raum ${entry.room}` : "",
   ].filter(Boolean);
   return [

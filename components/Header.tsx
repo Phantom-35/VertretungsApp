@@ -10,9 +10,34 @@ type HeaderProps = {
   dateIsPast: boolean;
   sourceUpdatedLabel: string;
   fetchedLabel: string;
+  /** The last check is long ago although the connection works. */
+  checkStale?: boolean;
   status: HeaderStatus;
   onOpenSettings: () => void;
 };
+
+/**
+ * When the plan was last checked: "gerade eben geprüft", "vor 5 Min.
+ * geprüft", "geprüft um 15:34 Uhr". In the warning colour when that is long
+ * ago although the connection works (something may be stuck).
+ */
+export function CheckedLabel({ label, stale = false }: { label: string; stale?: boolean }) {
+  const value = <span className={`font-medium ${stale ? "text-warn" : "text-foreground/80"}`}>{label}</span>;
+  if (label === "noch nie") {
+    return <>noch nicht geprüft</>;
+  }
+  return (
+    <span className={stale ? "text-warn" : undefined}>
+      {label.endsWith("Uhr") ? (
+        <>
+          geprüft {label.includes(".,") ? "am" : "um"} {value}
+        </>
+      ) : (
+        <>{value} geprüft</>
+      )}
+    </span>
+  );
+}
 
 export const statusBadges: Record<HeaderStatus, { label: string; className: string }> = {
   current: {
@@ -65,6 +90,7 @@ export function Header({
   dateIsPast,
   sourceUpdatedLabel,
   fetchedLabel,
+  checkStale = false,
   status,
   onOpenSettings,
 }: HeaderProps) {
@@ -125,14 +151,7 @@ export function Header({
             </span>
             <span aria-hidden>·</span>
             <span className="whitespace-nowrap">
-              {fetchedLabel === "noch nie" ? (
-                "noch nicht geprüft"
-              ) : (
-                <>
-                  geprüft{fetchedLabel.endsWith("Uhr") ? (isDate(fetchedLabel) ? " am" : " um") : ""}{" "}
-                  <span className="font-medium text-foreground/80">{fetchedLabel}</span>
-                </>
-              )}
+              <CheckedLabel label={fetchedLabel} stale={checkStale} />
             </span>
           </p>
         </div>

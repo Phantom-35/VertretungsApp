@@ -96,8 +96,8 @@ function NotificationStep({ push, myClass }: { push: PushControls; myClass: stri
       content = (
         <p className="rounded-2xl border border-line bg-card px-4 py-3 text-sm leading-6 text-foreground">
           Auf dem iPhone gehen Benachrichtigungen nur in der App auf dem Home-Bildschirm: in Safari
-          unten auf „Teilen“ tippen, „Zum Home-Bildschirm“ wählen und die App von dort öffnen. Danach
-          kannst du sie unter „Meine Klasse“ einschalten.
+          unten auf „Teilen“ tippen, „Zum Home-Bildschirm“ wählen und die App von dort öffnen. Dort
+          beginnt die Einführung neu und du kannst sie einschalten.
         </p>
       );
       break;

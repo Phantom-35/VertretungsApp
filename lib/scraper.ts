@@ -258,6 +258,9 @@ async function collectPages(base: string, firstPage: ParsedPage, warnings: strin
       break;
     }
 
+    // Pages announced as the rest of a day ("Seite 1/2") must be of that day:
+    // during an upload the next file may still be an old one.
+    const expectedDate = remainingOfDay > 0 ? current.date : null;
     const results = await mapWithConcurrency(candidates, PARALLEL_PAGE_LIMIT, (pageNumber) =>
       fetchPage(base, pageNumber),
     );
@@ -271,6 +274,14 @@ async function collectPages(base: string, firstPage: ParsedPage, warnings: strin
           parseSubstitutionPage(result.html, result.pageNumber),
           pages[pages.length - 1],
         );
+
+        if (expectedDate && parsed.meta.date && parsed.meta.date !== expectedDate) {
+          // The plan is incomplete for now (the next check sees the finished upload).
+          failedPages += 1;
+          warnings.push(`Seite ${result.pageNumber} gehört zu einem anderen Tag (Upload läuft?).`);
+          current = null;
+          break;
+        }
 
         if (isLeftoverPage(parsed, referenceStand)) {
           if (!isProbe) {

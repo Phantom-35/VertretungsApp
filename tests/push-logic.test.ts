@@ -372,6 +372,11 @@ describe("evening summary", () => {
     });
   });
 
+  it("counts the same row on two pages once", () => {
+    const twice = [entry({ lesson: "1" }), { ...entry({ lesson: "1" }) }];
+    expect(buildSummary(audience, twice, "2026-10-09", EVENING).title).toBe("5A · Morgen: 1 Änderung");
+  });
+
   it("says so when nothing changes", () => {
     expect(buildSummary(audience, [], "2026-10-09", EVENING)).toEqual({
       title: "5A · Morgen",

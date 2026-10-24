@@ -28,8 +28,8 @@ const NEW_VISIBLE_MS = 8_000;
 
 /**
  * "Neu", fading out once it has been fully on screen for a few seconds while
- * the app is in front. Scrolled partly away or the app in the background,
- * the time starts anew.
+ * the app is in front. Scrolled partly away, the app in the background or
+ * covered by the settings, the time starts anew.
  */
 function NewBadge({ onSeen }: { onSeen?: () => void }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -55,8 +55,10 @@ function NewBadge({ onSeen }: { onSeen?: () => void }) {
         setFading(true);
       }
     };
+    // The settings or the introduction cover the cards: not seen then.
+    const covered = () => document.querySelector("dialog[open]") !== null;
     const update = () => {
-      if (fullyOnScreen && document.visibilityState === "visible") {
+      if (fullyOnScreen && document.visibilityState === "visible" && !covered()) {
         timer ??= window.setTimeout(done, NEW_VISIBLE_MS);
       } else {
         window.clearTimeout(timer);
@@ -73,8 +75,12 @@ function NewBadge({ onSeen }: { onSeen?: () => void }) {
     );
     observer.observe(badge);
     document.addEventListener("visibilitychange", update);
+    // A dialog opening or closing pauses or resumes the time.
+    const dialogs = new MutationObserver(update);
+    dialogs.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["open"] });
     return () => {
       observer.disconnect();
+      dialogs.disconnect();
       document.removeEventListener("visibilitychange", update);
       window.clearTimeout(timer);
     };
@@ -117,7 +123,7 @@ function TeacherLine({ teacher, substitute }: { teacher: string; substitute: str
   if (isOpenSubstitute(substitute)) {
     return (
       <p className="text-sm text-foreground">
-        <span className="text-muted">Lehrer </span>
+        <span className="text-muted">Lehrkraft </span>
         {teacher ? (
           <>
             <span className="text-muted line-through">{teacher}</span>
@@ -135,7 +141,7 @@ function TeacherLine({ teacher, substitute }: { teacher: string; substitute: str
   if (!substitute || substitute === teacher) {
     return (
       <p className="text-sm text-foreground">
-        <span className="text-muted">Lehrer </span>
+        <span className="text-muted">Lehrkraft </span>
         {substitute ? (
           <span className="font-semibold">{substitute}</span>
         ) : (
@@ -151,7 +157,7 @@ function TeacherLine({ teacher, substitute }: { teacher: string; substitute: str
 
   return (
     <p className="text-sm text-foreground">
-      <span className="text-muted">Lehrer </span>
+      <span className="text-muted">Lehrkraft </span>
       {teacher ? (
         <>
           <span className="text-muted line-through">{teacher}</span>

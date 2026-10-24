@@ -47,7 +47,7 @@ type FeedbackFormProps = {
   /** "9B" or "Q1 (ABC, DEF)": the class the app opens with. */
   audience: string | null;
   pushStatus: string;
-  /** "Stand 16.10., 11:35 Uhr, geprüft gerade eben" */
+  /** "Stand 16.10., 11:35 Uhr, gerade eben geprüft" */
   planInfo: string;
   supportUrl: string;
 };

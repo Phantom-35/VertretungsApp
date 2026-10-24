@@ -79,7 +79,7 @@ test("compact cards on busy days, a short status line and neutral day counts", a
 
   // When the school changed the plan and when the app checked it.
   await expect(page.locator("header")).toContainText("Plan von 15:34 Uhr");
-  await expect(page.locator("header")).toContainText(/geprüft (gerade eben|vor \d+ Min\.)/);
+  await expect(page.locator("header")).toContainText(/(gerade eben|vor \d+ Min\.) geprüft/);
 
   // The count on the other day's tab is neutral, not orange like a warning.
   const otherCount = page.getByRole("tab", { selected: false }).locator("span.absolute");
@@ -287,6 +287,21 @@ test("does not announce a day after the holidays as not online yet", async ({ br
   await expect(page.getByText("noch nicht da")).toHaveCount(0);
   await expect(page.getByRole("tab", { selected: true })).toContainText("16.10.");
   await context.close();
+});
+
+test("says that no plan is online when the plan has no day at all", async ({ page }) => {
+  // Weeks later (the saved copy is old, so the app asks again) the school's
+  // export has no readable day.
+  await page.clock.setFixedTime(new Date("2026-11-03T09:00:00+01:00"));
+  await page.route("**/api/substitution*", async (route) => {
+    const response = await route.fetch();
+    const body = { ...(await response.json()), days: [], entries: [], notices: [] };
+    await route.fulfill({ response, json: body });
+  });
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  await expect(page.getByText("Kein Plan online")).toBeVisible();
+  await expect(page.getByText(/keine Änderungen eingetragen/)).toHaveCount(0);
 });
 
 test("says when the next plan is not online yet, and marks past days", async ({ page }) => {
