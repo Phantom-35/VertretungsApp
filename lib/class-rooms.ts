@@ -2,7 +2,8 @@
  * Which room belongs to which class, as printed on the room plan (rooms like
  * "C6-1" are the year group's extra rooms). Kept apart from the plan itself
  * so it is easy to take out: set SHOW_CLASS_ROOMS to false (or delete this
- * file and its two uses) and the plan shows only the room numbers.
+ * file and its uses) and the plan shows only the room numbers, without
+ * the year groups on the clusters.
  */
 
 export const SHOW_CLASS_ROOMS = true;
@@ -58,4 +59,10 @@ export function classRoomLabel(roomId: string) {
 export function classOfRoom(roomId: string) {
   const label = classRoomLabel(roomId);
   return label && /^\d{1,2}[A-Z]$/.test(label) ? label : null;
+}
+
+/** "Stufe 6" for a cluster whose class rooms are all of one year group, else null. */
+export function gradeOfRooms(roomIds: readonly string[]) {
+  const grades = new Set(roomIds.map((id) => classOfRoom(id)?.match(/^\d+/)?.[0]).filter(Boolean));
+  return grades.size === 1 ? `Stufe ${[...grades][0]}` : null;
 }

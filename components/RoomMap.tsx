@@ -1,5 +1,17 @@
-import { classRoomLabel } from "@/lib/class-rooms";
-import { ENTRANCE, FLOOR_PLANS, PLAN_HEIGHT, PLAN_WIDTH, floorName, type Floor, type Shape } from "@/lib/rooms";
+import { classRoomLabel, gradeOfRooms } from "@/lib/class-rooms";
+import {
+  CLUSTERS,
+  CLUSTER_NAMES,
+  ENTRANCE,
+  FLOOR_PLANS,
+  PLAN_HEIGHT,
+  PLAN_WIDTH,
+  clusterOf,
+  floorName,
+  type Cluster,
+  type Floor,
+  type Shape,
+} from "@/lib/rooms";
 
 const NUMBER_SIZE = 15;
 const NAME_SIZE = 10;
@@ -116,43 +128,109 @@ const fills: Record<Shape["kind"], string> = {
   wc: "fill-surface-muted",
   lift: "fill-surface-muted",
   stairs: "fill-surface-muted",
-  court: "fill-accent-soft",
-  blocked: "fill-foreground/15",
+  court: "fill-garden",
+  blocked: "fill-foreground/12",
 };
+
+const clusterFills: Record<Cluster, string> = {
+  "left-top": "fill-cluster-top",
+  "right-top": "fill-cluster-top",
+  "left-bottom": "fill-cluster-bottom",
+  "right-bottom": "fill-cluster-bottom",
+};
+
+/** Room between rooms: each one a tile of its own. */
+const GAP = 1.2;
+
+/** A garden: open to the sky, a tree in it. */
+function Garden({ shape }: { shape: Shape }) {
+  const cx = shape.x + shape.w / 2;
+  const cy = shape.y + shape.h / 2;
+  return (
+    <g className="fill-garden-ink">
+      <circle cx={cx} cy={cy - 14} r={11} opacity={0.35} />
+      <circle cx={cx - 8} cy={cy - 8} r={8} opacity={0.35} />
+      <circle cx={cx + 8} cy={cy - 8} r={8} opacity={0.35} />
+      <rect x={cx - 1.5} y={cy - 6} width={3} height={12} rx={1} opacity={0.55} />
+      <text x={cx} y={cy + 22} fontSize={12} fontWeight={700} textAnchor="middle">
+        Garten
+      </text>
+    </g>
+  );
+}
+
+/** The name of a cluster above or below it, on a tag in its colour. */
+function ClusterTag({ cluster, text }: { cluster: Cluster; text: string }) {
+  const [side, half] = cluster.split("-");
+  const x = side === "left" ? 220 : 780;
+  const y = half === "top" ? -17 : PLAN_HEIGHT + 17;
+  const width = text.length * 6.6 + 22;
+  return (
+    <g>
+      <rect x={x - width / 2} y={y - 10} width={width} height={20} rx={10} className={`${clusterFills[cluster]} stroke-foreground/15`} />
+      <text x={x} y={y + 4} fontSize={11.5} fontWeight={700} textAnchor="middle" className="fill-foreground">
+        {text}
+      </text>
+    </g>
+  );
+}
 
 /** One floor of the main building, a room marked if given. */
 export function RoomMap({ floor, marked, className }: { floor: Floor; marked: string | null; className?: string }) {
   const shapes = FLOOR_PLANS[floor];
   const markedShape = marked ? shapes.find((shape) => shape.id === marked) : undefined;
+  const clusterNames = CLUSTERS.map((cluster) => {
+    const ids = shapes.filter((shape) => shape.id && clusterOf(shape) === cluster).map((shape) => shape.id!);
+    return [cluster, CLUSTER_NAMES[floor][cluster] ?? gradeOfRooms(ids)] as const;
+  });
   return (
     <svg
       role="img"
       aria-label={`${floorName(floor)}${markedShape ? `, Raum ${marked} markiert` : ""}`}
-      viewBox={`-6 -6 ${PLAN_WIDTH + 12} ${PLAN_HEIGHT + 12}`}
+      viewBox={`-6 -32 ${PLAN_WIDTH + 12} ${PLAN_HEIGHT + 64}`}
       className={className}
       fontFamily="inherit"
     >
-      <rect width={PLAN_WIDTH} height={PLAN_HEIGHT} rx={4} strokeWidth={2.5} className="fill-background-soft stroke-foreground/45" />
+      <rect
+        x={-3}
+        y={-3}
+        width={PLAN_WIDTH + 6}
+        height={PLAN_HEIGHT + 6}
+        rx={10}
+        strokeWidth={2}
+        className="fill-background-soft stroke-foreground/30"
+      />
       {shapes.map((shape, index) => {
         const isMarked = shape === markedShape;
+        const cluster = clusterOf(shape);
+        const fill = cluster && (shape.kind === "room" || shape.kind === "space") ? clusterFills[cluster] : fills[shape.kind];
         return (
           <g key={index} data-room={shape.id}>
             <rect
-              x={shape.x}
-              y={shape.y}
-              width={shape.w}
-              height={shape.h}
-              strokeWidth={isMarked ? 2.5 : 1.2}
-              className={isMarked ? "fill-accent stroke-accent-strong" : `${fills[shape.kind]} stroke-foreground/35`}
+              x={shape.x + GAP}
+              y={shape.y + GAP}
+              width={shape.w - GAP * 2}
+              height={shape.h - GAP * 2}
+              rx={shape.kind === "court" ? 10 : 3}
+              strokeWidth={isMarked ? 2.5 : 1}
+              className={
+                isMarked
+                  ? "fill-accent stroke-accent-strong"
+                  : `${fill} ${shape.kind === "court" ? "stroke-garden-ink/25" : "stroke-foreground/20"}`
+              }
             />
-            <Label shape={shape} marked={isMarked} />
+            {shape.kind === "court" ? <Garden shape={shape} /> : <Label shape={shape} marked={isMarked} />}
           </g>
         );
       })}
+      {/* The middle: the stairwell (on the ground floor the foyer with the entrance). */}
+      <text x={502} y={258} fontSize={11.5} fontWeight={700} textAnchor="middle" className="fill-muted">
+        {floor === 0 ? "Foyer" : "Treppenhaus"}
+      </text>
       {floor === 0 ? (
         <>
           {/* The entrance: an opening in the outer wall. */}
-          <rect x={ENTRANCE.x + 2} y={PLAN_HEIGHT - 3} width={ENTRANCE.w - 4} height={6} className="fill-background-soft" />
+          <rect x={ENTRANCE.x + 2} y={PLAN_HEIGHT - 2} width={ENTRANCE.w - 4} height={8} className="fill-background-soft" />
           <text
             x={ENTRANCE.x + ENTRANCE.w / 2}
             y={PLAN_HEIGHT - 14}
@@ -165,13 +243,14 @@ export function RoomMap({ floor, marked, className }: { floor: Floor; marked: st
           </text>
         </>
       ) : null}
+      {clusterNames.map(([cluster, text]) => (text ? <ClusterTag key={cluster} cluster={cluster} text={text} /> : null))}
       {markedShape ? (
         <rect
           x={markedShape.x - 5}
           y={markedShape.y - 5}
           width={markedShape.w + 10}
           height={markedShape.h + 10}
-          rx={6}
+          rx={7}
           fill="none"
           strokeWidth={3}
           className="room-pulse stroke-accent"

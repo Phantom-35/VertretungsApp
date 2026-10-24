@@ -529,7 +529,11 @@ test("asks once about the room plan, over everything, then shows the rooms on it
   await confirmation.getByRole("button", { name: "Ausprobieren" }).click();
   await expect(confirmation).toBeHidden();
   const tryIt = page.getByRole("dialog", { name: "Raum 114" });
-  await expect(tryIt.getByText("Kunst ·")).toBeVisible();
+  await expect(tryIt.getByText("Kunst ·", { exact: true })).toBeVisible();
+  // The clusters are named, the gardens marked.
+  await expect(tryIt.getByText("Informatik · Kunst · Biologie")).toBeVisible();
+  await expect(tryIt.getByText("Stufe 8")).toBeVisible();
+  await expect(tryIt.getByText("Garten")).toHaveCount(2);
   await tryIt.getByRole("button", { name: "Fertig" }).click();
   await expect(tryIt).toBeHidden();
 

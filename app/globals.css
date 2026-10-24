@@ -29,6 +29,11 @@
   /* Text on a `warn` background. */
   --on-warn: #ffffff;
   --danger: #8e3f2b;
+  /* Room plan: the two clusters of a wing, and the gardens. */
+  --cluster-top: #e4f0ed;
+  --cluster-bottom: #f5ebdd;
+  --garden: #d9ead0;
+  --garden-ink: #3b6633;
   --font-sans: "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
   --font-mono: "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
 }
@@ -58,6 +63,10 @@
   --warn-soft: #3a2a1e;
   --on-warn: #1d140d;
   --danger: #f08f78;
+  --cluster-top: #1c3533;
+  --cluster-bottom: #352c22;
+  --garden: #1e3423;
+  --garden-ink: #a6d39a;
 }
 
 :root[data-theme="light"] {
@@ -92,6 +101,10 @@
   --color-warn-soft: var(--warn-soft);
   --color-on-warn: var(--on-warn);
   --color-danger: var(--danger);
+  --color-cluster-top: var(--cluster-top);
+  --color-cluster-bottom: var(--cluster-bottom);
+  --color-garden: var(--garden);
+  --color-garden-ink: var(--garden-ink);
   --font-mono: var(--font-mono);
 }
 

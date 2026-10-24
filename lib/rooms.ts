@@ -47,169 +47,230 @@ const of = (kind: Shape["kind"], x: number, y: number, w: number, h: number, nam
   name,
 });
 
-/** Toilets and storerooms around a shaft: the same on every floor, left and right. */
+/*
+ * The building, regular as it is: around the stairwell in the middle a wing
+ * on each side, each with a garden (open to the sky through all floors) and
+ * two clusters of rooms around it, top and bottom. The two clusters of a
+ * wing share the toilets between them. Rows and columns of rooms all end in
+ * a straight line towards the corridor.
+ */
+/** Where the top row of rooms ends and the bottom row begins. */
+const TOP = 82;
+const BOTTOM = 303;
+/** The left and the right column of rooms. */
+const LEFT = 100;
+const RIGHT = 900;
+/** The inner part of a wing: gardens, middle blocks, toilets. */
+const INNER_TOP = 108;
+const INNER_BOTTOM = 277;
+/** The line between the two clusters of a wing. */
+export const CLUSTER_LINE = 192;
+
+/** Toilets and storerooms around a shaft, between the two clusters of a wing. */
 function core(x: number, upper: string, lower: string, mirrored = false): Shape[] {
   const shaftX = mirrored ? x + 22 : x;
   const roomX = mirrored ? x : x + 39;
   return [
-    of("wc", x, 127, 61, 32),
-    of("blocked", shaftX, 159, 39, 66),
-    room(upper, roomX, 159, 22, 33, "Lehrmittel"),
-    room(lower, roomX, 192, 22, 33, "Lehrmittel"),
-    of("wc", x, 225, 61, 33),
+    of("wc", x, 118, 61, 32),
+    of("blocked", shaftX, 150, 39, 84),
+    room(upper, roomX, 150, 22, 42, "Lehrmittel"),
+    room(lower, roomX, 192, 22, 42, "Lehrmittel"),
+    of("wc", x, 234, 61, 32),
   ];
 }
 
+/** The left column: the same four rooms on every floor. */
+function leftColumn(ids: [string, string, string, string]): Shape[] {
+  return [
+    room(ids[0], 0, TOP, LEFT, 46),
+    room(ids[1], 0, 128, LEFT, 68),
+    room(ids[2], 0, 196, LEFT, 64),
+    room(ids[3], 0, 260, LEFT, BOTTOM - 260),
+  ];
+}
+
+const row = (top: boolean) => (top ? { y: 0, h: TOP } : { y: BOTTOM, h: PLAN_HEIGHT - BOTTOM });
+const gardens: Shape[] = [
+  of("court", 240, INNER_TOP, 130, INNER_BOTTOM - INNER_TOP, "Garten"),
+  of("court", 668, INNER_TOP, 122, INNER_BOTTOM - INNER_TOP, "Garten"),
+];
+const r = (id: string, x: number, w: number, top: boolean, name?: string) => {
+  const { y, h } = row(top);
+  return room(id, x, y, w, h, name);
+};
+const o = (kind: Shape["kind"], x: number, w: number, top: boolean) => {
+  const { y, h } = row(top);
+  return of(kind, x, y, w, h);
+};
+
 const groundFloor: Shape[] = [
-  room("039", 0, 0, 98, 82),
-  room("038", 98, 0, 88, 82),
-  room("037", 186, 0, 48, 82),
-  room("036", 234, 0, 84, 82),
-  of("stairs", 318, 0, 52, 82),
+  r("039", 0, 98, true),
+  r("038", 98, 88, true),
+  r("037", 186, 48, true),
+  r("036", 234, 84, true),
+  o("stairs", 318, 52, true),
   of("wc", 370, 0, 40, 50),
   of("lift", 370, 50, 40, 32),
-  of("blocked", 436, 0, 26, 82),
-  room("030", 462, 0, 45, 52, "Schulleitung"),
-  room("029", 507, 0, 97, 52, "Sekretariat"),
-  room("028", 604, 0, 55, 52, "Schulleitung"),
-  of("wc", 659, 0, 30, 80),
-  of("wc", 689, 0, 30, 80),
-  of("stairs", 719, 0, 56, 80),
-  room("022", 775, 0, 40, 52, "Verwaltung"),
-  room("021", 815, 0, 41, 52, "Schulentwicklung"),
-  room("020", 856, 0, 47, 52, "Mittelstufe"),
-  room("019", 903, 0, 49, 52, "Erprobungsstufe"),
-  room("018", 952, 0, 48, 84, "Bibliothek"),
-  room("040", 0, 82, 84, 46),
-  room("041", 0, 128, 115, 68),
-  room("042", 0, 196, 118, 64),
-  room("043", 0, 260, 82, 46),
-  room("001", 0, 306, 110, 79),
-  room("002", 110, 296, 95, 89),
-  room("003", 205, 296, 47, 89),
-  room("004", 252, 292, 77, 93),
-  of("stairs", 329, 290, 51, 95),
-  room("006", 380, 288, 37, 44, "Pause"),
-  room("005", 380, 332, 37, 53, "Sanitäter"),
-  room("007", 578, 312, 49, 73, "Sek-II-Beratung"),
-  room("008", 627, 312, 49, 73, "Sek-II-Beratung"),
-  room("009", 676, 312, 39, 73, "SII-Leitung"),
-  of("stairs", 715, 282, 53, 103),
-  room("010", 768, 282, 30, 103, "BOB"),
-  room("011", 798, 282, 34, 103, "Beratung"),
-  room("012", 832, 282, 71, 103, "Konferenz / Stillarbeit"),
-  room("013", 903, 282, 97, 103, "Stillarbeit"),
+  o("blocked", 436, 26, true),
+  r("030", 462, 45, true, "Schulleitung"),
+  r("029", 507, 97, true, "Sekretariat"),
+  r("028", 604, 55, true, "Schulleitung"),
+  o("wc", 659, 30, true),
+  o("wc", 689, 30, true),
+  o("stairs", 719, 56, true),
+  r("022", 775, 40, true, "Verwaltung"),
+  r("021", 815, 41, true, "Schulentwicklung"),
+  r("020", 856, 47, true, "Mittelstufe"),
+  r("019", 903, 49, true, "Erprobungsstufe"),
+  r("018", 952, 48, true, "Bibliothek"),
+  ...leftColumn(["040", "041", "042", "043"]),
+  r("001", 0, 110, false),
+  r("002", 110, 95, false),
+  r("003", 205, 47, false),
+  r("004", 252, 77, false),
+  o("stairs", 329, 51, false),
+  room("006", 380, BOTTOM, 37, 41, "Pause"),
+  room("005", 380, 344, 37, PLAN_HEIGHT - 344, "Sanitäter"),
+  r("007", 578, 49, false, "Sek-II-Beratung"),
+  r("008", 627, 49, false, "Sek-II-Beratung"),
+  r("009", 676, 39, false, "SII-Leitung"),
+  o("stairs", 715, 53, false),
+  r("010", 768, 30, false, "BOB"),
+  r("011", 798, 34, false, "Beratung"),
+  r("012", 832, 68, false, "Konferenz / Stillarbeit"),
+  r("013", RIGHT, 100, false, "Stillarbeit"),
+  room("017", RIGHT, TOP, 100, 73, "Ruheraum"),
+  room("016", RIGHT, 155, 100, 74, "Küche"),
+  room("015", RIGHT, 229, 100, BOTTOM - 229, "Kopierer"),
   ...core(145, "047", "046"),
-  of("court", 242, 108, 126, 162),
-  room("054", 368, 108, 50, 25, "SV"),
-  room("053", 368, 133, 50, 29, "Schulsozialarbeit"),
-  of("wc", 462, 104, 35, 62),
-  of("wc", 497, 104, 34, 62),
-  of("stairs", 490, 190, 36, 30),
-  room("060", 577, 106, 35, 154, "Materiallager"),
-  room("061", 629, 104, 39, 52, "Beratung 1"),
-  room("062", 629, 156, 39, 51, "Hausmeister"),
-  room("063", 629, 207, 39, 51, "Beratung 3"),
-  of("court", 668, 104, 119, 154),
-  room("014", 787, 100, 143, 158, "Lehrerzimmer"),
-  room("017", 930, 98, 70, 58, "Ruheraum"),
-  room("016", 930, 156, 70, 55, "Küche"),
-  room("015", 930, 211, 70, 47, "Kopierer"),
+  ...gardens,
+  room("054", 370, INNER_TOP, 50, 32, "SV"),
+  room("053", 370, 140, 50, 36, "Schulsozialarbeit"),
+  of("wc", 462, INNER_TOP, 35, 62),
+  of("wc", 497, INNER_TOP, 34, 62),
+  of("stairs", 490, 200, 36, 30),
+  room("060", 575, INNER_TOP, 32, INNER_BOTTOM - INNER_TOP, "Materiallager"),
+  room("061", 628, INNER_TOP, 40, 56, "Beratung 1"),
+  room("062", 628, 164, 40, 57, "Hausmeister"),
+  room("063", 628, 221, 40, INNER_BOTTOM - 221, "Beratung 3"),
+  room("014", 790, INNER_TOP, 110, INNER_BOTTOM - INNER_TOP, "Lehrerzimmer"),
 ];
 
 const firstFloor: Shape[] = [
-  room("130", 0, 0, 104, 82),
-  room("129", 104, 0, 86, 82),
-  room("128", 190, 0, 49, 82),
-  room("127", 239, 0, 83, 82),
-  of("stairs", 322, 0, 55, 82),
+  r("130", 0, 104, true),
+  r("129", 104, 86, true),
+  r("128", 190, 49, true),
+  r("127", 239, 83, true),
+  o("stairs", 322, 55, true),
   of("wc", 377, 0, 38, 55),
-  of("lift", 377, 55, 38, 27),
-  of("wc", 440, 0, 54, 82),
-  room("117", 494, 0, 101, 82, "Informatik / PC 2"),
-  room("116", 595, 0, 37, 82, "Kunst-Vorbereitung"),
-  room("115", 632, 0, 95, 82, "Informatik / PC 1"),
-  of("stairs", 727, 0, 55, 82),
-  room("114", 782, 0, 123, 82, "Kunst"),
-  room("113", 905, 0, 95, 90, "Biologie-Vorbereitung"),
-  room("131", 0, 82, 84, 46),
-  room("132", 0, 128, 115, 68),
-  room("133", 0, 196, 118, 64),
-  room("134", 0, 260, 82, 46),
-  room("101", 0, 306, 123, 79),
-  room("102", 123, 296, 83, 89),
-  room("103", 206, 296, 48, 89),
-  room("104", 254, 292, 80, 93),
-  of("stairs", 334, 290, 52, 95),
-  room("105", 386, 290, 38, 95, "Musik-Vorbereitung"),
-  room("106", 424, 290, 108, 95, "Physik 1"),
-  room("107", 532, 290, 78, 95, "Physik-Vorbereitung"),
-  room("108", 610, 290, 114, 95, "Physik 2"),
-  of("stairs", 724, 290, 51, 95),
-  room("109", 775, 290, 111, 95, "Chemie 1"),
-  room("110", 886, 290, 114, 95, "Chemie-Vorbereitung"),
-  room("112", 930, 90, 70, 105, "Biologie 1 / NW"),
-  room("111", 930, 195, 70, 95, "Chemie 2"),
+  of("lift", 377, 55, 38, TOP - 55),
+  o("wc", 440, 54, true),
+  r("117", 494, 101, true, "Informatik / PC\u00a02"),
+  r("116", 595, 37, true, "Kunst-Vorbereitung"),
+  r("115", 632, 95, true, "Informatik / PC\u00a01"),
+  o("stairs", 727, 55, true),
+  r("114", 782, 118, true, "Kunst"),
+  r("113", RIGHT, 100, true, "Biologie-Vorbereitung"),
+  ...leftColumn(["131", "132", "133", "134"]),
+  r("101", 0, 123, false),
+  r("102", 123, 83, false),
+  r("103", 206, 48, false),
+  r("104", 254, 80, false),
+  o("stairs", 334, 52, false),
+  r("105", 386, 38, false, "Musik-Vorbereitung"),
+  r("106", 424, 108, false, "Physik 1"),
+  r("107", 532, 78, false, "Physik-Vorbereitung"),
+  r("108", 610, 114, false, "Physik 2"),
+  o("stairs", 724, 51, false),
+  r("109", 775, 125, false, "Chemie 1"),
+  r("110", RIGHT, 100, false, "Chemie-Vorbereitung"),
+  room("112", RIGHT, TOP, 100, CLUSTER_LINE - TOP, "Biologie 1 / NW"),
+  room("111", RIGHT, CLUSTER_LINE, 100, BOTTOM - CLUSTER_LINE, "Chemie 2"),
   ...core(145, "138", "137"),
-  of("court", 242, 105, 127, 162),
-  of("space", 369, 95, 76, 162, "Bibliothek"),
-  of("stairs", 490, 190, 36, 30),
-  of("blocked", 559, 108, 35, 55),
-  room("145", 559, 163, 35, 50, "Bücherlager"),
-  room("147", 594, 108, 74, 105, "Biologie 2 / Kunst / Musik"),
-  room("146", 559, 213, 109, 54, "Musik"),
-  of("court", 668, 105, 120, 162),
-  ...core(833, "152", "153", true),
+  ...gardens,
+  of("space", 370, INNER_TOP, 75, INNER_BOTTOM - INNER_TOP, "Bibliothek"),
+  of("stairs", 490, 200, 36, 30),
+  of("blocked", 560, INNER_TOP, 36, 55),
+  room("145", 560, 163, 36, 57, "Bücherlager"),
+  room("147", 596, INNER_TOP, 72, 112, "Biologie 2 / Kunst / Musik"),
+  room("146", 560, 220, 108, INNER_BOTTOM - 220, "Musik"),
+  ...core(830, "152", "153", true),
 ];
 
 const secondFloor: Shape[] = [
-  room("234", 0, 0, 101, 82),
-  room("233", 101, 0, 88, 82),
-  room("232", 189, 0, 49, 82),
-  room("231", 238, 0, 86, 82),
-  of("stairs", 324, 0, 57, 82),
+  r("234", 0, 101, true),
+  r("233", 101, 88, true),
+  r("232", 189, 49, true),
+  r("231", 238, 86, true),
+  o("stairs", 324, 57, true),
   of("wc", 381, 0, 38, 55),
-  of("lift", 381, 55, 38, 27),
-  of("wc", 445, 0, 55, 82),
-  room("222", 500, 0, 79, 82, "Sek II"),
-  room("221", 579, 0, 81, 82, "Sek II"),
-  room("220", 660, 0, 80, 82, "Sek II"),
-  of("stairs", 740, 0, 57, 82),
-  room("219", 797, 0, 65, 82, "Sek II"),
-  room("218", 862, 0, 64, 86, "Sek II"),
-  room("217", 926, 0, 74, 95, "Sek II"),
-  room("235", 0, 82, 84, 46),
-  room("236", 0, 128, 115, 68),
-  room("237", 0, 196, 118, 64),
-  room("238", 0, 260, 82, 46),
-  room("201", 0, 306, 121, 79),
-  room("202", 121, 296, 85, 89),
-  room("203", 206, 296, 48, 89),
-  room("204", 254, 292, 80, 93),
-  of("stairs", 334, 290, 55, 95),
-  of("blocked", 389, 290, 24, 95),
-  room("206", 413, 290, 53, 95, "Arbeitsraum Sek II"),
-  room("208", 495, 290, 86, 95, "Sek II"),
-  room("209", 581, 290, 78, 95, "Sek II"),
-  room("210", 659, 290, 74, 95, "Sek II"),
-  of("stairs", 733, 290, 50, 95),
-  room("211", 783, 290, 61, 95, "Sek II"),
-  room("212", 844, 290, 60, 95, "Sek II"),
-  room("213", 904, 290, 96, 95, "Sek II"),
-  room("216", 930, 95, 70, 90, "Sek II"),
-  room("215", 930, 185, 70, 28, "Lehrmittel"),
-  room("214", 930, 213, 70, 77, "Sek II"),
+  of("lift", 381, 55, 38, TOP - 55),
+  o("wc", 445, 55, true),
+  r("222", 500, 79, true, "Sek II"),
+  r("221", 579, 81, true, "Sek II"),
+  r("220", 660, 80, true, "Sek II"),
+  o("stairs", 740, 57, true),
+  r("219", 797, 65, true, "Sek II"),
+  r("218", 862, 64, true, "Sek II"),
+  r("217", 926, 74, true, "Sek II"),
+  ...leftColumn(["235", "236", "237", "238"]),
+  r("201", 0, 121, false),
+  r("202", 121, 85, false),
+  r("203", 206, 48, false),
+  r("204", 254, 80, false),
+  o("stairs", 334, 55, false),
+  o("blocked", 389, 24, false),
+  r("206", 413, 53, false, "Arbeitsraum Sek II"),
+  r("208", 495, 86, false, "Sek II"),
+  r("209", 581, 78, false, "Sek II"),
+  r("210", 659, 74, false, "Sek II"),
+  o("stairs", 733, 50, false),
+  r("211", 783, 61, false, "Sek II"),
+  r("212", 844, 56, false, "Sek II"),
+  r("213", RIGHT, 100, false, "Sek II"),
+  room("216", RIGHT, TOP, 100, 93, "Sek II"),
+  room("215", RIGHT, 175, 100, 30, "Lehrmittel"),
+  room("214", RIGHT, 205, 100, BOTTOM - 205, "Sek II"),
   ...core(145, "242", "241"),
-  of("court", 242, 105, 127, 162),
-  room("247", 369, 95, 76, 162, "Oberstufenraum"),
-  of("stairs", 490, 190, 36, 30),
-  room("248", 559, 105, 109, 80, "Klausur 1"),
-  room("249", 559, 185, 109, 82, "Klausur 2"),
-  of("court", 668, 105, 120, 162),
-  ...core(833, "254", "255", true),
+  ...gardens,
+  room("247", 370, INNER_TOP, 75, INNER_BOTTOM - INNER_TOP, "Oberstufenraum"),
+  of("stairs", 490, 200, 36, 30),
+  room("248", 560, INNER_TOP, 108, CLUSTER_LINE - INNER_TOP, "Klausur 1"),
+  room("249", 560, CLUSTER_LINE, 108, INNER_BOTTOM - CLUSTER_LINE, "Klausur 2"),
+  ...core(830, "254", "255", true),
 ];
 
 export const FLOOR_PLANS: Record<Floor, Shape[]> = { 0: groundFloor, 1: firstFloor, 2: secondFloor };
+
+export type Cluster = "left-top" | "left-bottom" | "right-top" | "right-bottom";
+export const CLUSTERS: readonly Cluster[] = ["left-top", "left-bottom", "right-top", "right-bottom"];
+
+/** What the right wing's clusters hold; the left ones are named by their classes (lib/class-rooms.ts). */
+export const CLUSTER_NAMES: Record<Floor, Partial<Record<Cluster, string>>> = {
+  0: { "right-top": "Verwaltung", "right-bottom": "Beratung · Stillarbeit" },
+  1: { "right-top": "Informatik · Kunst · Biologie", "right-bottom": "Physik · Chemie" },
+  2: { "right-top": "Oberstufe", "right-bottom": "Oberstufe" },
+};
+
+/**
+ * The cluster a shape belongs to, or null: the middle around the stairwell,
+ * the gardens, the toilets two clusters share, and what spans both.
+ */
+export function clusterOf(shape: Shape): Cluster | null {
+  if (shape.kind === "court" || shape.kind === "blocked") {
+    return null;
+  }
+  const cx = shape.x + shape.w / 2;
+  const inner = shape.y >= INNER_TOP - 10 && shape.y + shape.h <= INNER_BOTTOM + 10;
+  const shared = inner && ((cx > 140 && cx < 210) || (cx > 825 && cx < 895));
+  const middle = inner ? cx >= 370 && cx <= 668 : cx >= 445 && cx <= 560;
+  const spans = shape.y < CLUSTER_LINE - 10 && shape.y + shape.h > CLUSTER_LINE + 10;
+  if (shared || middle || spans) {
+    return null;
+  }
+  const half = shape.y + shape.h / 2 < CLUSTER_LINE ? "top" : "bottom";
+  return cx < 500 ? `left-${half}` : `right-${half}`;
+}
 
 /** Where the entrance is (ground floor, bottom edge). */
 export const ENTRANCE = { x: 417, w: 161 };

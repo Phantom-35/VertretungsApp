@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { classOfRoom, classRoomLabel } from "@/lib/class-rooms";
+import { classOfRoom, classRoomLabel, gradeOfRooms } from "@/lib/class-rooms";
 import { SCHOOL_CLASSES } from "@/lib/entries";
 import {
   ALL_ROOMS,
+  CLUSTERS,
   FLOORS,
   FLOOR_PLANS,
   PLAN_HEIGHT,
   PLAN_WIDTH,
+  clusterOf,
   findRoom,
   firstKnownRoom,
   normalizeRoom,
@@ -65,6 +67,38 @@ describe("room plan", () => {
     expect(splitRooms("")).toEqual([]);
     expect(firstKnownRoom(["", "TU3", "SWI, 104"])).toBe("104");
     expect(firstKnownRoom(["TU3"])).toBeNull();
+  });
+});
+
+describe("clusters", () => {
+  const roomsIn = (floor: 0 | 1 | 2, cluster: (typeof CLUSTERS)[number]) =>
+    FLOOR_PLANS[floor].filter((shape) => shape.id && clusterOf(shape) === cluster).map((shape) => shape.id!);
+
+  it("are the year groups on the left, top and bottom of each floor", () => {
+    expect([0, 1, 2].map((floor) => gradeOfRooms(roomsIn(floor as 0 | 1 | 2, "left-top")))).toEqual([
+      "Stufe 6",
+      "Stufe 8",
+      "Stufe 10",
+    ]);
+    expect([0, 1, 2].map((floor) => gradeOfRooms(roomsIn(floor as 0 | 1 | 2, "left-bottom")))).toEqual([
+      "Stufe 5",
+      "Stufe 7",
+      "Stufe 9",
+    ]);
+    // Each holds all four classes of its year group.
+    expect(roomsIn(0, "left-top").filter((id) => classOfRoom(id))).toHaveLength(4);
+    expect(roomsIn(2, "left-bottom").filter((id) => classOfRoom(id))).toHaveLength(4);
+  });
+
+  it("leave out the middle, the gardens and the toilets two clusters share", () => {
+    const shape = (floor: 0 | 1 | 2, id: string) => FLOOR_PLANS[floor].find((item) => item.id === id)!;
+    expect(clusterOf(shape(1, "138"))).toBeNull();
+    expect(clusterOf(shape(1, "152"))).toBeNull();
+    expect(clusterOf(shape(2, "247"))).toBeNull();
+    expect(clusterOf(shape(0, "029"))).toBeNull();
+    expect(FLOOR_PLANS[1].filter((item) => item.kind === "court").map(clusterOf)).toEqual([null, null]);
+    expect(clusterOf(shape(1, "114"))).toBe("right-top");
+    expect(clusterOf(shape(1, "109"))).toBe("right-bottom");
   });
 });
 
