@@ -62,11 +62,6 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** Whether the reminder is on screen this visit (other hints wait for it). */
-export function useInstallReminderVisible() {
-  return useSyncExternalStore(subscribe, decide, () => false);
-}
-
 /**
  * A gentle reminder to install the app, for people who use it in the
  * browser: on the 3rd and the 10th visit, small and easy to close.

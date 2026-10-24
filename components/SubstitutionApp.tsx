@@ -14,7 +14,7 @@ import { PwaRegistrar } from "@/components/PwaRegistrar";
 import { RefreshStatus } from "@/components/RefreshStatus";
 import { ShareButton } from "@/components/ShareButton";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
-import { InstallReminder, useInstallReminderVisible } from "@/components/InstallReminder";
+import { InstallReminder } from "@/components/InstallReminder";
 import { RoomPlanOffer } from "@/components/RoomPlanOffer";
 import { RoomPlanSheet } from "@/components/RoomPlanSheet";
 import { NotificationSettings } from "@/components/NotificationSettings";
@@ -125,7 +125,11 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     morningSummaryTime: settings.morningSummaryTime,
   });
   const onboarding = useOnboarding();
-  const installReminderVisible = useInstallReminderVisible();
+  // The introduction was on screen during this visit.
+  const [introducedNow, setIntroducedNow] = useState(false);
+  if (!onboarding.done && !introducedNow) {
+    setIntroducedNow(true);
+  }
   // Computer or tablet in landscape: a view of its own (phones never get it).
   const wide = useWideScreen();
   // The sections glide in when the app opens, not when one appears later.
@@ -450,8 +454,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       appUrl: classLink(window.location.origin, selectedClass ?? ""),
       notices: visibleNotices,
     });
-  // Asked once, after the introduction and with a class, not together with the install reminder.
-  const showRoomPlanOffer = onboarding.done && selectedClass !== null && !installReminderVisible;
+  // Asked once, over everything, when the app opens; not right after the
+  // introduction (that is enough for one visit) and not over the settings.
+  const showRoomPlanOffer = onboarding.done && !introducedNow && !settingsOpen && !opensFromAddress;
   const exampleRoom = firstKnownRoom(visibleEntries.map((entry) => entry.room));
   const emptyDayLabel = selectedDay
     ? `Am ${selectedDay.dayLabel ?? formatPlanDateLabel(selectedDay.date, null)}`
@@ -471,7 +476,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
           status={headerStatus}
           opening={opening}
           showInstallReminder={onboarding.done}
-          roomPlanOffer={showRoomPlanOffer ? <RoomPlanOffer exampleRoom={exampleRoom} /> : null}
           onRefresh={() => void forceRefresh()}
           onOpenSettings={openSettings}
           selectedClass={selectedClass}
@@ -528,7 +532,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
 
             {/* Not during the introduction, which has its own install step. */}
             {onboarding.done ? <InstallReminder /> : null}
-            {showRoomPlanOffer ? <RoomPlanOffer exampleRoom={exampleRoom} /> : null}
 
             <ClassSelector
               classes={SCHOOL_CLASSES}
@@ -783,6 +786,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
         }}
       />
       <RoomPlanSheet myClass={myClass ?? null} />
+      <RoomPlanOffer ready={showRoomPlanOffer} exampleRoom={exampleRoom} />
       {!onboarding.done ? (
         <Onboarding
           myClass={myClass ?? null}

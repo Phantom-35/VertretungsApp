@@ -304,6 +304,15 @@ body {
   animation: fade-in 200ms ease-out;
 }
 
+/* The one-time question about the room plan: a card over everything. */
+.room-offer[open] {
+  animation: dialog-in 320ms var(--ease-ios);
+}
+
+.room-offer[open]::backdrop {
+  animation: backdrop-in 320ms var(--ease-ios);
+}
+
 /* Opening the app: the sections glide in one after another. "backwards"
    only, so no transform stays behind once they have arrived. */
 @keyframes rise-in {
@@ -350,6 +359,8 @@ body {
   .settings-page-forward,
   .settings-page-back,
   .onboarding[open],
+  .room-offer[open],
+  .room-offer[open]::backdrop,
   .app-enter > * {
     animation: none;
   }

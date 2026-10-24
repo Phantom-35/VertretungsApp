@@ -25,11 +25,18 @@ export default defineConfig({
     locale: "de-DE",
     timezoneId: "Europe/Berlin",
     trace: "retain-on-failure",
-    // The introduction has been seen; its own test starts without this.
+    // The introduction has been seen and the question about the room plan
+    // answered; their own tests start without this.
     storageState: {
       cookies: [],
       origins: [
-        { origin: `http://localhost:${APP_PORT}`, localStorage: [{ name: "kag:onboarded", value: "1" }] },
+        {
+          origin: `http://localhost:${APP_PORT}`,
+          localStorage: [
+            { name: "kag:onboarded", value: "1" },
+            { name: "kag:settings", value: JSON.stringify({ roomPlan: false }) },
+          ],
+        },
       ],
     },
   },

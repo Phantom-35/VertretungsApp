@@ -508,28 +508,33 @@ test("offers no printing in the installed app on an iPhone, where it does nothin
   await iphone.close();
 });
 
-test("asks once about the room plan, then shows the rooms on it", async ({ page }) => {
+/** Opens the app as on the first start after the update: the room plan not asked yet. */
+async function openUnasked(page: Page) {
   await page.goto("/");
-  await chooseClass(page, "5A");
-  const roomButtons = page.getByRole("button", { name: /auf dem Raumplan zeigen$/ });
-  const offer = page.getByRole("complementary", { name: "Neu: Raumplan" });
-  await expect(offer).toBeVisible();
-  // Until it is switched on, the room numbers are plain text.
-  await expect(page.locator("article").first()).toBeVisible();
-  await expect(roomButtons).toHaveCount(0);
+  await page.evaluate(() => localStorage.removeItem("kag:settings"));
+  await page.reload();
+}
 
+test("asks once about the room plan, over everything, then shows the rooms on it", async ({ page }) => {
+  await openUnasked(page);
+  const offer = page.getByRole("dialog", { name: "Raumplan", exact: true });
+  await expect(offer).toBeVisible();
+  await expect(offer).toContainText("Neu");
+  // Over the whole app: nothing behind it can be used meanwhile.
+  expect(await offer.evaluate((dialog) => dialog.matches(":modal"))).toBe(true);
   await offer.getByRole("button", { name: "Ja, gerne" }).click();
-  // Then it says how to get there.
-  const confirmation = page.getByRole("complementary", { name: "Raumplan ist an" });
+  // Then it says how to get there, and it can be tried at once.
+  const confirmation = page.getByRole("dialog", { name: "Raumplan ist an" });
   await expect(confirmation).toContainText("Raumnummer mit dem Pin-Zeichen");
   await confirmation.getByRole("button", { name: "Ausprobieren" }).click();
-  const tryIt = page.getByRole("dialog", { name: "Raum 004" });
-  await expect(tryIt).toBeVisible();
+  await expect(confirmation).toBeHidden();
+  const tryIt = page.getByRole("dialog", { name: "Raum 114" });
+  await expect(tryIt.getByText("Kunst ·")).toBeVisible();
   await tryIt.getByRole("button", { name: "Fertig" }).click();
   await expect(tryIt).toBeHidden();
-  await confirmation.getByRole("button", { name: "Alles klar" }).click();
-  await expect(confirmation).toHaveCount(0);
 
+  await chooseClass(page, "5A");
+  const roomButtons = page.getByRole("button", { name: /auf dem Raumplan zeigen$/ });
   await page.getByRole("button", { name: "Raum 004 auf dem Raumplan zeigen" }).first().click();
   const sheet = page.getByRole("dialog", { name: "Raum 004" });
   await expect(sheet).toBeVisible();
@@ -557,14 +562,14 @@ test("asks once about the room plan, then shows the rooms on it", async ({ page 
   // Asked only once.
   await page.reload();
   await expect(page.locator("article").first()).toBeVisible();
-  await expect(offer).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await chooseClass(page, "5A");
   await expect(roomButtons.first()).toBeVisible();
 
   // The whole plan from the settings, and switched off there.
   const dialog = await openSettings(page, "Anzeige");
   await dialog.getByRole("button", { name: "Raumplan ansehen" }).click();
-  const plan = page.getByRole("dialog", { name: "Raumplan" });
+  const plan = page.getByRole("dialog", { name: "Raumplan", exact: true });
   await expect(plan.getByRole("img", { name: "Erdgeschoss" })).toBeVisible();
   await plan.getByRole("button", { name: "Fertig" }).click();
   await expect(plan).toBeHidden();
@@ -576,18 +581,24 @@ test("asks once about the room plan, then shows the rooms on it", async ({ page 
   await dialog.getByRole("button", { name: "Fertig" }).click();
   await expect(dialog).toBeHidden();
   await expect(roomButtons).toHaveCount(0);
-  await expect(offer).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("leaves the rooms as they are after a no to the room plan", async ({ page }) => {
-  await page.goto("/");
+test("asks again after Escape, and leaves the rooms as they are after a no", async ({ page }) => {
+  await openUnasked(page);
+  const offer = page.getByRole("dialog", { name: "Raumplan", exact: true });
+  // Escape (or the back button) decides nothing: asked again next time.
+  await expect(offer).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(offer).toBeHidden();
   await chooseClass(page, "5A");
-  const offer = page.getByRole("complementary", { name: "Neu: Raumplan" });
+  await expect(page.getByRole("button", { name: /auf dem Raumplan zeigen$/ })).toHaveCount(0);
+  await page.reload();
   await offer.getByRole("button", { name: "Nein, danke" }).click();
-  await expect(offer).toHaveCount(0);
+  await expect(offer).toBeHidden();
   await page.reload();
   await expect(page.locator("article").first()).toBeVisible();
-  await expect(offer).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /auf dem Raumplan zeigen$/ })).toHaveCount(0);
   const dialog = await openSettings(page, "Anzeige");
   await expect(dialog.getByRole("switch", { name: "Räume auf dem Plan zeigen" })).not.toBeChecked();
@@ -664,7 +675,7 @@ test("help and contact: a message to click through, sent with the device details
 });
 
 test("keeps the settings button on screen with large text on a small phone", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("kag:settings", JSON.stringify({ textSize: "large" })));
+  await page.addInitScript(() => localStorage.setItem("kag:settings", JSON.stringify({ textSize: "large", roomPlan: false })));
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/");
   await chooseClass(page, "Q1");
@@ -873,11 +884,16 @@ test.describe("first start", () => {
       "RUK",
     );
     await expect(page.getByRole("button", { name: "Aktualisieren" })).toHaveCount(0);
+    // The question about the room plan waits for the next opening: one thing at a time.
+    const roomPlanOffer = page.getByRole("dialog", { name: "Raumplan", exact: true });
+    await expect(roomPlanOffer).toHaveCount(0);
 
     // Only once.
     await page.reload();
     await expect(page.locator("h1")).toHaveText("Q1");
     await expect(page.getByRole("heading", { name: "Willkommen!" })).toHaveCount(0);
+    await roomPlanOffer.getByRole("button", { name: "Nein, danke" }).click();
+    await expect(roomPlanOffer).toHaveCount(0);
 
     // Can be watched again from the settings; Escape skips it.
     await openSettings(page, "Über die App");
@@ -1527,7 +1543,7 @@ test("settings: the header can be swiped even when scrolled down", async ({ brow
   await page.goto("/");
   // Both daily overviews on: their times make the page long enough to scroll.
   await page.evaluate(() =>
-    localStorage.setItem("kag:settings", JSON.stringify({ eveningSummary: true, morningSummary: true })),
+    localStorage.setItem("kag:settings", JSON.stringify({ eveningSummary: true, morningSummary: true, roomPlan: false })),
   );
   await page.reload();
   await chooseClass(page, "Q1");
