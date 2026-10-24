@@ -188,3 +188,21 @@ describe("the school's second website as a stand-in", () => {
     }
   });
 });
+
+describe("the message about the source", () => {
+  it("never holds up the plan, also when Redis hangs", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/source-switch", () => ({ reportPlanSource: () => new Promise(() => undefined) }));
+    try {
+      mockSchoolServer(allFixturePages());
+      const { fetchSubstitutionData: fetchWithHangingRedis } = await import("@/lib/scraper");
+      const started = Date.now();
+      const data = await fetchWithHangingRedis();
+      expect(data.success).toBe(true);
+      expect(Date.now() - started).toBeLessThan(4_000);
+    } finally {
+      vi.doUnmock("@/lib/source-switch");
+      vi.resetModules();
+    }
+  });
+});

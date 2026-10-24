@@ -317,6 +317,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   .settings-sheet[open],
   .settings-sheet[open]::backdrop,
   .settings-sheet[data-closing],

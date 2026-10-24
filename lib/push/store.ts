@@ -42,12 +42,15 @@ export interface PushStore {
   /** True if the lock was free; it expires by itself after `seconds`. */
   acquireLock(name: string, seconds: number): Promise<boolean>;
   releaseLock(name: string): Promise<void>;
+  /** Counts up a value that starts afresh after `seconds` (e.g. per hour); returns the new count. */
+  countUp(name: string, seconds: number): Promise<number>;
 }
 
 const SUBSCRIBERS_KEY = "push:subscribers";
 const PLAN_KEY = "push:plan";
 const LOCK_PREFIX = "push:lock:";
 const META_PREFIX = "push:meta:";
+const COUNT_PREFIX = "push:count:";
 
 /** Upstash may return stored JSON already parsed. */
 function parse<T>(value: unknown): T | null {
@@ -114,6 +117,15 @@ class RedisStore implements PushStore {
   async releaseLock(name: string) {
     await this.redis.del(LOCK_PREFIX + name);
   }
+
+  async countUp(name: string, seconds: number) {
+    const key = COUNT_PREFIX + name;
+    const count = await this.redis.incr(key);
+    if (count === 1) {
+      await this.redis.expire(key, seconds);
+    }
+    return count;
+  }
 }
 
 /** Keeps everything in memory. Only for tests: serverless instances do not share memory. */
@@ -121,6 +133,7 @@ export class MemoryStore implements PushStore {
   subscribers = new Map<string, Subscriber>();
   plan: PlanState | null = null;
   locks = new Map<string, number>();
+  counts = new Map<string, { count: number; until: number }>();
   meta = new Map<string, string>();
 
   async getSubscriber(id: string) {
@@ -160,6 +173,13 @@ export class MemoryStore implements PushStore {
   }
   async releaseLock(name: string) {
     this.locks.delete(name);
+  }
+  async countUp(name: string, seconds: number) {
+    const now = Date.now();
+    const current = this.counts.get(name);
+    const next = current && current.until > now ? { ...current, count: current.count + 1 } : { count: 1, until: now + seconds * 1000 };
+    this.counts.set(name, next);
+    return next.count;
   }
 }
 

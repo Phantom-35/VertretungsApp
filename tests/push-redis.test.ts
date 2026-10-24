@@ -147,7 +147,7 @@ describe("Redis push store (Upstash REST)", () => {
       await check([entry("1")]);
       expect(sent).toHaveLength(1);
       expect(await check([entry("1")])).toMatchObject({ removed: 1, notified: 1 });
-      expect(sent.at(-1)!.body).toBe("✅ Wieder nach Plan (Vertretung gestrichen)");
+      expect(sent.at(-1)!.body).toBe("✅ Wieder nach Plan (war: Vertretung)");
       // Back to unchanged: no more writes.
       const writes = planWrites();
       await check([entry("1")]);

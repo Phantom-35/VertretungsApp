@@ -149,6 +149,15 @@ describe("checkParsedPages (self-check)", () => {
       `Seite 1: ${page.stats.tableRows} Zeilen auf der Seite, aber ${page.entries.length} gelesen.`,
     );
   });
+
+  it("reads a note spanning the whole table without calling the plan incomplete", () => {
+    const html = loadFixture(1);
+    const row = html.match(/<tr class='list odd'>.*?<\/tr>/)![0];
+    const note = "<tr class='list even'><td class='list' colspan='7'>Wandertag der 5. Klassen</td></tr>";
+    const page = parseSubstitutionPage(html.replace(row, row + note), 1);
+    expect(page.entries.some((item) => item.className === "Wandertag der 5. Klassen")).toBe(true);
+    expect(checkParsedPages([page]).problems).toEqual([]);
+  });
   it("counts an open substitute (???) like the parser does", () => {
     const html = loadFixture(1);
     const row = html.match(/<tr class='list odd'>.*?<\/tr>/)![0];

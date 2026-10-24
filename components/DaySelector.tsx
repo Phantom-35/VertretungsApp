@@ -18,9 +18,19 @@ type DaySelectorProps = {
   now: number | null;
   /** The next school day, not yet published by the school: a pale extra tab. */
   pendingDate?: string | null;
+  /** Other days with changes the user has not seen yet: a small dot. */
+  newDates?: ReadonlySet<string>;
 };
 
-export function DaySelector({ days, selectedDate, onChange, counts, now, pendingDate = null }: DaySelectorProps) {
+export function DaySelector({
+  days,
+  selectedDate,
+  onChange,
+  counts,
+  now,
+  pendingDate = null,
+  newDates,
+}: DaySelectorProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
   // With many days the selected one can be outside the visible strip; scroll
@@ -37,7 +47,7 @@ export function DaySelector({ days, selectedDate, onChange, counts, now, pending
     if (tabRect.left < listRect.left || tabRect.right > listRect.right) {
       list.scrollBy({
         left: tabRect.left - listRect.left - (listRect.width - tabRect.width) / 2,
-        behavior: "smooth",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       });
     }
   }, [selectedDate, days.length]);
@@ -102,6 +112,10 @@ export function DaySelector({ days, selectedDate, onChange, counts, now, pending
           >
             <span className="block text-sm font-semibold">
               {relative ?? day.dayLabel ?? formatWeekday(day.date)}
+              {/* Something new there since the last look. */}
+              {newDates?.has(day.date) && !selected ? (
+                <span aria-hidden className="ml-1 inline-block size-2 rounded-full bg-accent align-middle" />
+              ) : null}
             </span>
             <span className={`block text-xs ${selected && !pending ? "text-white/80" : "text-muted"}`}>
               {/* "vorbei": a past day is not mistaken for the coming one. */}
@@ -133,6 +147,7 @@ export function DaySelector({ days, selectedDate, onChange, counts, now, pending
             {count !== null ? (
               <span className="sr-only">, {count === 1 ? "1 Änderung" : `${count} Änderungen`}</span>
             ) : null}
+            {newDates?.has(day.date) && !selected ? <span className="sr-only">, neu</span> : null}
           </button>
         );
       })}

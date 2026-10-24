@@ -117,6 +117,21 @@ function Choices<T extends string>({ name, legend, options, value, onChange }: {
   );
 }
 
+type Draft = {
+  category: FeedbackCategory | null;
+  problem: FeedbackProblem | null;
+  message: string;
+  contact: string;
+  withDetails: boolean;
+};
+
+/**
+ * What was written so far, kept while the app is open: closing the settings
+ * to look something up must not lose a half-written message. Only in memory,
+ * nothing is stored on the device.
+ */
+let draft: Draft = { category: null, problem: null, message: "", contact: "", withDetails: true };
+
 type SendState =
   | { kind: "idle" }
   | { kind: "sending" }
@@ -132,11 +147,14 @@ export function FeedbackForm(props: FeedbackFormProps) {
   const id = useId();
   const wide = useWideScreen();
   const [settings] = useSettings();
-  const [category, setCategory] = useState<FeedbackCategory | null>(null);
-  const [problem, setProblem] = useState<FeedbackProblem | null>(null);
-  const [message, setMessage] = useState("");
-  const [contact, setContact] = useState("");
-  const [withDetails, setWithDetails] = useState(true);
+  const [category, setCategory] = useState<FeedbackCategory | null>(() => draft.category);
+  const [problem, setProblem] = useState<FeedbackProblem | null>(() => draft.problem);
+  const [message, setMessage] = useState(() => draft.message);
+  const [contact, setContact] = useState(() => draft.contact);
+  const [withDetails, setWithDetails] = useState(() => draft.withDetails);
+  useEffect(() => {
+    draft = { category, problem, message, contact, withDetails };
+  }, [category, problem, message, contact, withDetails]);
   const [website, setWebsite] = useState("");
   const [state, setState] = useState<SendState>({ kind: "idle" });
   // Chromium names the phone model only on request (other browsers never).

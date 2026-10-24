@@ -341,9 +341,11 @@ export function checkParsedPages(pages: ParsedPage[]) {
       if (stats.tableRows > 0) {
         problems.push(`${label}: Tabellenformat nicht erkannt.`);
       }
-    } else if (entries.length !== stats.tableRows) {
+    } else if (stats.readRows < stats.tableRows) {
+      // Rows the parser did not read mean a wrongly read table. More read
+      // than counted (e.g. a note spanning the table) is no harm.
       problems.push(
-        `${label}: ${stats.tableRows} Zeilen auf der Seite, aber ${entries.length} gelesen.`,
+        `${label}: ${stats.tableRows} Zeilen auf der Seite, aber ${stats.readRows} gelesen.`,
       );
     }
 
@@ -373,10 +375,19 @@ export function checkParsedPages(pages: ParsedPage[]) {
  * monitor2020 again, so it is back in use as soon as it answers. The
  * maintainer hears about each switch (lib/source-switch.ts); users do not.
  */
+/**
+ * The maintainer's message about the source never holds up the plan: a slow
+ * or unreachable Redis (or webhook) gets this long, then it goes on alone.
+ */
+const SOURCE_REPORT_WAIT_MS = 1_500;
+function reportSource(...args: Parameters<typeof reportPlanSource>) {
+  return Promise.race([reportPlanSource(...args), wait(SOURCE_REPORT_WAIT_MS)]);
+}
+
 export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
   const primary = await fetchFrom(BASE_URL);
   if (primary.payload.success) {
-    await reportPlanSource("primary");
+    await reportSource("primary");
     return primary.payload;
   }
   if (!FALLBACK_BASE_URL) {
@@ -387,7 +398,7 @@ export async function fetchSubstitutionData(): Promise<SubstitutionPayload> {
     // Both down: nothing has switched; the app shows its last plan.
     return primary.payload;
   }
-  await reportPlanSource("fallback", primary.reason);
+  await reportSource("fallback", primary.reason);
   return fallback.payload;
 }
 
@@ -414,7 +425,9 @@ async function fetchFrom(base: string): Promise<{ payload: SubstitutionPayload; 
   if (diagnostics.length > 0) {
     console.warn("[substitution] Selbstkontrolle:", diagnostics.join(" "));
   }
-  await reportPlanProblems(diagnostics);
+  // Only real problems: notes (e.g. one all-day row) are information for
+  // /api/health, not a reason to warn that the plan may be incomplete.
+  await reportPlanProblems(problems);
 
   const allEntries = sortEntries(
     fetchedPages.flatMap((page) => page.entries).filter((entry) => entry.className),

@@ -50,6 +50,38 @@ describe("diffPlan", () => {
     updatedAt: "",
   });
 
+  it("does not report a whole day vanishing at once until it lasts (a broken upload)", () => {
+    const day = [entry({ lesson: "1" }), entry({ lesson: "2" }), entry({ lesson: "3" }), entry({ lesson: "4" })];
+    const other = entry({ date: "2026-10-12", lesson: "5" });
+    const at = (minutes: number) => new Date(MORNING + minutes * 60_000);
+    const dates = ["2026-10-09", "2026-10-12"];
+    // The day's page is there, but empty: twice, three times – nothing reported.
+    let diff = diffPlan(state([...day, other]), [other], TODAY, at(0), dates);
+    expect(diff.removed).toEqual([]);
+    expect(diff.state.vanishedSince).toEqual({ "2026-10-09": at(0).toISOString() });
+    diff = diffPlan(diff.state, [other], TODAY, at(10), dates);
+    diff = diffPlan(diff.state, [other], TODAY, at(20), dates);
+    expect(diff.removed).toEqual([]);
+    expect(diff.state.keys).toHaveLength(5);
+    // Back again: nothing to report either.
+    const back = diffPlan(diff.state, [...day, other], TODAY, at(30), dates);
+    expect(back.added).toEqual([]);
+    expect(back.removed).toEqual([]);
+    expect(back.state.vanishedSince).toBeUndefined();
+    // Still empty after the wait: then it really was withdrawn.
+    diff = diffPlan(diff.state, [other], TODAY, at(50), dates);
+    expect(diff.removed).toHaveLength(4);
+    expect(diff.state.keys).toEqual([entryKey(other)]);
+  });
+
+  it("still reports a single withdrawn lesson after two checks", () => {
+    const day = [entry({ lesson: "1" }), entry({ lesson: "2" }), entry({ lesson: "3" }), entry({ lesson: "4" })];
+    const first = diffPlan(state(day), day.slice(1), TODAY, new Date(MORNING), ["2026-10-09"]);
+    expect(first.removed).toEqual([]);
+    const second = diffPlan(first.state, day.slice(1), TODAY, new Date(MORNING + 600_000), ["2026-10-09"]);
+    expect(second.removed).toHaveLength(1);
+  });
+
   it("only records the plan on the first run", () => {
     const diff = diffPlan(null, [entry({})], TODAY);
     expect(diff.initial).toBe(true);
@@ -208,7 +240,7 @@ describe("notification text", () => {
     );
     const withdrawn = changesFor({ added: [], removed: [entry({})] }, audience, MORNING);
     expect(buildNotification("5A", withdrawn, MORNING).body).toBe(
-      "✅ Wieder nach Plan (Entfall gestrichen)",
+      "✅ Findet doch statt (war: Entfall)",
     );
   });
 

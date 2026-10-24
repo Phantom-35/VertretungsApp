@@ -409,4 +409,6 @@ test("explains how to allow blocked notifications", async ({ page }) => {
   await page.goto("/");
   await page.locator("#class-selector").selectOption("5A");
   await expect(page.getByText(/Benachrichtigungen sind blockiert/)).toBeVisible();
+  // The way back for the device at hand (here a computer browser).
+  await expect(page.getByText(/Benachrichtigungen sind blockiert/)).toContainText("Schloss-Symbol neben der Adresse");
 });

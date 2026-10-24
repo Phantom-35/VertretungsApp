@@ -55,6 +55,22 @@ describe("reportPlanSource", () => {
     expect(sent.every((item) => item.url.startsWith("https://ntfy.sh/kag-geheim-test"))).toBe(true);
   });
 
+  it("tries again when the message could not be sent, instead of losing it", async () => {
+    let fail = true;
+    vi.stubGlobal("fetch", async (url: URL | string, init: RequestInit) => {
+      if (fail) return new Response(null, { status: 500 });
+      sent.push({ url: String(url), body: String(init.body) });
+      return new Response(null, { status: 200 });
+    });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const report = await freshInstance();
+    expect(await report("fallback")).toBe("failed");
+    fail = false;
+    expect(await report("fallback")).toBe("sent");
+    expect(sent).toHaveLength(1);
+    expect(await report("fallback")).toBe("unchanged");
+  });
+
   it("keeps quiet without a channel and never throws", async () => {
     vi.stubEnv("FEEDBACK_WEBHOOK_URL", "");
     vi.stubEnv("ALERT_WEBHOOK_URL", "");

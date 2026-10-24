@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { addressRequest } from "@/lib/address";
 import type { SubstitutionPayload } from "@/lib/types";
 
 const DATA_STORAGE_KEY = "kag:substitution-cache:v3";
@@ -21,6 +22,10 @@ const RETRY_DELAYS_MS = [1_000, 3_000];
 
 const OFFLINE_MESSAGE = "Keine Verbindung. Ist das Internet an?";
 const SCHOOL_DOWN_MESSAGE = "Die Seite der Schule ist gerade nicht erreichbar.";
+const SERVER_DOWN_MESSAGE = "Der Plan ist gerade nicht abrufbar.";
+
+/** The app's server answered, but with an error page instead of a plan. */
+class ServerProblem extends Error {}
 
 export type LoadStatus = "idle" | "loading" | "refreshing";
 
@@ -32,8 +37,8 @@ type State = {
   /** The app's own server could not be reached or had no data at all. */
   connectionError: string | null;
   /**
-   * The server answered, but could not read the school's plan (its pages
-   * missing or down): not the device being offline.
+   * The server answered, but without a plan (the school's pages missing or
+   * down, or an error of the server itself): not the device being offline.
    */
   schoolDown: boolean;
 };
@@ -116,7 +121,12 @@ async function fetchPayload(force: boolean) {
         cache: "no-store",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-      return (await response.json()) as SubstitutionPayload;
+      const payload = (await response.json().catch(() => null)) as SubstitutionPayload | null;
+      if (!payload || typeof payload !== "object") {
+        // E.g. a 500 or 504 page of the hosting: the device is online.
+        throw new ServerProblem(`HTTP ${response.status}`);
+      }
+      return payload;
     } catch (error) {
       if (attempt >= RETRY_DELAYS_MS.length) {
         throw error;
@@ -192,12 +202,14 @@ export function useSubstitutionData(initialData: SubstitutionPayload | null) {
               schoolDown: true,
             }));
           }
-        } catch {
+        } catch (error) {
+          // Only no answer at all means offline; an error page is a disruption.
+          const serverProblem = error instanceof ServerProblem;
           setState((current) => ({
             ...current,
             status: "idle",
-            connectionError: OFFLINE_MESSAGE,
-            schoolDown: false,
+            connectionError: serverProblem ? SERVER_DOWN_MESSAGE : OFFLINE_MESSAGE,
+            schoolDown: serverProblem,
           }));
         } finally {
           lastAttemptRef.current = Date.now();
@@ -231,7 +243,7 @@ export function useSubstitutionData(initialData: SubstitutionPayload | null) {
       : Number.POSITIVE_INFINITY;
     // Opened from a notification ("?day="): the change it announced may be
     // newer than any cached copy, so ask the school website itself.
-    const fromNotification = new URLSearchParams(window.location.search).has("day");
+    const fromNotification = addressRequest().day !== null;
     if (fromNotification || initialAge > INITIAL_DATA_MAX_AGE_MS) {
       void refresh(fromNotification);
     } else {

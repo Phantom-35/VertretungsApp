@@ -65,6 +65,8 @@ export type ParseStats = {
   headerFound: boolean;
   /** Distinct data rows in the page's tables, counted independently of the parser. */
   tableRows: number;
+  /** Of those, the rows the parser read into entries (counted the same way). */
+  readRows: number;
   /** Header cells the parser does not know; their content is not shown. */
   unknownColumns: string[];
 };

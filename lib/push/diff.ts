@@ -25,7 +25,20 @@ export type PlanState = {
    * switch must not be read as changes.
    */
   source?: "fallback";
+  /**
+   * Days on which (nearly) all entries vanished at once, with the time this
+   * was first seen. Such a day is far more likely a broken or half-finished
+   * upload than everything being withdrawn: it is only reported after a
+   * while (MASS_VANISH_WAIT_MS), not after the usual two checks.
+   */
+  vanishedSince?: Record<string, string>;
 };
+
+/** From this many entries of a day vanishing at once (and most of them) … */
+const MASS_VANISH_MIN = 3;
+const MASS_VANISH_SHARE = 0.8;
+/** … they count as withdrawn only when the day stays like that this long. */
+export const MASS_VANISH_WAIT_MS = 45 * 60_000;
 
 export type PlanDiff = {
   state: PlanState;
@@ -94,14 +107,47 @@ export function diffPlan(
   // in an incomplete upload: report it at once, as one change with the new one.
   const replacedSlots = new Set(added.map(slotOf));
   const replaced = gone.filter((key) => replacedSlots.has(slotOf(key)));
-  const removed = gone.filter((key) => replaced.includes(key) || wasMissing.has(key));
-  const stillMissing = gone.filter((key) => !removed.includes(key));
+
+  // Nearly a whole day gone at once (e.g. its page uploaded empty): kept as it
+  // was until that has lasted a while, so that nobody gets "back to normal"
+  // for every lesson because of a broken upload.
+  const vanishedSince: Record<string, string> = {};
+  const held = new Set<string>();
+  const byDay = new Map<string, { known: number; vanished: string[] }>();
+  for (const key of known) {
+    const day = byDay.get(dateOf(key)) ?? { known: 0, vanished: [] };
+    day.known += 1;
+    if (gone.includes(key) && !replaced.includes(key)) {
+      day.vanished.push(key);
+    }
+    byDay.set(dateOf(key), day);
+  }
+  for (const [date, day] of byDay) {
+    if (day.vanished.length < MASS_VANISH_MIN || day.vanished.length < day.known * MASS_VANISH_SHARE) {
+      continue;
+    }
+    const since = previous.vanishedSince?.[date] ?? updatedAt;
+    if (now.getTime() - Date.parse(since) < MASS_VANISH_WAIT_MS) {
+      vanishedSince[date] = since;
+      day.vanished.forEach((key) => held.add(key));
+    }
+  }
+  const settled = gone.filter((key) => !held.has(key));
+  // After the wait, such a day is reported at once (it was checked often enough).
+  const waited = (key: string) => previous.vanishedSince?.[dateOf(key)] !== undefined;
+  const removed = settled.filter((key) => replaced.includes(key) || wasMissing.has(key) || waited(key));
+  const stillMissing = settled.filter((key) => !removed.includes(key));
+  const heldKeys = [...held];
 
   return {
     state: {
-      keys: [...current, ...stillMissing, ...kept],
-      missing: [...stillMissing, ...previous.missing.filter((key) => kept.includes(key))],
+      keys: [...current, ...stillMissing, ...kept, ...heldKeys],
+      missing: [
+        ...stillMissing,
+        ...previous.missing.filter((key) => kept.includes(key) || held.has(key)),
+      ],
       updatedAt,
+      ...(Object.keys(vanishedSince).length > 0 ? { vanishedSince } : {}),
     },
     initial: false,
     added: added.map(parseEntryKey),

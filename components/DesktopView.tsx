@@ -13,7 +13,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
 import { SettingsButton, ThemeToggle } from "@/components/ThemeSettings";
 import type { PushControls } from "@/hooks/usePushNotifications";
-import { formatClassName } from "@/lib/entries";
+import { formatClassName, isCourseClass } from "@/lib/entries";
 import {
   formatAge,
   formatPlanDate,
@@ -26,7 +26,7 @@ import {
 } from "@/lib/format";
 import type { HolidayBreak } from "@/lib/holidays";
 import { entryKey } from "@/lib/seen";
-import { buildShareText } from "@/lib/share";
+import { buildShareText, classLink } from "@/lib/share";
 import type { PlanDay, SubstitutionEntry, SubstitutionPayload } from "@/lib/types";
 
 /** From this many changes on a day, the cards are shown smaller (as on phones). */
@@ -172,7 +172,6 @@ export function DesktopView(props: DesktopViewProps) {
             schoolDown={props.schoolDown}
             stale={data.stale}
             error={data.error}
-            warnings={data.warnings}
             lastSuccessLabel={formatAge(data.lastSuccessfulUpdate ?? data.lastUpdated, now)}
             sourceUrl={data.sourceUrl}
             onRetry={props.onRefresh}
@@ -357,7 +356,7 @@ function TopBar(props: DesktopViewProps) {
                 <svg
                   aria-hidden
                   viewBox="0 0 24 24"
-                  className={`size-[1.15rem] ${props.isBusy ? "animate-spin" : ""}`}
+                  className={`size-[1.15rem] ${props.isBusy ? "motion-safe:animate-spin" : ""}`}
                   fill="none"
                   stroke="currentColor"
                   strokeWidth={2}
@@ -508,6 +507,7 @@ function DayColumn({
   findNew,
   onNewSeen,
   push,
+  viewingOther,
 }: DesktopViewProps & { day: PlanDay; data: SubstitutionPayload; selectedClass: string }) {
   const { date } = day;
   // Entries without a readable date are shown on every day (as on phones).
@@ -529,8 +529,9 @@ function DayColumn({
       dayLabel: formatPlanDateLabel(date, now),
       entries,
       ownCoursesOnly: Boolean(courseFilter?.active) && !showOtherCourses,
+      viewingOther,
       sourceUpdated: data.sourceUpdatedAt ? formatTimestamp(data.sourceUpdatedAt, now) : null,
-      appUrl: `${window.location.origin}/`,
+      appUrl: classLink(window.location.origin, selectedClass),
       notices,
     });
   // Cards keyed by their content (see the phone view).
@@ -589,6 +590,7 @@ function DayColumn({
             showingOtherCourses={showOtherCourses}
             onToggleOtherCourses={onToggleOtherCourses}
             getShareText={getShareText}
+            courses={isCourseClass(selectedClass)}
           />
           {entries.length > 0 ? (
             <div className={compact ? "space-y-2.5" : "space-y-3"}>

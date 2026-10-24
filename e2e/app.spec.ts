@@ -250,6 +250,15 @@ test("tells a school website that is down apart from being offline", async ({ pa
   // The plan stays on screen.
   await expect(page.locator("article").first()).toBeVisible();
 
+  // The app's own server answers with an error page: a disruption as well.
+  await page.unroute("**/api/substitution*");
+  await page.route("**/api/substitution*", (route) =>
+    route.fulfill({ status: 504, contentType: "text/html", body: "<h1>Gateway Timeout</h1>" }),
+  );
+  await page.getByRole("button", { name: "Plan neu laden" }).click();
+  await expect(header).toContainText("Der Plan ist gerade nicht abrufbar.", { timeout: 15_000 });
+  await expect(page.getByText("Störung", { exact: true })).toBeVisible();
+
   // No internet on the device: that is "Offline".
   await page.unroute("**/api/substitution*");
   await context.setOffline(true);
@@ -257,6 +266,27 @@ test("tells a school website that is down apart from being offline", async ({ pa
   await expect(page.getByText("Offline", { exact: true })).toBeVisible();
   await expect(header).toContainText("Keine Verbindung. Ist das Internet an?");
   await context.setOffline(false);
+});
+
+test("does not announce a day after the holidays as not online yet", async ({ browser }) => {
+  // The saved plan moved to the last week before the autumn holidays.
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("kag:onboarded", "1"));
+  const page = await context.newPage();
+  const moveWeek = async (route: Route) => {
+    const response = await route.fetch();
+    const body = (await response.text()).replaceAll("2026-10-08", "2026-10-15").replaceAll("2026-10-09", "2026-10-16");
+    await route.fulfill({ response, body });
+  };
+  await page.route((url) => url.pathname === "/" || url.pathname === "/api/substitution", moveWeek);
+  // Friday evening, the last school day: Monday is two weeks away.
+  await page.clock.setFixedTime(new Date("2026-10-16T18:00:00+02:00"));
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  await expect(page.getByText("noch nicht da")).toHaveCount(0);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("16.10.");
+  await context.close();
 });
 
 test("says when the next plan is not online yet, and marks past days", async ({ page }) => {
@@ -335,6 +365,62 @@ test("shows a public holiday instead of an old plan", async ({ page }) => {
   await expect(card).toContainText("Der Plan für Fr., 07.05. erscheint hier");
 });
 
+test("a class only looked at is gone when the app is opened anew", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-08T08:00:00+02:00") });
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  // A sibling's class, looked at in the evening.
+  await chooseClass(page, "7B");
+  await expect(page.getByText("Nur angesehen.")).toBeVisible();
+  const setVisibility = (state: "hidden" | "visible") =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, "visibilityState", { value, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, state);
+  // Away for a few minutes: still the sibling's class.
+  await setVisibility("hidden");
+  await page.clock.runFor(5 * 60_000);
+  await setVisibility("visible");
+  await expect(page.locator("h1")).toHaveText("7B");
+  // Away for an hour (the app stayed alive in the background): the own class again.
+  await setVisibility("hidden");
+  await page.clock.runFor(60 * 60_000);
+  await setVisibility("visible");
+  await expect(page.locator("h1")).toHaveText("5A");
+  await expect(page.getByText("Nur angesehen.")).toHaveCount(0);
+});
+
+test("a shared link opens its class: looked at, or the own class for someone new", async ({ page, browser }) => {
+  // Someone with an own class (e.g. parents): the linked class is only looked at.
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  await page.goto("/?klasse=7B");
+  await expect(page.locator("h1")).toHaveText("7B");
+  await expect(page.getByText("Nur angesehen.")).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+
+  // Someone new: it becomes the own class (the introduction shows it chosen).
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const newcomer = await context.newPage();
+  await newcomer.goto(`${new URL(page.url()).origin}/?klasse=Q1`);
+  const intro = newcomer.getByRole("dialog");
+  await intro.getByRole("button", { name: "Los geht’s" }).click();
+  await expect(intro.getByRole("radio", { name: "Q1" })).toHaveAttribute("aria-checked", "true");
+  await context.close();
+});
+
+test("a day from a notification applies once, not to every reload", async ({ page }) => {
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  // Opened from a notification about tomorrow.
+  await page.goto("/?day=2026-10-09");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
+  await expect(page).toHaveURL(/\/$/);
+  // Later reloaded (e.g. for a new version): today again, as when opened normally.
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
+});
+
 test("links the legal pages and offers a QR code to pass the app on", async ({ page }) => {
   await page.goto("/");
   await chooseClass(page, "5A");
@@ -367,15 +453,19 @@ test("links the legal pages and offers a QR code to pass the app on", async ({ p
   await expect(page.getByRole("button", { name: "Aushang drucken" })).toBeVisible();
   await page.getByRole("link", { name: "← Zurück" }).click();
   await expect(dialog.getByRole("heading", { name: "App weitergeben" })).toBeVisible();
-  // It stays open (nothing reloads the page behind it), and closes as usual.
+  // The address is clean again, and the sheet stays open all the same.
+  await expect(page).toHaveURL(new RegExp(`^${origin}/$`));
   await page.waitForTimeout(1000);
   await expect(dialog.getByRole("heading", { name: "App weitergeben" })).toBeVisible();
   await dialog.getByRole("button", { name: "Fertig" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.locator("header")).toContainText("5A");
-  // Opened again from the app: the overview, not the code.
+  // Opened again from the app: the overview, not the code; nor after a reload.
   await page.getByRole("button", { name: "Einstellungen", exact: true }).click();
   await expect(dialog.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await page.reload();
+  await expect(page.locator("header")).toContainText("5A");
+  await expect(dialog).toBeHidden();
 });
 
 test("help and contact: a message to click through, sent with the device details", async ({ page, request }) => {
@@ -407,6 +497,14 @@ test("help and contact: a message to click through, sent with the device details
   await expect(dialog.getByText("Bitte prüf die Adresse.")).toBeVisible();
   await expect(send).toBeDisabled();
   await dialog.getByRole("textbox", { name: /Deine E-Mail/ }).fill("schueler@example.de");
+  await expect(send).toBeEnabled();
+
+  // Closed to look something up and opened again: nothing written is lost.
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await expect(dialog).toBeHidden();
+  await openSettings(page, "Hilfe & Kontakt");
+  await expect(dialog.getByRole("textbox", { name: "Kurz beschreiben" })).toHaveValue("Seit gestern kommt nichts mehr.");
+  await expect(dialog.getByRole("textbox", { name: /Deine E-Mail/ })).toHaveValue("schueler@example.de");
   await expect(send).toBeEnabled();
 
   // The details are shown before they are sent.
@@ -1040,8 +1138,9 @@ test("shares the day's changes", async ({ page, context }) => {
   expect(shared[0].text!.split("\n\n")).toHaveLength(fiveA.length + 2);
   expect(lines.filter((line) => / \*[^*]+ Std\.\* · /.test(line))).toHaveLength(fiveA.length);
   expect(lines.at(-2)).toMatch(/^🕐 Stand der Schule: /);
-  // Whoever gets the message can find the app.
-  expect(lines.at(-1)).toBe(`📲 Ganzer Plan: ${new URL(page.url()).origin}/`);
+  // Whoever gets the message finds the app, at this class.
+  const origin = new URL(page.url()).origin;
+  expect(lines.at(-1)).toBe(`📲 Ganzer Plan: ${origin}/?klasse=5A`);
   // Only the text: no separate title or link for the share menu to add.
   expect(shared[0].title).toBeUndefined();
   expect(shared[0].url).toBeUndefined();
@@ -1069,8 +1168,8 @@ test("shares the day's changes", async ({ page, context }) => {
   await expect(desktop.getByText("Kopiert")).toBeVisible();
   const copied = await desktop.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/^📋 \*Vertretungsplan 5A\*\nMorgen, Freitag, 09\.10\. · \d+ Änderung/);
-  // Only the app's own address, so whoever gets it can find the app.
-  expect(copied.match(/https?:\/\/\S+/g)).toEqual([`${new URL(desktop.url()).origin}/`]);
+  // Only the app's own address (at this class), so whoever gets it can find the plan.
+  expect(copied.match(/https?:\/\/\S+/g)).toEqual([`${new URL(desktop.url()).origin}/?klasse=5A`]);
 });
 
 test("settings: an overview with a few pages, and the app version", async ({ page }) => {
@@ -1141,6 +1240,33 @@ test("settings: next day hour and new badges", async ({ page }) => {
   await page.mouse.click(200, 30);
   await expect(dialog).toBeHidden();
   await expect(page.getByText("Neu", { exact: true })).toHaveCount(0);
+});
+
+test("a dot on another day's tab when something is new there", async ({ page }) => {
+  // A class with changes tomorrow; one of them not seen yet.
+  const schoolClass = SCHOOL_CLASSES.find((name) =>
+    plan.entries.some((entry) => entry.date === "2026-10-09" && entryAppliesToClass(entry.className, name)),
+  )!;
+  await page.goto("/");
+  await chooseClass(page, schoolClass);
+  const tomorrow = page.getByRole("tab").nth(1);
+  await expect(tomorrow).not.toContainText("neu");
+  const unseen = plan.entries
+    .filter((entry) => entry.date === "2026-10-09" && entryAppliesToClass(entry.className, schoolClass))
+    .slice(0, 1)
+    .map(entryKey);
+  await page.evaluate((keys) => {
+    const seen = JSON.parse(localStorage.getItem("kag:seen-entries") ?? "[]") as string[];
+    localStorage.setItem("kag:seen-entries", JSON.stringify(seen.filter((key) => !keys.includes(key))));
+  }, unseen);
+  await page.reload();
+  // Today is shown; tomorrow's tab carries the dot (read out as "neu").
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
+  await expect(tomorrow).toContainText("neu");
+  // Looked at, it goes there the "Neu" badge on the card instead.
+  await tomorrow.click();
+  await expect(page.getByText("Neu", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("tab").nth(1)).not.toContainText(", neu");
 });
 
 test("settings: swipe down closes the sheet without refreshing", async ({ browser }) => {

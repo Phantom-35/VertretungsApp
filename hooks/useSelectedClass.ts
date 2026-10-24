@@ -1,5 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { normalizeSelectedClass } from "@/lib/entries";
+import { schoolToday } from "@/lib/time";
 
 /** The student's own class (key kept from older versions of the app). */
 export const MY_CLASS_STORAGE_KEY = "kag:selected-class";
@@ -62,6 +63,54 @@ function classStore(kind: StorageKind, key: string) {
 const myClassStore = classStore("localStorage", MY_CLASS_STORAGE_KEY);
 const viewedClassStore = classStore("sessionStorage", VIEWED_CLASS_STORAGE_KEY);
 
+/** Away from the app this long counts as opening it anew. */
+const AWAY_MS = 30 * 60_000;
+const DAY_CHECK_MS = 60_000;
+
+/**
+ * A class only looked at is forgotten when the app is opened anew: installed
+ * apps often stay alive in the background for days (and keep their session
+ * storage), so "until the app is closed" alone would show a sibling's class
+ * the next morning. Anew means after half an hour away, or on another day.
+ */
+function forgetViewedClassWhenAway(set: (value: string | null) => void) {
+  let since = Date.now();
+  const forgetIfAnew = (away: boolean) => {
+    const now = Date.now();
+    if ((away && now - since >= AWAY_MS) || schoolToday(now) !== schoolToday(since)) {
+      set(null);
+    }
+    since = now;
+  };
+  const onVisibility = () => {
+    if (document.visibilityState === "visible") {
+      forgetIfAnew(true);
+    } else {
+      since = Date.now();
+    }
+  };
+  // Left on screen overnight (e.g. a tablet): the next day starts fresh too.
+  const timer = window.setInterval(() => {
+    if (document.visibilityState === "visible") {
+      forgetIfAnew(false);
+    }
+  }, DAY_CHECK_MS);
+  document.addEventListener("visibilitychange", onVisibility);
+  return () => {
+    window.clearInterval(timer);
+    document.removeEventListener("visibilitychange", onVisibility);
+  };
+}
+
+const subscribeViewed = (listener: () => void) => {
+  const unsubscribe = viewedClassStore.subscribe(listener);
+  const stopForgetting = forgetViewedClassWhenAway(viewedClassStore.set);
+  return () => {
+    unsubscribe();
+    stopForgetting();
+  };
+};
+
 const getServerSnapshot = () => undefined;
 
 function useClassStore(store: ReturnType<typeof classStore>) {
@@ -81,8 +130,11 @@ export function useMyClass() {
 
 /**
  * Another class looked at on the main page, e.g. a sibling's. Only kept
- * until the app is closed; `null` shows the student's own class.
+ * until the app is closed or opened anew (see forgetViewedClassWhenAway);
+ * `null` shows the student's own class.
  */
 export function useViewedClass() {
-  return useClassStore(viewedClassStore);
+  const value = useSyncExternalStore(subscribeViewed, viewedClassStore.getSnapshot, getServerSnapshot);
+  const set = useCallback((next: string | null) => viewedClassStore.set(next), []);
+  return [value, set] as const;
 }

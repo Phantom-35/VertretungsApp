@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cancelledFirstLessons,
   courseTeachers,
   entryAppliesToClass,
   entryMatchesTeachers,
@@ -20,7 +21,7 @@ import {
   schoolToday,
 } from "@/lib/time";
 import { entryKey, findNewKeys, mergeSeenKeys } from "@/lib/seen";
-import { buildShareText, formatShareBlock } from "@/lib/share";
+import { buildShareText, classLink, formatShareBlock } from "@/lib/share";
 import type { SubstitutionPayload } from "@/lib/types";
 import { pickDisplayedPayload } from "@/hooks/useSubstitutionData";
 
@@ -358,7 +359,7 @@ describe("share text", () => {
         entries: [{ ...base, type: "Entfall", teacher: "ABC" }, { ...base, lesson: "3", room: "108", type: "Raum-Vtr." }],
         ownCoursesOnly: false,
         sourceUpdated: "08.10., 15:34 Uhr",
-        appUrl: "https://example.org/",
+        appUrl: classLink("https://example.org", "5A"),
         notices: ["Bitte Einsätze in SPR beachten."],
       }),
     ).toBe(
@@ -367,9 +368,21 @@ describe("share text", () => {
         "❌ *1. Std.* · Entfall\nLehrer ABC",
         "🚪 *3. Std.* · Raumänderung\nRaum 108",
         "ℹ️ Bitte Einsätze in SPR beachten.",
-        "🕐 Stand der Schule: 08.10., 15:34 Uhr\n📲 Ganzer Plan: https://example.org/",
+        "🕐 Stand der Schule: 08.10., 15:34 Uhr\n📲 Ganzer Plan: https://example.org/?klasse=5A",
       ].join("\n\n"),
     );
+  });
+
+  it("does not call a looked-at class's courses \"mine\"", () => {
+    const text = buildShareText({
+      schoolClass: "Q1",
+      dayLabel: "Heute",
+      entries: [],
+      ownCoursesOnly: true,
+      viewingOther: true,
+      sourceUpdated: null,
+    });
+    expect(text.split("\n")[0]).toBe("📋 *Vertretungsplan Q1 (ausgewählte Kurse)*");
   });
 
   it("puts each change in a short block", () => {
@@ -396,5 +409,24 @@ describe("day labels", () => {
     expect(formatDayMonth("2026-10-08")).toBe("08.10.");
     expect(formatWeekday("2026-10-08")).toBe("Donnerstag");
     expect(formatDayMonth("2027-01-01")).toBe("01.01.");
+  });
+});
+
+describe("cancelledFirstLessons", () => {
+  const e = (lesson: string, type: string) => ({ lesson, type });
+  it("names the first lessons that are all cancelled", () => {
+    expect(cancelledFirstLessons([e("1 - 2", "Entfall"), e("5", "Vertretung")])).toBe(2);
+    expect(cancelledFirstLessons([e("1", "Entfall"), e("2", "Entfall"), e("3", "Entfall")])).toBe(3);
+    expect(cancelledFirstLessons([e("1", "Entfall")])).toBe(1);
+  });
+
+  it("says nothing when it cannot be sure", () => {
+    // Not from the first lesson on.
+    expect(cancelledFirstLessons([e("2 - 3", "Entfall")])).toBeNull();
+    // Another group still has its lesson.
+    expect(cancelledFirstLessons([e("1 - 2", "Entfall"), e("1 - 2", "Vertretung")])).toBeNull();
+    // Self-study is no lesson off.
+    expect(cancelledFirstLessons([e("1 - 2", "EVA")])).toBeNull();
+    expect(cancelledFirstLessons([])).toBeNull();
   });
 });

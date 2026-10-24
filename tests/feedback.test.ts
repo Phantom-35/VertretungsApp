@@ -85,6 +85,22 @@ describe("message text", () => {
     expect(feedbackText({ ...feedback, contact: "", details: {} })).toBe("Kommt nichts");
   });
 
+  it("always fits into one push as readable text", () => {
+    const long = {
+      ...feedback,
+      message: "Ä".repeat(2000),
+      details: { device: "x".repeat(400), browser: "y".repeat(400), userAgent: "z".repeat(400) },
+    };
+    const text = feedbackText(long, 3_800);
+    expect(new TextEncoder().encode(text).length).toBeLessThanOrEqual(3_800);
+    // The details go first, the message is only shortened when needed.
+    expect(text).not.toContain("Kennung:");
+    expect(text.startsWith("Ä")).toBe(true);
+    expect(text).toContain("Antwort an: a@b.de");
+    // Short messages stay whole.
+    expect(feedbackText(feedback, 3_800)).toBe(feedbackText(feedback));
+  });
+
   it("is the same as an e-mail", () => {
     const mailto = feedbackMailto(feedback);
     expect(mailto.startsWith("mailto:phandevstudios@gmx.de?subject=")).toBe(true);
@@ -164,6 +180,21 @@ describe("POST /api/feedback", () => {
     expect((await POST(post({ ...message, message: "" }))).status).toBe(400);
     expect((await POST(post({ ...message, website: "https://spam.example" }))).status).toBe(200);
     expect(calls).toHaveLength(0);
+  });
+
+  it("counts all server instances together, too", async () => {
+    vi.stubEnv("PUSH_STORE", "memory");
+    delete (globalThis as { __pushMemoryStore?: unknown }).__pushMemoryStore;
+    const { POST, calls } = await route();
+    // 30 an hour from different addresses (and instances): then it stops.
+    for (let index = 0; index < 30; index += 1) {
+      delete (globalThis as { __feedbackLimits?: unknown }).__feedbackLimits;
+      expect((await POST(post(message, { "x-forwarded-for": `198.51.100.${index}` }))).status).toBe(200);
+    }
+    delete (globalThis as { __feedbackLimits?: unknown }).__feedbackLimits;
+    expect((await POST(post(message, { "x-forwarded-for": "203.0.113.99" }))).status).toBe(429);
+    expect(calls).toHaveLength(30);
+    delete (globalThis as { __pushMemoryStore?: unknown }).__pushMemoryStore;
   });
 
   it("slows down a flood: three per address in ten minutes", async () => {

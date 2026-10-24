@@ -33,6 +33,16 @@ describe("push API", () => {
     expect(response.status).toBe(400);
   });
 
+  it("refuses addresses that are no push service before asking the database", async () => {
+    vi.stubEnv("PUSH_STORE", "memory");
+    vi.stubEnv("PUSH_ALLOW_ANY_ENDPOINT", "");
+    vi.stubEnv("VAPID_PUBLIC_KEY", "public-key");
+    vi.stubEnv("VAPID_PRIVATE_KEY", "private-key");
+    const { POST } = await import("@/app/api/push/unsubscribe/route");
+    expect((await POST(post({ endpoint: "https://random.example/123" }))).status).toBe(400);
+    expect((await POST(post({ endpoint: "https://web.push.apple.com/abc" }))).status).toBe(200);
+  });
+
   it("only runs the check with the right secret", async () => {
     vi.stubEnv("CRON_SECRET", "s3cret-value");
     const { GET } = await import("@/app/api/push/check/route");

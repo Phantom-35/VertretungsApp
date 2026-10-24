@@ -7,7 +7,6 @@ type RefreshStatusProps = {
   stale: boolean;
   /** Error reported by the server for a partial result. */
   error: string | null;
-  warnings: string[];
   lastSuccessLabel: string;
   /** Original plan on the school website, for checking by hand. */
   sourceUrl: string | undefined;
@@ -19,7 +18,6 @@ export function RefreshStatus({
   schoolDown = false,
   stale,
   error,
-  warnings,
   lastSuccessLabel,
   sourceUrl,
   onRetry,
@@ -31,11 +29,13 @@ export function RefreshStatus({
     title = connectionError;
     message = `Du siehst den Plan, der zuletzt geladen wurde (${lastSuccessLabel}).`;
   } else if (schoolDown || stale) {
-    title = "Die Seite der Schule ist gerade nicht erreichbar.";
-    message = `Du siehst den Plan, der zuletzt geladen wurde (${lastSuccessLabel}). Sobald sie wieder geht, aktualisiert sich die App von selbst.`;
+    title = (schoolDown ? connectionError : null) ?? "Die Seite der Schule ist gerade nicht erreichbar.";
+    message = `Du siehst den Plan, der zuletzt geladen wurde (${lastSuccessLabel}). Sobald es wieder geht, aktualisiert sich die App von selbst.`;
   } else if (error) {
+    // The technical details ("Seite 3 …") are for /api/health; students need
+    // to know what it means for them.
     title = error;
-    message = warnings.length > 0 ? warnings.join(" ") : null;
+    message = "Es können Einträge fehlen. Im Zweifel den Original-Plan der Schule ansehen.";
   }
 
   if (!title) {

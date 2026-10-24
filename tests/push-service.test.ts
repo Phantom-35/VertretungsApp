@@ -190,7 +190,7 @@ describe("runPushCheck", () => {
     expect(sent).toHaveLength(0);
     await runPushCheck({ store, send, loadPlan: async () => plan([]), now: NOW + 1_200_000 });
     expect(sent).toHaveLength(1);
-    expect(sent[0].payload.body).toBe("✅ Wieder nach Plan (Entfall gestrichen)");
+    expect(sent[0].payload.body).toBe("✅ Findet doch statt (war: Entfall)");
   });
 
   it("does not compare an incomplete plan", async () => {
@@ -520,7 +520,7 @@ describe("withdrawn changes on a summary day", () => {
     await runPushCheck({ store, send, loadPlan: async () => withDays([]), now: Date.parse("2026-10-08T18:40:00+02:00") });
     await runPushCheck({ store, send, loadPlan: async () => withDays([]), now: Date.parse("2026-10-08T19:05:00+02:00") });
     expect(sent.map((item) => item.payload.body)).toEqual([
-      "✅ Wieder nach Plan (Entfall gestrichen)",
+      "✅ Findet doch statt (war: Entfall)",
       "Keine Änderungen eingetragen.",
     ]);
   });

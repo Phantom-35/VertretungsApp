@@ -21,7 +21,7 @@ export const statusBadges: Record<HeaderStatus, { label: string; className: stri
   },
   updating: {
     label: "Lädt …",
-    className: "border-accent/10 bg-accent-soft text-accent-strong animate-pulse",
+    className: "border-accent/10 bg-accent-soft text-accent-strong motion-safe:animate-pulse",
   },
   offline: {
     label: "Offline",

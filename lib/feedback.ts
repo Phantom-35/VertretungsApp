@@ -106,19 +106,45 @@ export function feedbackTitle(feedback: Pick<Feedback, "category" | "problem">) 
     : `${category.symbol} ${category.label}`;
 }
 
-/** The text that reaches the maintainer (push or e-mail), details at the end. */
-export function feedbackText(feedback: Omit<Feedback, "category" | "problem">) {
-  const lines = [feedback.message];
-  if (feedback.contact) {
-    lines.push("", `Antwort an: ${feedback.contact}`);
+/**
+ * ntfy shows a message up to 4096 bytes; a longer one only arrives as an
+ * attachment. Room is kept for the title and umlauts or emoji.
+ */
+export const MAX_TEXT_BYTES = 3_800;
+
+const byteLength = (text: string) => new TextEncoder().encode(text).length;
+
+function compose(message: string, contact: string, details: string[]) {
+  const lines = [message];
+  if (contact) {
+    lines.push("", `Antwort an: ${contact}`);
   }
-  const details = FEEDBACK_DETAILS.filter(({ key }) => feedback.details[key]).map(
-    ({ key, label }) => `${label}: ${feedback.details[key]}`,
-  );
   if (details.length > 0) {
     lines.push("", "---", ...details);
   }
   return lines.join("\n");
+}
+
+/**
+ * The text that reaches the maintainer (push or e-mail), details at the end.
+ * Too long for one push, the details go first (the last ones first), then
+ * the message is shortened: it always arrives as readable text.
+ */
+export function feedbackText(feedback: Omit<Feedback, "category" | "problem">, maxBytes = Infinity) {
+  const details = FEEDBACK_DETAILS.filter(({ key }) => feedback.details[key]).map(
+    ({ key, label }) => `${label}: ${feedback.details[key]}`,
+  );
+  let text = compose(feedback.message, feedback.contact, details);
+  while (byteLength(text) > maxBytes && details.length > 0) {
+    details.pop();
+    text = compose(feedback.message, feedback.contact, details);
+  }
+  let message = feedback.message;
+  while (byteLength(text) > maxBytes && message.length > 0) {
+    message = message.slice(0, Math.max(0, message.length - 50));
+    text = compose(`${message}…`, feedback.contact, details);
+  }
+  return text;
 }
 
 /** The same message as an e-mail (if sending directly is not possible or wanted). */

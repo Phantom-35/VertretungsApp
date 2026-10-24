@@ -17,6 +17,17 @@ wird wieder monitor2020 versucht. Jeden Wechsel (ausgefallen / wieder da) meldet
 dem Betreiber über `FEEDBACK_WEBHOOK_URL` (sonst `ALERT_WEBHOOK_URL`); `/api/health`
 nennt die aktive Notlösung unter `notes` (`lib/scraper.ts`, `lib/source-switch.ts`).
 
+**Adresse beim Öffnen** (`lib/address.ts`): `?day=2026-11-02` (aus einer Benachrichtigung)
+zeigt diesen Tag, `?klasse=7B` (Link aus einem geteilten Plan) zeigt die Klasse – ohne
+eigene Klasse wird sie zur eigenen, sonst nur angesehen –, `?einstellungen=teilen` öffnet
+die Einstellungen beim QR-Code. Die App liest das einmal und nimmt es dann aus der Adresse,
+damit ein Neuladen nicht wieder darauf springt. Eine nur angesehene Klasse gilt bis die App
+neu geöffnet wird (nach 30 Minuten im Hintergrund oder am nächsten Tag).
+
+**Benachrichtigungen bei kaputtem Upload:** Verschwinden auf einmal (fast) alle Einträge
+eines Tages, meldet der Push-Check das erst, wenn es 45 Minuten so bleibt
+(`lib/push/diff.ts`), statt allen „Findet doch statt“ zu schicken.
+
 ## Inhalt
 
 - [Für Nutzerinnen und Nutzer](#für-nutzerinnen-und-nutzer)

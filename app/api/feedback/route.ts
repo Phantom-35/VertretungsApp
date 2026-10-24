@@ -1,5 +1,6 @@
 import { maintainerWebhook, send } from "@/lib/alert";
-import { feedbackText, feedbackTitle, parseFeedback } from "@/lib/feedback";
+import { MAX_TEXT_BYTES, feedbackText, feedbackTitle, parseFeedback } from "@/lib/feedback";
+import { getPushStore } from "@/lib/push/store";
 import { json, readJson } from "@/lib/push/http";
 
 export const dynamic = "force-dynamic";
@@ -79,8 +80,17 @@ export async function POST(request: Request) {
   if (!allowed(address, Date.now())) {
     return json({ error: "Gerade kamen zu viele Nachrichten. Versuch es später noch einmal oder per E-Mail." }, 429);
   }
+  // All server instances together: the limit above is per instance only.
   try {
-    await send(url, feedbackText(feedback), feedbackTitle(feedback));
+    const total = await getPushStore()?.countUp("feedback", HOUR_MS / 1000);
+    if (total !== undefined && total > PER_HOUR) {
+      return json({ error: "Gerade kamen zu viele Nachrichten. Versuch es später noch einmal oder per E-Mail." }, 429);
+    }
+  } catch {
+    // Without the database the per-instance limit still applies.
+  }
+  try {
+    await send(url, feedbackText(feedback, MAX_TEXT_BYTES), feedbackTitle(feedback));
   } catch (error) {
     console.warn("[feedback] Nachricht konnte nicht weitergeleitet werden:", error);
     return json({ error: "Senden hat nicht geklappt. Versuch es später noch einmal oder per E-Mail." }, 502);

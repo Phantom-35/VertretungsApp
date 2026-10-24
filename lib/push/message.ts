@@ -166,8 +166,14 @@ function describeChange(change: Change): [symbol: string, text: string] {
         entrySymbol(change.entry),
         describeShort(change.entry, `${displayType(change.entry.type)} statt ${displayType(change.previous.type)}`),
       ];
-    case "removed":
-      return ["✅", `Wieder nach Plan (${displayType(change.entry.type)} gestrichen)`];
+    case "removed": {
+      // A lesson that was off takes place after all: said so plainly (the old
+      // "back to normal (cancellation withdrawn)" was a double negation).
+      const kind = getEntryKind(change.entry.type);
+      return kind === "cancelled" || kind === "self-study"
+        ? ["✅", `Findet doch statt (war: ${displayType(change.entry.type)})`]
+        : ["✅", `Wieder nach Plan (war: ${displayType(change.entry.type)})`];
+    }
   }
 }
 

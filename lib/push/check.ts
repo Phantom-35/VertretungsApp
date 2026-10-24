@@ -116,7 +116,12 @@ function sameList(left: readonly string[], right: readonly string[]) {
 
 /** The same entries, also the same ones missing for the moment (the time of the check aside). */
 function sameState(left: PlanState, right: PlanState) {
-  return sameList(left.keys, right.keys) && sameList(left.missing, right.missing) && left.source === right.source;
+  return (
+    sameList(left.keys, right.keys) &&
+    sameList(left.missing, right.missing) &&
+    left.source === right.source &&
+    JSON.stringify(left.vanishedSince ?? {}) === JSON.stringify(right.vanishedSince ?? {})
+  );
 }
 
 /** Bookkeeping key: when the scheduler last called the check (see /api/health). */

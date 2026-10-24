@@ -302,6 +302,8 @@ export function SettingsSheet({
   const heightBefore = useRef<number | null>(null);
   /** Set when the app itself closes the dialog (see its "close" event). */
   const closedByApp = useRef(false);
+  /** Stops a slide-out that is still running (its end would close the sheet). */
+  const cancelClosing = useRef<(() => void) | null>(null);
 
   // Every opening starts at the overview (or the section asked for), also
   // when it is opened again while still sliding away. Adjusted while
@@ -355,7 +357,9 @@ export function SettingsSheet({
       return;
     }
     if (open && dialog.dataset.closing !== undefined) {
-      // Opened again while still sliding away: it simply stays.
+      // Opened again while still sliding away: it simply stays, and the
+      // pending end of that slide must not close it later.
+      cancelClosing.current?.();
       delete dialog.dataset.closing;
       dialog.inert = false;
       dialog.removeAttribute("aria-hidden");
@@ -382,19 +386,37 @@ export function SettingsSheet({
       dialog.inert = true;
       dialog.setAttribute("aria-hidden", "true");
       const finish = () => {
-        if (dialog.dataset.closing !== undefined) {
-          delete dialog.dataset.closing;
-          dialog.inert = false;
-          dialog.removeAttribute("aria-hidden");
+        cancelClosing.current?.();
+        if (dialog.dataset.closing === undefined) {
+          return;
+        }
+        delete dialog.dataset.closing;
+        dialog.inert = false;
+        dialog.removeAttribute("aria-hidden");
+        // Already closed some other way (e.g. a second Escape): no close
+        // event will come to reset the flag.
+        if (dialog.open) {
           closedByApp.current = true;
           dialog.close();
         }
       };
-      // Not undone by a later render (e.g. the focus being reset as it
-      // closes): finish() does nothing once the sheet was opened again.
-      dialog.addEventListener("animationend", finish, { once: true });
+      // Only the sheet's own slide: the page inside has animations as well,
+      // and their end bubbles up to here.
+      const onAnimationEnd = (event: AnimationEvent) => {
+        if (event.target === dialog && !event.pseudoElement) {
+          finish();
+        }
+      };
+      dialog.addEventListener("animationend", onAnimationEnd);
       // In case the animation does not run (e.g. a hidden tab).
-      window.setTimeout(finish, CLOSE_MS + 100);
+      const fallback = window.setTimeout(finish, CLOSE_MS + 100);
+      // Not undone by a later render (e.g. the focus being reset as it
+      // closes), only by opening again or the end of the slide.
+      cancelClosing.current = () => {
+        cancelClosing.current = null;
+        window.clearTimeout(fallback);
+        dialog.removeEventListener("animationend", onAnimationEnd);
+      };
     }
     // Only opening and closing: the focus is read when it opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -631,6 +653,12 @@ export function SettingsSheet({
                 <NotificationControls {...notifications} />
               </Setting>
             ) : null}
+            {notifications.push.status === "unavailable" ? (
+              <p className="text-sm leading-6 text-muted">Benachrichtigungen gibt es gerade nicht.</p>
+            ) : null}
+            {/* What to be told about only matters where they can be on. */}
+            {notifications.push.status === "on" || notifications.push.status === "off" ? (
+            <>
             <Setting title="Worüber" description="Bei welchen Änderungen du eine Nachricht bekommst.">
               <div className="divide-y divide-line rounded-2xl border border-line bg-card">
                 {NOTIFY_GROUPS.map((group) => (
@@ -648,10 +676,17 @@ export function SettingsSheet({
                   />
                 ))}
               </div>
+              {settings.notifyGroups.length === 0 ? (
+                <p role="status" className="text-xs font-semibold leading-5 text-warn">
+                  Alles aus: Zu Änderungen kommt keine Nachricht mehr, nur noch die Überblicke, falls eingeschaltet.
+                </p>
+              ) : null}
             </Setting>
             <Setting title="Tägliche Überblicke" description="Eine Nachricht mit allen Änderungen des Tages, zur Uhrzeit deiner Wahl.">
               <SummarySwitches id="settings-summaries" name="settings" />
             </Setting>
+            </>
+            ) : null}
           </>
         ) : null}
 

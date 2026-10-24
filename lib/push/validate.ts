@@ -96,7 +96,12 @@ export function parseSubscribeRequest(value: unknown): SubscribeRequest | string
 
 /** `{ endpoint }` of an existing subscription. */
 export function parseEndpoint(value: unknown) {
-  return isRecord(value) && typeof value.endpoint === "string" && value.endpoint.length <= 1024
+  // Only push services' addresses: anything else is refused before it costs
+  // a database command (no such device can be registered anyway).
+  return isRecord(value) &&
+    typeof value.endpoint === "string" &&
+    value.endpoint.length <= 1024 &&
+    isAllowedEndpoint(value.endpoint)
     ? value.endpoint
     : null;
 }

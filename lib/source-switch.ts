@@ -8,7 +8,21 @@ const SOURCE_META = "plan-source";
 const LOCK_NAME = "plan-source";
 const LOCK_SECONDS = 30;
 
-const globalSource = globalThis as typeof globalThis & { __planSource?: PlanSource };
+/**
+ * What this instance last knew, and when. Trusted only for a while: another
+ * instance may have reported a switch back in the meantime.
+ */
+const MEMORY_MS = 10 * 60_000;
+type Known = { source: PlanSource; at: number };
+const globalSource = globalThis as typeof globalThis & { __planSource?: Known };
+
+const remembered = () => {
+  const known = globalSource.__planSource;
+  return known && Date.now() - known.at < MEMORY_MS ? known.source : null;
+};
+const remember = (source: PlanSource) => {
+  globalSource.__planSource = { source, at: Date.now() };
+};
 
 const MESSAGES: Record<PlanSource, (reason: string | null) => { title: string; text: string }> = {
   fallback: (reason) => ({
@@ -33,7 +47,7 @@ const MESSAGES: Record<PlanSource, (reason: string | null) => { title: string; t
  * Never throws: the plan matters more than the message.
  */
 export async function reportPlanSource(source: PlanSource, reason: string | null = null) {
-  if (globalSource.__planSource === source) {
+  if (remembered() === source) {
     return "unchanged" as const;
   }
   try {
@@ -41,13 +55,13 @@ export async function reportPlanSource(source: PlanSource, reason: string | null
     if (!store) {
       // Without Redis (local runs): only this instance's memory. Starting on
       // monitor2020 is the normal case and not worth a message.
-      const previous = globalSource.__planSource ?? "primary";
-      globalSource.__planSource = source;
+      const previous = globalSource.__planSource?.source ?? "primary";
+      remember(source);
       return previous === source ? ("unchanged" as const) : notify(source, reason);
     }
     const reported = ((await store.getMeta(SOURCE_META)) as PlanSource | null) ?? "primary";
     if (reported === source) {
-      globalSource.__planSource = source;
+      remember(source);
       return "unchanged" as const;
     }
     // Several instances may notice at once: one of them reports it.
@@ -55,9 +69,14 @@ export async function reportPlanSource(source: PlanSource, reason: string | null
       return "busy" as const;
     }
     try {
-      await store.setMeta(SOURCE_META, source);
-      globalSource.__planSource = source;
-      return await notify(source, reason);
+      const result = await notify(source, reason);
+      // Recorded only once told (or nobody to tell): a failed message is
+      // tried again with the next fetch instead of being lost.
+      if (result !== "failed") {
+        await store.setMeta(SOURCE_META, source);
+        remember(source);
+      }
+      return result;
     } finally {
       await store.releaseLock(LOCK_NAME);
     }

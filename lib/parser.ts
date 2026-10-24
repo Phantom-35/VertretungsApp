@@ -211,6 +211,17 @@ function buildEntryId(entry: Omit<SubstitutionEntry, "id">) {
  * Counts the data rows of the substitution tables without relying on the
  * header detection, so that the parse result can be cross-checked.
  */
+/** A data row's cells as the self-check compares them ("???" stays, see OPEN_SUBSTITUTE). */
+function cellTexts($: cheerio.CheerioAPI, rowElement: Element) {
+  return $(rowElement)
+    .find("td")
+    .toArray()
+    .map((cell) => {
+      const text = normalizeWhitespace($(cell).text());
+      return text === "???" ? text : normalizeCell(text);
+    });
+}
+
 function countDataRows($: cheerio.CheerioAPI) {
   const rows = new Set<string>();
 
@@ -218,14 +229,7 @@ function countDataRows($: cheerio.CheerioAPI) {
     .not(".info, .mon_head")
     .find("tr")
     .each((_, rowElement) => {
-      const cells = $(rowElement)
-        .find("td")
-        .toArray()
-        // "???" stays, as in the parsed entries (see OPEN_SUBSTITUTE).
-        .map((cell) => {
-          const text = normalizeWhitespace($(cell).text());
-          return text === "???" ? text : normalizeCell(text);
-        });
+      const cells = cellTexts($, rowElement);
       const isHeader =
         normalizeHeader(cells[0] ?? "").startsWith("klasse") &&
         normalizeHeader(cells[1] ?? "") === "stunde";
@@ -249,6 +253,7 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
   const parsedEntries: SubstitutionEntry[] = [];
   let headerFound = false;
   const unknownColumns = new Set<string>();
+  const readRows = new Set<string>();
 
   $("table").each((_, tableElement) => {
     const table = $(tableElement);
@@ -335,6 +340,12 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
         ...entryBase,
         id: buildEntryId(entryBase),
       });
+      // Only full rows, as countDataRows counts them: a note spanning the
+      // whole table is read, but must not hide a row that was not. Rows that
+      // differ only in an unknown column still count once (one is lost).
+      if (cellTexts($, rowElement).length >= 4) {
+        readRows.add(buildEntryId(entryBase));
+      }
     });
   });
 
@@ -348,6 +359,7 @@ export function parseSubstitutionPage(html: string, pageNumber: number): ParsedP
     stats: {
       headerFound,
       tableRows: countDataRows($),
+      readRows: readRows.size,
       unknownColumns: Array.from(unknownColumns),
     },
   };

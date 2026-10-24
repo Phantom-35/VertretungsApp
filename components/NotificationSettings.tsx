@@ -3,6 +3,21 @@ import { FadingStatus } from "@/components/FadingStatus";
 import { InstallGuide } from "@/components/InstallGuide";
 import type { PushControls } from "@/hooks/usePushNotifications";
 import { useSettings } from "@/hooks/useSettings";
+import { currentBrowser, isStandalone } from "@/lib/device";
+
+/** Where to allow notifications again, for the device at hand. */
+function allowAgainHint() {
+  const { platform } = currentBrowser();
+  if (platform === "ios") {
+    return "iPhone: Einstellungen → Mitteilungen → Vertretungsplan";
+  }
+  if (platform === "android") {
+    return isStandalone()
+      ? "Android: lange auf das App-Symbol tippen → App-Info → Benachrichtigungen"
+      : "Android: Schloss-Symbol neben der Adresse → Berechtigungen → Benachrichtigungen";
+  }
+  return "Computer: Schloss-Symbol neben der Adresse → Benachrichtigungen erlauben";
+}
 
 type NotificationSettingsProps = {
   push: PushControls;
@@ -58,7 +73,7 @@ export function NotificationSettings({ push, schoolClass, teachers, onOpenSettin
       break;
     case "denied":
       description =
-        "Benachrichtigungen sind blockiert. Erlaube sie in den Einstellungen des Geräts (iPhone: Einstellungen → Mitteilungen → Vertretungsplan).";
+        `Benachrichtigungen sind blockiert. Erlaube sie in den Einstellungen des Geräts (${allowAgainHint()}).`;
       break;
     case "on":
       description = "";
@@ -225,7 +240,7 @@ export function NotificationControls({
       break;
     case "denied":
       text =
-        "Blockiert. Erlaube sie in den Einstellungen des Geräts (iPhone: Einstellungen → Mitteilungen → Vertretungsplan).";
+        `Blockiert. Erlaube sie in den Einstellungen des Geräts (${allowAgainHint()}).`;
       break;
     default:
       text = "Dieser Browser kann keine Benachrichtigungen empfangen.";

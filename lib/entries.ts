@@ -193,6 +193,38 @@ export function summarizeEntries(entries: Pick<SubstitutionEntry, "type">[]) {
 }
 
 /** Classes of the upper school, where students attend courses, not one class. */
+/** The lessons an entry covers: "3 - 4" -> [3, 4], "5" -> [5]; none without a number. */
+function lessonNumbers(lesson: string) {
+  const numbers = (lesson.match(/\d+/g) ?? []).map(Number);
+  if (numbers.length === 0) {
+    return [];
+  }
+  const first = Math.min(...numbers);
+  const last = Math.max(...numbers);
+  return last - first > 12 ? [first] : Array.from({ length: last - first + 1 }, (_, index) => first + index);
+}
+
+/**
+ * For the day's summary: the last of the first lessons that are all
+ * cancelled ("1.–2. Std. fallen aus"), or null. Only when nothing else is
+ * planned for those lessons, so a cancellation for one group next to
+ * another group's lesson does not count. Not knowing the timetable, the app
+ * says what is cancelled, not that the day starts later.
+ */
+export function cancelledFirstLessons(entries: Pick<SubstitutionEntry, "lesson" | "type">[]) {
+  const cancelled = new Set<number>();
+  const other = new Set<number>();
+  for (const entry of entries) {
+    const target = getEntryKind(entry.type) === "cancelled" ? cancelled : other;
+    lessonNumbers(entry.lesson).forEach((lesson) => target.add(lesson));
+  }
+  let last = 0;
+  while (cancelled.has(last + 1) && !other.has(last + 1)) {
+    last += 1;
+  }
+  return last > 0 ? last : null;
+}
+
 export function isCourseClass(schoolClass: string) {
   return /^(EF|Q1|Q2)$/.test(schoolClass);
 }

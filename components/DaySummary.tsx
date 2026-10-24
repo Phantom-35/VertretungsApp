@@ -1,6 +1,6 @@
 import { ShareButton } from "@/components/ShareButton";
 import { kindStyles } from "@/components/SubstitutionCard";
-import { summarizeEntries } from "@/lib/entries";
+import { cancelledFirstLessons, summarizeEntries } from "@/lib/entries";
 import type { SubstitutionEntry } from "@/lib/types";
 
 type DaySummaryProps = {
@@ -13,6 +13,8 @@ type DaySummaryProps = {
   showingOtherCourses: boolean;
   onToggleOtherCourses: () => void;
   getShareText: () => string;
+  /** Upper school: courses differ per student, so no "first lessons cancelled". */
+  courses?: boolean;
 };
 
 /** "4 Änderungen" with one chip per kind, e.g. "1 Ausfall". */
@@ -23,8 +25,11 @@ export function DaySummary({
   showingOtherCourses,
   onToggleOtherCourses,
   getShareText,
+  courses = false,
 }: DaySummaryProps) {
   const items = summarizeEntries(entries);
+  // The question of the morning: do the first lessons take place?
+  const firstCancelled = courses ? null : cancelledFirstLessons(entries);
   // Without changes, the card below offers sharing instead.
   const empty = entries.length === 0;
   if (empty && newCount === 0 && otherCourses === 0) {
@@ -43,6 +48,11 @@ export function DaySummary({
           {newCount > 0 ? (
             <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-white">
               {newCount} neu
+            </span>
+          ) : null}
+          {firstCancelled !== null ? (
+            <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${kindStyles.cancelled}`}>
+              {firstCancelled === 1 ? "1. Std. fällt aus" : `1.–${firstCancelled}. Std. fallen aus`}
             </span>
           ) : null}
           {items.map((item) => (
@@ -64,7 +74,7 @@ export function DaySummary({
           <button
             type="button"
             onClick={onToggleOtherCourses}
-            className="font-semibold text-accent-strong underline underline-offset-2"
+            className="tap-target font-semibold text-accent-strong underline underline-offset-2"
           >
             {showingOtherCourses ? "Ausblenden" : "Anzeigen"}
           </button>

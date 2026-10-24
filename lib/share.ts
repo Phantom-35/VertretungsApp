@@ -13,11 +13,13 @@ type ShareOptions = {
   /** "Heute, Donnerstag, 08.10." */
   dayLabel: string;
   entries: SubstitutionEntry[];
-  /** Only the student's own courses are included. */
+  /** Only the chosen courses are included. */
   ownCoursesOnly: boolean;
+  /** The class is only looked at (e.g. a sibling's): its courses are not "mine". */
+  viewingOther?: boolean;
   /** "08.10., 15:34 Uhr"; omitted when unknown. */
   sourceUpdated: string | null;
-  /** The app's address, so that whoever gets the message can find the app. */
+  /** The app's address (opening at the class), so that whoever gets the message finds the plan. */
   appUrl?: string | null;
   /** The school's notes for the day ("Nachrichten zum Tag"). */
   notices?: readonly string[];
@@ -89,13 +91,14 @@ export function buildShareText({
   dayLabel,
   entries,
   ownCoursesOnly,
+  viewingOther = false,
   sourceUpdated,
   appUrl = null,
   notices = [],
 }: ShareOptions) {
   const count = entries.length === 1 ? "1 Änderung" : `${entries.length} Änderungen`;
   const heading = [
-    `📋 *Vertretungsplan ${schoolClass}${ownCoursesOnly ? " (meine Kurse)" : ""}*`,
+    `📋 *Vertretungsplan ${schoolClass}${ownCoursesOnly ? (viewingOther ? " (ausgewählte Kurse)" : " (meine Kurse)") : ""}*`,
     entries.length > 0 ? `${dayLabel} · ${count}` : dayLabel,
   ].join("\n");
   const body =
@@ -109,4 +112,9 @@ export function buildShareText({
   ].join("\n");
   // Blank lines between the blocks keep it readable in a chat.
   return [heading, ...body, ...notes, ...(footer ? [footer] : [])].join("\n\n");
+}
+
+/** The app's address opening at a class ("…/?klasse=7B"), for shared texts. */
+export function classLink(origin: string, schoolClass: string) {
+  return schoolClass ? `${origin}/?klasse=${encodeURIComponent(schoolClass)}` : `${origin}/`;
 }

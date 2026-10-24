@@ -35,12 +35,14 @@ import {
   entryMatchesTeachers,
   formatClassName,
   isCourseClass,
+  normalizeSelectedClass,
   normalizeTeacher,
 } from "@/lib/entries";
 import { formatAge, formatPlanDateLabel, formatShortDate, formatTimestamp, formatWeekday, isPastDate } from "@/lib/format";
+import { addressRequest, clearAddressRequest, dayFromUrl } from "@/lib/address";
 import { freeUntil, holidayBreakAt, nextSchoolDay } from "@/lib/holidays";
 import { entryKey, findNewKeys } from "@/lib/seen";
-import { buildShareText } from "@/lib/share";
+import { buildShareText, classLink } from "@/lib/share";
 import { daysBetween, pickDefaultDate, schoolHour, schoolToday } from "@/lib/time";
 import type { PlanDay, SubstitutionPayload } from "@/lib/types";
 
@@ -51,15 +53,10 @@ type SubstitutionAppProps = {
 };
 
 const noSubscribe = () => () => undefined;
-const dayInAddress = () => dayFromUrl(window.location.href);
+// What the address asked for when the app opened (read once, see lib/address.ts).
+const dayInAddress = () => addressRequest().day;
 /** "?einstellungen=teilen": back from the notice to print, to the code in the settings. */
-const settingsInAddress = () => new URLSearchParams(window.location.search).get("einstellungen");
-
-/** "?day=2026-10-09" in a URL opened from a notification. */
-function dayFromUrl(url: string) {
-  const day = new URL(url, "http://localhost").searchParams.get("day");
-  return day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
-}
+const settingsInAddress = () => addressRequest().settings;
 
 /** From this many changes on a day, the cards are shown smaller. */
 const COMPACT_FROM = 6;
@@ -135,9 +132,34 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   // Opened at the code by the address, until closed (or opened otherwise).
   const shareInAddress = useSyncExternalStore(noSubscribe, settingsInAddress, () => null) === "teilen";
   const [addressHandled, setAddressHandled] = useState(false);
-  // The address keeps it: removing it would make the router load the page
-  // again, which closes the sheet. Once closed, it no longer applies.
+  // Once closed (or the settings opened otherwise), it no longer applies.
   const opensFromAddress = shareInAddress && !addressHandled;
+  // Read at this opening; then out of the address, so that a reload (also
+  // the one for a new version) does not jump to that day or open the
+  // settings again.
+  useEffect(() => {
+    clearAddressRequest();
+  }, []);
+  // A shared plan's link ("?klasse=7B"): without an own class yet it becomes
+  // the own class (someone new to the app), otherwise it is only looked at
+  // (e.g. parents opening their child's class). Once the class is known.
+  const classFromLink = useRef(true);
+  useEffect(() => {
+    if (myClass === undefined || !classFromLink.current) {
+      return;
+    }
+    classFromLink.current = false;
+    const linked = addressRequest().schoolClass;
+    const schoolClass = linked ? normalizeSelectedClass(linked) : null;
+    if (!schoolClass) {
+      return;
+    }
+    if (!myClass) {
+      setMyClass(schoolClass);
+    } else if (schoolClass !== myClass) {
+      setViewedClass(schoolClass);
+    }
+  }, [myClass, setMyClass, setViewedClass]);
   const openSettings = (focus: SettingsFocus = null) => {
     setAddressHandled(true);
     setSettingsFocus(focus);
@@ -237,8 +259,11 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   // Also on the weekend after the last plan day (Friday's plan, Monday not
   // there yet), as on Friday evening; in the holidays their card says it all.
   const followsPlan = !holiday && latestDate !== null && nextSchoolDay(latestDate) === upcoming;
+  // Only for an ordinary (or long) weekend: before the holidays, "not online
+  // yet" for a day weeks away would only confuse.
+  const upcomingSoon = upcoming !== null && today !== null && daysBetween(today, upcoming) <= 4;
   const pendingDate =
-    (planAhead || followsPlan) && upcoming !== null && !days.some((day) => day.date === upcoming)
+    (planAhead || followsPlan) && upcomingSoon && !days.some((day) => day.date === upcoming)
       ? upcoming
       : null;
   const tabDays: PlanDay[] = pendingDate
@@ -360,6 +385,18 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const newKeys = settings.showNewBadges
     ? findNewKeys(seenBaseline, visibleEntries, acknowledgedNew)
     : new Set<string>();
+  // Other days with something new: a small dot on their tab.
+  const newDates = new Set(
+    settings.showNewBadges && selectedClass
+      ? days
+          .filter((day) => day.date !== selectedDate)
+          .filter(
+            (day) =>
+              findNewKeys(seenBaseline, shownEntries.filter((entry) => entry.date === day.date), acknowledgedNew).size > 0,
+          )
+          .map((day) => day.date)
+      : [],
+  );
   const otherCourseCount =
     classEntries.filter(onSelectedDay).length - ownEntries.filter(onSelectedDay).length;
   // Teachers of the own class in the plan, for choosing courses in the introduction.
@@ -392,8 +429,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       dayLabel: selectedDay ? dateLabel : "aktueller Plan",
       entries: visibleEntries,
       ownCoursesOnly: teachers.length > 0 && !showOtherCourses,
+      viewingOther: Boolean(viewedClass && myClass && viewedClass !== myClass),
       sourceUpdated: data?.sourceUpdatedAt ? formatTimestamp(data.sourceUpdatedAt, now) : null,
-      appUrl: `${window.location.origin}/`,
+      appUrl: classLink(window.location.origin, selectedClass ?? ""),
       notices: visibleNotices,
     });
   const emptyDayLabel = selectedDay
@@ -512,7 +550,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                 schoolDown={schoolDown}
                 stale={data.stale}
                 error={data.error}
-                warnings={data.warnings}
                 lastSuccessLabel={formatAge(
                   data.lastSuccessfulUpdate ?? data.lastUpdated,
                   now,
@@ -535,6 +572,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                 selectedDate={selectedDate}
                 onChange={chooseDate}
                 counts={countsByDate}
+                newDates={newDates}
                 now={now}
                 pendingDate={pendingDate}
               />
@@ -627,6 +665,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                   showingOtherCourses={showOtherCourses}
                   onToggleOtherCourses={() => setShowOtherCourses((value) => !value)}
                   getShareText={getShareText}
+                  courses={selectedClass ? isCourseClass(selectedClass) : false}
                 />
               ) : null}
 
