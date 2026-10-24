@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import Link from "next/link";
+import { AppQrCode, ShareSteps } from "@/components/AppQrCode";
 import { FeedbackForm } from "@/components/FeedbackForm";
 import { InstallGuide } from "@/components/InstallGuide";
 import { NotificationControls } from "@/components/NotificationSettings";
@@ -14,7 +15,7 @@ import { SCHOOL_CLASSES } from "@/lib/entries";
 import { NOTIFY_GROUP_LABELS, NOTIFY_GROUPS } from "@/lib/notify";
 import { resetDevice } from "@/lib/reset";
 
-export type SettingsFocus = "teachers" | "summaries" | "notifications" | null;
+export type SettingsFocus = "teachers" | "summaries" | "notifications" | "share" | null;
 
 type CourseFilter = {
   schoolClass: string;
@@ -95,13 +96,14 @@ function Setting({ id, title, description, children }: {
 }
 
 /** The pages of the sheet: the overview and a few subpages, to keep each one short. */
-type Page = "main" | "notifications" | "display" | "teachers" | "install" | "help" | "about";
+type Page = "main" | "notifications" | "display" | "teachers" | "install" | "share" | "help" | "about";
 
 const PAGE_TITLES: Record<Exclude<Page, "main">, string> = {
   notifications: "Benachrichtigungen",
   display: "Anzeige",
   teachers: "Meine Lehrkräfte",
   install: "Als App installieren",
+  share: "App weitergeben",
   help: "Hilfe & Kontakt",
   about: "Über die App",
 };
@@ -110,6 +112,9 @@ const PAGE_TITLES: Record<Exclude<Page, "main">, string> = {
 function pageFor(focus: SettingsFocus): Page {
   if (focus === "notifications" || focus === "summaries") {
     return "notifications";
+  }
+  if (focus === "share") {
+    return "share";
   }
   return focus === "teachers" ? "teachers" : "main";
 }
@@ -601,7 +606,7 @@ export function SettingsSheet({
               {!installed ? (
                 <NavRow icon={ICONS.install} title="Als App installieren" page="install" onClick={() => goTo("install")} />
               ) : null}
-              <NavRow icon={ICONS.share} title="App weitergeben (QR-Code)" href="/teilen" />
+              <NavRow icon={ICONS.share} title="App weitergeben (QR-Code)" page="share" onClick={() => goTo("share")} />
               <NavRow icon={ICONS.help} title="Hilfe & Kontakt" page="help" onClick={() => goTo("help")} />
               <NavRow icon={ICONS.about} title="Über die App" page="about" onClick={() => goTo("about")} />
             </nav>
@@ -715,6 +720,16 @@ export function SettingsSheet({
               funktioniert offline und kann Benachrichtigungen schicken.
             </p>
             <InstallGuide />
+          </div>
+        ) : null}
+
+        {page === "share" ? (
+          <div className="pt-1">
+            <p className="mb-5 text-center text-sm leading-6 text-muted">
+              Zeig den Code deinen Freunden: Kamera drauf, Klasse wählen, fertig.
+            </p>
+            <AppQrCode printHref="/teilen" />
+            <ShareSteps />
           </div>
         ) : null}
 

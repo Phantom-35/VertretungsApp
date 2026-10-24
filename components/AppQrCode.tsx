@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { encode } from "uqr";
 import { ShareButton } from "@/components/ShareButton";
@@ -33,8 +34,37 @@ function QrCode({ text }: { text: string }) {
   );
 }
 
-/** The app's address as a QR code, with buttons to share or print it. */
-export function AppQrCode() {
+const steps = [
+  "Code mit der Handy-Kamera scannen.",
+  "Klasse wählen.",
+  "Als App auf den Home-Bildschirm legen – fertig.",
+];
+
+/** How a friend gets the app from the code, in three steps. */
+export function ShareSteps() {
+  return (
+    <ol className="mx-auto mt-6 max-w-xs space-y-2 print:mt-10 print:max-w-lg print:space-y-4">
+      {steps.map((step, index) => (
+        <li key={step} className="flex gap-3 text-sm leading-6 text-foreground print:text-2xl print:text-black">
+          <span
+            aria-hidden
+            className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold leading-none text-white print:size-9 print:border-2 print:border-black print:bg-transparent print:text-lg print:text-black"
+          >
+            {index + 1}
+          </span>
+          {step}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * The app's address as a QR code, with buttons to share or print it. In the
+ * settings, printing opens the page made for it (`printHref`): printing a
+ * sheet over the app would print the app as well.
+ */
+export function AppQrCode({ printHref }: { printHref?: string } = {}) {
   // The address the app runs at (production, preview or local).
   const url = useSyncExternalStore(noSubscribe, appUrl, () => null);
   if (!url) {
@@ -51,13 +81,22 @@ export function AppQrCode() {
       </p>
       <div className="mt-5 flex items-start justify-center gap-3 print:hidden">
         <ShareButton getText={() => `KAG Vertretungsplan – die Vertretungen deiner Klasse: ${url}`} size="large" label="Link teilen" />
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="rounded-full border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-accent-strong transition active:scale-95"
-        >
-          Aushang drucken
-        </button>
+        {printHref ? (
+          <Link
+            href={printHref}
+            className="rounded-full border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-accent-strong transition active:scale-95"
+          >
+            Aushang drucken
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-full border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-accent-strong transition active:scale-95"
+          >
+            Aushang drucken
+          </button>
+        )}
       </div>
     </>
   );

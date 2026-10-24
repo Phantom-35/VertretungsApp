@@ -348,15 +348,34 @@ test("links the legal pages and offers a QR code to pass the app on", async ({ p
     "https://support-vertretung-kag.vercel.app/datenschutz",
   );
   await dialog.getByRole("button", { name: "Zurück zu den Einstellungen" }).click();
-  await dialog.getByRole("link", { name: "App weitergeben (QR-Code)" }).click();
-  await expect(page).toHaveURL(/\/teilen$/);
-  const origin = new URL(page.url()).origin;
-  await expect(page.getByRole("img", { name: `QR-Code für ${origin}/` })).toBeVisible();
-  await expect(page.getByText(origin.replace(/^https?:\/\//, ""), { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Aushang drucken" })).toBeVisible();
 
-  await page.getByRole("link", { name: "← Zurück zur App" }).click();
+  // The code is a page of the settings: no page load, back to the settings.
+  await dialog.getByRole("button", { name: "App weitergeben (QR-Code)" }).click();
+  await expect(dialog.getByRole("heading", { name: "App weitergeben" })).toBeVisible();
+  const origin = new URL(page.url()).origin;
+  await expect(dialog.getByRole("img", { name: `QR-Code für ${origin}/` })).toBeVisible();
+  await expect(dialog.getByText(origin.replace(/^https?:\/\//, ""), { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Link teilen" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Zurück zu den Einstellungen" }).click();
+  await expect(dialog.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+
+  // Printing has its own page; back from it, the code in the settings again.
+  await dialog.getByRole("button", { name: "App weitergeben (QR-Code)" }).click();
+  await dialog.getByRole("link", { name: "Aushang drucken" }).click();
+  await expect(page).toHaveURL(/\/teilen$/);
+  await expect(page.getByRole("img", { name: `QR-Code für ${origin}/` })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Aushang drucken" })).toBeVisible();
+  await page.getByRole("link", { name: "← Zurück" }).click();
+  await expect(dialog.getByRole("heading", { name: "App weitergeben" })).toBeVisible();
+  // It stays open (nothing reloads the page behind it), and closes as usual.
+  await page.waitForTimeout(1000);
+  await expect(dialog.getByRole("heading", { name: "App weitergeben" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await expect(dialog).toBeHidden();
   await expect(page.locator("header")).toContainText("5A");
+  // Opened again from the app: the overview, not the code.
+  await page.getByRole("button", { name: "Einstellungen", exact: true }).click();
+  await expect(dialog.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
 });
 
 test("help and contact: a message to click through, sent with the device details", async ({ page, request }) => {

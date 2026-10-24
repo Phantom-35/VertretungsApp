@@ -52,6 +52,8 @@ type SubstitutionAppProps = {
 
 const noSubscribe = () => () => undefined;
 const dayInAddress = () => dayFromUrl(window.location.href);
+/** "?einstellungen=teilen": back from the notice to print, to the code in the settings. */
+const settingsInAddress = () => new URLSearchParams(window.location.search).get("einstellungen");
 
 /** "?day=2026-10-09" in a URL opened from a notification. */
 function dayFromUrl(url: string) {
@@ -130,7 +132,14 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsFocus, setSettingsFocus] = useState<SettingsFocus>(null);
+  // Opened at the code by the address, until closed (or opened otherwise).
+  const shareInAddress = useSyncExternalStore(noSubscribe, settingsInAddress, () => null) === "teilen";
+  const [addressHandled, setAddressHandled] = useState(false);
+  // The address keeps it: removing it would make the router load the page
+  // again, which closes the sheet. Once closed, it no longer applies.
+  const opensFromAddress = shareInAddress && !addressHandled;
   const openSettings = (focus: SettingsFocus = null) => {
+    setAddressHandled(true);
     setSettingsFocus(focus);
     setSettingsOpen(true);
   };
@@ -652,9 +661,12 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       )}
 
       <SettingsSheet
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        focus={settingsFocus}
+        open={settingsOpen || opensFromAddress}
+        onClose={() => {
+          setAddressHandled(true);
+          setSettingsOpen(false);
+        }}
+        focus={opensFromAddress ? "share" : settingsFocus}
         notifications={{ push, schoolClass: myClass ?? null, teachers: myTeachers }}
         courseFilter={
           // The upper-school class on screen; otherwise the own one, whose
@@ -696,6 +708,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
             : "nicht geladen"
         }
         onShowIntroduction={() => {
+          setAddressHandled(true);
           setSettingsOpen(false);
           onboarding.restart();
         }}
