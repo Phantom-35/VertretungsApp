@@ -62,3 +62,40 @@ export function ClassSelector({
     </section>
   );
 }
+
+/**
+ * Another class than the own one is only being looked at: one small line,
+ * and the way back. The own class stays for the next opening and the
+ * notifications.
+ */
+export function ViewingOtherNote({ myClass, onBack, className = "" }: { myClass: string; onBack: () => void; className?: string }) {
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-2xl bg-surface-muted py-1.5 pl-3 pr-1.5 motion-safe:animate-[fade-in_240ms_ease-out] ${className}`}
+    >
+      <svg
+        aria-hidden
+        viewBox="0 0 24 24"
+        className="size-4 shrink-0 text-muted"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+      <p className="min-w-0 flex-1 text-xs leading-4 text-muted">
+        <span className="font-semibold text-foreground">Nur angesehen</span> · deine Klasse: {myClass}
+      </p>
+      <button
+        type="button"
+        onClick={onBack}
+        className="tap-target shrink-0 rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-accent-strong transition active:scale-95"
+      >
+        Zurück<span className="sr-only"> zur {myClass}</span>
+      </button>
+    </div>
+  );
+}

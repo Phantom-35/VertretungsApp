@@ -1,5 +1,6 @@
 "use client";
 
+import { ViewingOtherNote } from "@/components/ClassSelector";
 import { DaySummary } from "@/components/DaySummary";
 import { FadingStatus } from "@/components/FadingStatus";
 import { CheckedLabel, statusBadges, type HeaderStatus } from "@/components/Header";
@@ -208,15 +209,18 @@ function TopBar(props: DesktopViewProps) {
   const fetched = data?.lastUpdated ? formatAge(data.lastUpdated, now) : "noch nie";
   const extras = (
     <>
-      <DesktopNotifications
-        push={props.push}
-        audience={props.notificationAudience}
-        onOpenSettings={props.onOpenSettings}
-      />
+      {/* They are about the own class: not repeated while another is looked at. */}
+      {viewingOther && props.myClass ? null : (
+        <DesktopNotifications
+          push={props.push}
+          audience={props.notificationAudience}
+          onOpenSettings={props.onOpenSettings}
+        />
+      )}
       {courseFilter && selectedClass ? (
         <div className="flex items-center gap-3">
           <p className="text-sm text-muted">
-            Meine Lehrkräfte:{" "}
+            {viewingOther ? "Lehrkräfte" : "Meine Lehrkräfte"}:{" "}
             <span className="font-medium text-foreground">
               {courseFilter.selected.length > 0
                 ? [...courseFilter.selected].sort((left, right) => left.localeCompare(right, "de-DE")).join(", ")
@@ -234,22 +238,14 @@ function TopBar(props: DesktopViewProps) {
         </div>
       ) : null}
       {viewingOther && props.myClass ? (
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-muted">
-            Nur angesehen. Beim nächsten Öffnen und für Benachrichtigungen gilt weiter die{" "}
-            <span className="font-semibold text-foreground">{props.myClass}</span>.
-          </p>
-          <button type="button" onClick={() => props.onChooseClass(props.myClass!)} className={smallButtonClass}>
-            Zurück zur {props.myClass}
-          </button>
-        </div>
+        <ViewingOtherNote myClass={props.myClass} onBack={() => props.onChooseClass(props.myClass!)} />
       ) : null}
     </>
   );
   const hasExtras =
     Boolean(courseFilter && selectedClass) ||
     (viewingOther && Boolean(props.myClass)) ||
-    !["checking", "unavailable", "unsupported"].includes(props.push.status);
+    (!["checking", "unavailable", "unsupported"].includes(props.push.status) && !(viewingOther && props.myClass));
 
   return (
     // Stays at the top while scrolling through long days.

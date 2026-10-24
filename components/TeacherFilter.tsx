@@ -6,25 +6,26 @@ const sortTeachers = (teachers: readonly string[]) =>
 
 type TeacherHintProps = {
   schoolClass: string;
+  /** The own class (its courses); otherwise only looked at. */
+  own: boolean;
   selected: readonly string[];
   onOpenSettings: () => void;
 };
 
 /**
- * Upper school, on the main page: which teachers' courses are shown. The
- * choice itself is made in the settings.
+ * Upper school, on the main page: which teachers' courses are shown, in one
+ * line. The choice itself is made in the settings.
  */
-export function TeacherHint({ schoolClass, selected, onOpenSettings }: TeacherHintProps) {
+export function TeacherHint({ schoolClass, own, selected, onOpenSettings }: TeacherHintProps) {
   return (
     <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
-          Meine Lehrkräfte
-        </p>
-        <p className="mt-1 truncate text-sm font-medium text-foreground">
+      <p className="min-w-0 truncate text-sm text-foreground">
+        <span className="text-muted">{own ? "Meine Lehrkräfte" : "Lehrkräfte"}</span>
+        <span className="text-muted">: </span>
+        <span className="font-medium">
           {selected.length > 0 ? sortTeachers(selected).join(", ") : `Alle Kurse der ${schoolClass}`}
-        </p>
-      </div>
+        </span>
+      </p>
       <button
         type="button"
         onClick={onOpenSettings}

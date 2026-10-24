@@ -72,8 +72,19 @@ export function NotificationSettings({ push, schoolClass, teachers, onOpenSettin
       description = "Dieser Browser kann keine Benachrichtigungen empfangen.";
       break;
     case "denied":
-      description =
-        `Benachrichtigungen sind blockiert. Erlaube sie in den Einstellungen des Geräts (${allowAgainHint()}).`;
+      // Short as well; where to allow them again only on request.
+      description = "Auf diesem Gerät blockiert.";
+      actions = (
+        <button
+          type="button"
+          onClick={() => setShowInstall((value) => !value)}
+          aria-expanded={showInstall}
+          aria-controls="allow-again"
+          className={`${buttonClass} border border-line bg-surface text-accent-strong`}
+        >
+          {showInstall ? "Schließen" : "Wie erlauben?"}
+        </button>
+      );
       break;
     case "on":
       description = "";
@@ -173,6 +184,11 @@ export function NotificationSettings({ push, schoolClass, teachers, onOpenSettin
         <div id="install-guide" className="mt-3 rounded-2xl border border-line bg-surface p-3">
           <InstallGuide />
         </div>
+      ) : null}
+      {status === "denied" && showInstall ? (
+        <p id="allow-again" className="mt-2 text-sm leading-5 text-muted">
+          Erlaube sie in den Einstellungen des Geräts ({allowAgainHint()}).
+        </p>
       ) : null}
       <FadingStatus message={message} className="pt-2" />
     </div>

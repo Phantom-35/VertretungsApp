@@ -151,8 +151,9 @@ test("notifies the right devices about changes, also a second upload", async ({ 
 
     // Only looking at another class does not move the notifications.
     await chooseClass(page, "7B");
-    await expect(page.getByText(/Nur angesehen\..*gilt weiter die 5A/)).toBeVisible();
-    await expect(settings).toContainText("Benachrichtigungen an für 5A");
+    await expect(page.getByText(/Nur angesehen · deine Klasse: 5A/)).toBeVisible();
+    // The line about them is not repeated while another class is looked at.
+    await expect(settings).toHaveCount(0);
     await changePlan(
       request,
       4,
@@ -173,7 +174,7 @@ test("notifies the right devices about changes, also a second upload", async ({ 
     await sheet.getByRole("button", { name: "Fertig" }).click();
     await synced;
     await expect(settings).toContainText("Benachrichtigungen an für 7B");
-    await expect(page.getByText("Nur angesehen.")).toHaveCount(0);
+    await expect(page.getByText("Nur angesehen", { exact: true })).toHaveCount(0);
     await changePlan(
       request,
       4,
@@ -408,7 +409,12 @@ test("explains how to allow blocked notifications", async ({ page }) => {
   });
   await page.goto("/");
   await page.locator("#class-selector").selectOption("5A");
-  await expect(page.getByText(/Benachrichtigungen sind blockiert/)).toBeVisible();
-  // The way back for the device at hand (here a computer browser).
-  await expect(page.getByText(/Benachrichtigungen sind blockiert/)).toContainText("Schloss-Symbol neben der Adresse");
+  const group = page.getByRole("group", { name: "Benachrichtigungen" });
+  // Short on the page; the way back on request, for the device at hand (here a computer browser).
+  await expect(group).toContainText("Auf diesem Gerät blockiert.");
+  await expect(group.getByText(/Schloss-Symbol neben der Adresse/)).toHaveCount(0);
+  await group.getByRole("button", { name: "Wie erlauben?" }).click();
+  await expect(group.getByText(/Erlaube sie in den Einstellungen des Geräts/)).toContainText("Schloss-Symbol neben der Adresse");
+  await group.getByRole("button", { name: "Schließen" }).click();
+  await expect(group.getByText(/Schloss-Symbol/)).toHaveCount(0);
 });

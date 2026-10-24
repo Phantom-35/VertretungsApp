@@ -386,7 +386,7 @@ test("a class only looked at is gone when the app is opened anew", async ({ page
   await chooseClass(page, "5A");
   // A sibling's class, looked at in the evening.
   await chooseClass(page, "7B");
-  await expect(page.getByText("Nur angesehen.")).toBeVisible();
+  await expect(page.getByText("Nur angesehen", { exact: true })).toBeVisible();
   const setVisibility = (state: "hidden" | "visible") =>
     page.evaluate((value) => {
       Object.defineProperty(document, "visibilityState", { value, configurable: true });
@@ -402,7 +402,7 @@ test("a class only looked at is gone when the app is opened anew", async ({ page
   await page.clock.runFor(60 * 60_000);
   await setVisibility("visible");
   await expect(page.locator("h1")).toHaveText("5A");
-  await expect(page.getByText("Nur angesehen.")).toHaveCount(0);
+  await expect(page.getByText("Nur angesehen", { exact: true })).toHaveCount(0);
 });
 
 test("a shared link opens its class: looked at, or the own class for someone new", async ({ page, browser }) => {
@@ -411,7 +411,7 @@ test("a shared link opens its class: looked at, or the own class for someone new
   await chooseClass(page, "5A");
   await page.goto("/?klasse=7B");
   await expect(page.locator("h1")).toHaveText("7B");
-  await expect(page.getByText("Nur angesehen.")).toBeVisible();
+  await expect(page.getByText("Nur angesehen", { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
 
   // Someone new: it becomes the own class (the introduction shows it chosen).
@@ -846,7 +846,9 @@ test("opens with the own class; other classes are only looked at", async ({ page
   await expect(page.locator("main").getByText("Meine Klasse", { exact: true })).toBeVisible();
   await chooseClass(page, "7B");
   await expect(page.locator("main").getByText("Andere Klasse", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Nur angesehen\..*gilt weiter die 5A/)).toBeVisible();
+  await expect(page.getByText(/Nur angesehen · deine Klasse: 5A/)).toBeVisible();
+  // Notifications are about the own class: not offered while another is looked at.
+  await expect(page.getByRole("group", { name: "Benachrichtigungen" })).toHaveCount(0);
   // Kept while the app stays open.
   await page.reload();
   await expect(page.locator("h1")).toHaveText("7B");
@@ -854,7 +856,8 @@ test("opens with the own class; other classes are only looked at", async ({ page
   // Back with one tap; no list of recent classes.
   await page.getByRole("button", { name: "Zurück zur 5A" }).click();
   await expect(page.locator("h1")).toHaveText("5A");
-  await expect(page.getByText("Nur angesehen.")).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Benachrichtigungen" })).toBeVisible();
+  await expect(page.getByText("Nur angesehen", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Zuletzt:")).toHaveCount(0);
 
   // Opened anew, the app shows the own class again.

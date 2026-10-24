@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ClassSelector } from "@/components/ClassSelector";
+import { ClassSelector, ViewingOtherNote } from "@/components/ClassSelector";
 import { DAY_PANEL_ID, DaySelector, dayTabId } from "@/components/DaySelector";
 import { DaySummary } from "@/components/DaySummary";
 import { DesktopView } from "@/components/DesktopView";
@@ -539,35 +539,26 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
               onChange={chooseClass}
               viewingOther={Boolean(viewedClass && myClass && viewedClass !== myClass)}
             >
+              {viewedClass && myClass && viewedClass !== myClass ? (
+                <ViewingOtherNote myClass={myClass} onBack={() => chooseClass(myClass)} className="mt-3" />
+              ) : null}
               {usesCourseFilter && selectedClass ? (
                 <TeacherHint
+                  own={selectedClass === myClass}
                   schoolClass={selectedClass}
                   selected={storedTeachers}
                   onOpenSettings={() => openSettings("teachers")}
                 />
               ) : null}
-              {viewedClass && myClass && viewedClass !== myClass ? (
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
-                  {/* With large text on a narrow phone the button moves below the text. */}
-                  <p className="min-w-[11rem] flex-1 text-sm leading-5 text-muted">
-                    Nur angesehen. Beim nächsten Öffnen und für Benachrichtigungen gilt weiter die{" "}
-                    <span className="font-semibold text-foreground">{myClass}</span>.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => chooseClass(myClass)}
-                    className="tap-target shrink-0 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-accent-strong"
-                  >
-                    Zurück zur {myClass}
-                  </button>
-                </div>
-              ) : null}
-              <NotificationSettings
-                push={push}
-                schoolClass={myClass}
-                teachers={myTeachers}
-                onOpenSettings={openSettings}
-              />
+              {/* They are about the own class: not repeated while another is looked at. */}
+              {viewedClass && myClass && viewedClass !== myClass ? null : (
+                <NotificationSettings
+                  push={push}
+                  schoolClass={myClass}
+                  teachers={myTeachers}
+                  onOpenSettings={openSettings}
+                />
+              )}
             </ClassSelector>
 
             {data ? (
