@@ -4,9 +4,13 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { encode } from "uqr";
 import { ShareButton } from "@/components/ShareButton";
+import { isIos, isStandalone } from "@/lib/device";
 
 const noSubscribe = () => () => undefined;
 const appUrl = () => `${window.location.origin}/`;
+// The installed app on iPhone/iPad ignores window.print(): no print dialog
+// opens there, so the button would do nothing.
+const canPrint = () => !(isIos() && isStandalone());
 
 /** The QR code as one SVG path: a 1×1 square per dark module. */
 function QrCode({ text }: { text: string }) {
@@ -67,6 +71,7 @@ export function ShareSteps() {
 export function AppQrCode({ printHref }: { printHref?: string } = {}) {
   // The address the app runs at (production, preview or local).
   const url = useSyncExternalStore(noSubscribe, appUrl, () => null);
+  const printable = useSyncExternalStore(noSubscribe, canPrint, () => false);
   if (!url) {
     return <div className="mx-auto aspect-square w-64 sm:w-72 print:w-[11cm]" />;
   }
@@ -81,7 +86,7 @@ export function AppQrCode({ printHref }: { printHref?: string } = {}) {
       </p>
       <div className="mt-5 flex items-start justify-center gap-3 print:hidden">
         <ShareButton getText={() => `KAG Vertretungsplan – die Vertretungen deiner Klasse: ${url}`} size="large" label="Link teilen" />
-        {printHref ? (
+        {!printable ? null : printHref ? (
           <Link
             href={printHref}
             className="rounded-full border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-accent-strong transition active:scale-95"

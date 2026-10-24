@@ -483,6 +483,31 @@ test("links the legal pages and offers a QR code to pass the app on", async ({ p
   await expect(dialog).toBeHidden();
 });
 
+test("offers no printing in the installed app on an iPhone, where it does nothing", async ({ browser }) => {
+  const iphone = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+  });
+  await iphone.addInitScript(() => {
+    localStorage.setItem("kag:onboarded", "1");
+    Object.defineProperty(navigator, "standalone", { value: true });
+  });
+  const page = await iphone.newPage();
+  await page.clock.setFixedTime(TODAY);
+  await page.goto("/?einstellungen=teilen");
+  const dialog = page.getByRole("dialog", { name: "Einstellungen" });
+  await expect(dialog.getByRole("heading", { name: "App weitergeben" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Link teilen" })).toBeVisible();
+  await expect(dialog.getByText("Aushang drucken")).toHaveCount(0);
+  await page.goto("/teilen");
+  await expect(page.getByRole("button", { name: "Link teilen" })).toBeVisible();
+  await expect(page.getByText("Aushang drucken")).toHaveCount(0);
+  await iphone.close();
+});
+
 test("help and contact: a message to click through, sent with the device details", async ({ page, request }) => {
   const received = async () =>
     (await (await request.get(`${FIXTURE_URL}/__feedback`)).json()) as { text: string }[];
