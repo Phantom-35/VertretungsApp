@@ -139,7 +139,15 @@ body {
   background: rgba(31, 107, 103, 0.18);
 }
 
-/* Settings sheet slides up from the bottom. */
+/*
+ * Motion like in native iOS apps: one curve that starts fast and settles
+ * softly (as UIKit's sheets and navigation pushes do), short durations.
+ */
+:root {
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Settings sheet slides up from the bottom, and back down when closed. */
 @keyframes sheet-up {
   from {
     transform: translateY(100%);
@@ -149,8 +157,92 @@ body {
   }
 }
 
+@keyframes sheet-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+
 .settings-sheet[open] {
-  animation: sheet-up 220ms ease-out;
+  animation: sheet-up 380ms var(--ease-ios);
+}
+
+.settings-sheet[open]::backdrop {
+  animation: backdrop-in 380ms var(--ease-ios);
+}
+
+.settings-sheet[data-closing] {
+  animation: sheet-down 260ms var(--ease-ios) forwards;
+}
+
+.settings-sheet[data-closing]::backdrop {
+  animation: backdrop-out 260ms var(--ease-ios) forwards;
+}
+
+/*
+ * The settings' subpages: forward, the new page comes in from the right,
+ * back from the left, like a navigation push and pop on iOS.
+ */
+@keyframes page-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(32%);
+  }
+}
+
+@keyframes page-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-32%);
+  }
+}
+
+.settings-page-forward {
+  animation: page-from-right 360ms var(--ease-ios);
+}
+
+.settings-page-back {
+  animation: page-from-left 360ms var(--ease-ios);
+}
+
+/*
+ * Touch feedback at once, as on iOS: rows light up, buttons and links dim
+ * while pressed and fade back when let go. Only on touch screens (a mouse
+ * has its hover states). Zero specificity: a component's own styles win.
+ */
+@media (hover: none) {
+  :where(button, a, summary, [role="button"], label:has(> input[type="radio"]), label:has(> input[type="checkbox"])) {
+    transition: opacity 200ms ease-out;
+  }
+
+  :where(button, a, summary, [role="button"], label:has(> input[type="radio"]), label:has(> input[type="checkbox"])):active:not(:disabled):not(.press-highlight) {
+    opacity: 0.55;
+    transition-duration: 0ms;
+  }
+
+  .press-highlight {
+    transition: background-color 250ms ease-out;
+  }
+
+  .press-highlight:active {
+    background-color: var(--surface-muted);
+    transition-duration: 0ms;
+  }
 }
 
 /* On large screens the settings open as a dialog in the middle. */
@@ -165,9 +257,20 @@ body {
   }
 }
 
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
 @media (min-width: 1024px) and (min-height: 600px) {
   .settings-sheet[open] {
-    animation: dialog-in 200ms ease-out;
+    animation: dialog-in 240ms var(--ease-ios);
+  }
+
+  .settings-sheet[data-closing] {
+    animation: dialog-out 180ms ease-in forwards;
   }
 }
 
@@ -215,6 +318,11 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .settings-sheet[open],
+  .settings-sheet[open]::backdrop,
+  .settings-sheet[data-closing],
+  .settings-sheet[data-closing]::backdrop,
+  .settings-page-forward,
+  .settings-page-back,
   .onboarding[open],
   .app-enter > * {
     animation: none;

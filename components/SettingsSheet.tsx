@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import Link from "next/link";
 import { FeedbackForm } from "@/components/FeedbackForm";
 import { InstallGuide } from "@/components/InstallGuide";
@@ -64,6 +64,13 @@ const LEGAL_LINKS = [
   { label: "Impressum", url: process.env.NEXT_PUBLIC_IMPRESSUM_URL?.trim() || `${SUPPORT_URL}/impressum` },
   { label: "Datenschutz", url: process.env.NEXT_PUBLIC_DATENSCHUTZ_URL?.trim() || `${SUPPORT_URL}/datenschutz` },
 ];
+
+/** The iOS curve (see --ease-ios in app/globals.css) and the durations used with it. */
+const EASE_IOS = "cubic-bezier(0.32, 0.72, 0, 1)";
+const PAGE_MS = 360;
+const CLOSE_MS = 260;
+
+const prefersReducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Dragged this far down (px) or flicked this fast (px/ms), the sheet closes. */
 const CLOSE_DISTANCE = 90;
@@ -166,7 +173,7 @@ const chevron = (
 );
 
 const rowClass =
-  "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-surface-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40";
+  "press-highlight flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-surface-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40";
 
 /** A row in the overview that opens a subpage (or another page of the app). */
 function NavRow({ icon, title, value, ...rest }: {
@@ -284,9 +291,31 @@ export function SettingsSheet({
   // Without an upper-school class there are no teachers to choose.
   const page = wantedPage === "teachers" && !courseFilter ? "main" : wantedPage;
 
+  // Which way the last page change went (for the slide), and the sheet's
+  // height before it, so that it grows or shrinks smoothly instead of jumping.
+  const [direction, setDirection] = useState<"forward" | "back" | null>(null);
+  const heightBefore = useRef<number | null>(null);
+  /** Set when the app itself closes the dialog (see its "close" event). */
+  const closedByApp = useRef(false);
+
+  // Every opening starts at the overview (or the section asked for), also
+  // when it is opened again while still sliding away. Adjusted while
+  // rendering, as React recommends for state that follows a prop.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setChosenPage(null);
+      setDirection(null);
+      setConfirmReset(false);
+    }
+  }
+
   /** Shows another page from its top, with the keyboard focus on it. */
   const goTo = (next: Page) => {
     const from = page;
+    heightBefore.current = dialogRef.current?.offsetHeight ?? null;
+    setDirection(next === "main" ? "back" : "forward");
     setChosenPage(next);
     requestAnimationFrame(() => {
       const dialog = dialogRef.current;
@@ -302,10 +331,29 @@ export function SettingsSheet({
     });
   };
 
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    const from = heightBefore.current;
+    heightBefore.current = null;
+    if (!dialog || from === null || prefersReducedMotion()) {
+      return;
+    }
+    const to = dialog.offsetHeight;
+    if (Math.abs(to - from) > 1) {
+      dialog.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: PAGE_MS, easing: EASE_IOS });
+    }
+  }, [page]);
+
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) {
       return;
+    }
+    if (open && dialog.dataset.closing !== undefined) {
+      // Opened again while still sliding away: it simply stays.
+      delete dialog.dataset.closing;
+      dialog.inert = false;
+      dialog.removeAttribute("aria-hidden");
     }
     if (open && !dialog.open) {
       dialog.style.transform = "";
@@ -317,9 +365,35 @@ export function SettingsSheet({
         dialog.scrollTop = 0;
       }
     } else if (!open && dialog.open) {
-      dialog.close();
+      // Swiped away, or without motion: already out of sight. Otherwise it
+      // slides down first (see .settings-sheet[data-closing]).
+      if (dialog.style.transform === "translateY(100%)" || prefersReducedMotion()) {
+        closedByApp.current = true;
+        dialog.close();
+        return;
+      }
+      dialog.dataset.closing = "";
+      // Out of reach at once: no taps (or screen reader) on what is leaving.
+      dialog.inert = true;
+      dialog.setAttribute("aria-hidden", "true");
+      const finish = () => {
+        if (dialog.dataset.closing !== undefined) {
+          delete dialog.dataset.closing;
+          dialog.inert = false;
+          dialog.removeAttribute("aria-hidden");
+          closedByApp.current = true;
+          dialog.close();
+        }
+      };
+      // Not undone by a later render (e.g. the focus being reset as it
+      // closes): finish() does nothing once the sheet was opened again.
+      dialog.addEventListener("animationend", finish, { once: true });
+      // In case the animation does not run (e.g. a hidden tab).
+      window.setTimeout(finish, CLOSE_MS + 100);
     }
-  }, [open, focus]);
+    // Only opening and closing: the focus is read when it opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   useEffect(() => (open ? lockPageScroll() : undefined), [open]);
 
@@ -406,9 +480,17 @@ export function SettingsSheet({
       // Stays "Einstellungen" on every page.
       aria-label="Einstellungen"
       onClose={() => {
-        setConfirmReset(false);
-        // Opens at the overview (or the section asked for) next time.
-        setChosenPage(null);
+        // The "close" event comes a moment later; if the app closed it, the
+        // app knows already (and the sheet may be open again by now).
+        if (closedByApp.current) {
+          closedByApp.current = false;
+          return;
+        }
+        onClose();
+      }}
+      // Escape: closed by the app, so that it slides away like on "Fertig".
+      onCancel={(event) => {
+        event.preventDefault();
         onClose();
       }}
       // A tap on the dimmed area closes the sheet.
@@ -417,7 +499,7 @@ export function SettingsSheet({
           onClose();
         }
       }}
-      className="settings-sheet fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[85dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-b-0 border-line bg-background p-0 text-foreground shadow-[0_-18px_45px_rgba(18,41,39,0.18)] backdrop:bg-black/40 wide:inset-0 wide:m-auto wide:h-fit wide:max-w-lg wide:rounded-[1.75rem] wide:border-b wide:shadow-[0_24px_60px_rgba(18,41,39,0.25)]"
+      className="settings-sheet fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[85dvh] w-full max-w-md overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-[1.75rem] border border-b-0 border-line bg-background p-0 text-foreground shadow-[0_-18px_45px_rgba(18,41,39,0.18)] backdrop:bg-black/40 wide:inset-0 wide:m-auto wide:h-fit wide:max-w-lg wide:rounded-[1.75rem] wide:border-b wide:shadow-[0_24px_60px_rgba(18,41,39,0.25)]"
     >
       <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         {/* Stays visible while scrolling; swiping it down always closes the sheet. */}
@@ -453,6 +535,8 @@ export function SettingsSheet({
           </div>
         </div>
 
+        {/* New for every page, so that its slide-in runs again. */}
+        <div key={page} className={direction ? `settings-page-${direction}` : undefined}>
         {page === "main" ? (
           <>
             <Setting
@@ -730,6 +814,7 @@ export function SettingsSheet({
             </Card>
           </>
         ) : null}
+        </div>
       </div>
     </dialog>
   );

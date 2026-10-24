@@ -88,7 +88,7 @@ function Choices<T extends string>({ name, legend, options, value, onChange }: {
           return (
             <label
               key={option.value}
-              className="flex cursor-pointer items-center gap-3 px-4 py-3 text-sm font-medium text-foreground transition hover:bg-surface-muted/60 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset has-[:focus-visible]:ring-accent/40"
+              className="press-highlight flex cursor-pointer items-center gap-3 px-4 py-3 text-sm font-medium text-foreground transition hover:bg-surface-muted/60 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset has-[:focus-visible]:ring-accent/40"
             >
               <input
                 type="radio"
