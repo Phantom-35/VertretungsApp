@@ -9,11 +9,13 @@ import { SummarySwitches } from "@/components/SummarySwitches";
 import { Switch } from "@/components/Switch";
 import { TeacherChooser } from "@/components/TeacherFilter";
 import { ThemeChoice } from "@/components/ThemeSettings";
+import { openRoomPlan } from "@/hooks/useRoomPlan";
 import { NEXT_DAY_HOURS, useSettings, type TextSize } from "@/hooks/useSettings";
 import { isStandalone } from "@/lib/device";
 import { SCHOOL_CLASSES } from "@/lib/entries";
 import { NOTIFY_GROUP_LABELS, NOTIFY_GROUPS } from "@/lib/notify";
 import { resetDevice } from "@/lib/reset";
+import { lockPageScroll } from "@/lib/scroll-lock";
 
 export type SettingsFocus = "teachers" | "summaries" | "notifications" | "share" | null;
 
@@ -242,30 +244,6 @@ function Card({ id, title, description, tone = "normal", children }: {
 }
 
 const noSubscribe = () => () => undefined;
-
-/** Keeps the page behind the sheet from scrolling (also on iOS). */
-function lockPageScroll() {
-  const { body, documentElement } = document;
-  const scrollY = window.scrollY;
-  const previous = {
-    position: body.style.position,
-    top: body.style.top,
-    width: body.style.width,
-    overflow: documentElement.style.overflow,
-  };
-  body.style.position = "fixed";
-  body.style.top = `-${scrollY}px`;
-  body.style.width = "100%";
-  documentElement.style.overflow = "hidden";
-  return () => {
-    body.style.position = previous.position;
-    body.style.top = previous.top;
-    body.style.width = previous.width;
-    documentElement.style.overflow = previous.overflow;
-    // At once, not with the page's smooth scrolling.
-    window.scrollTo({ top: scrollY, behavior: "instant" });
-  };
-}
 
 /** Settings as a sheet from the bottom of the screen. */
 export function SettingsSheet({
@@ -726,6 +704,30 @@ export function SettingsSheet({
                   checked={settings.showNewBadges}
                   onChange={(showNewBadges) => updateSettings({ showNewBadges })}
                 />
+              </div>
+            </Setting>
+            <Setting
+              title="Raumplan"
+              description="Tipp in einer Vertretung auf die Raumnummer, dann zeigt dir die App den Raum auf dem Plan der Schule."
+            >
+              <div className="rounded-2xl border border-line bg-card">
+                <Switch
+                  label="Räume auf dem Plan zeigen"
+                  checked={settings.roomPlan === true}
+                  onChange={(roomPlan) => updateSettings({ roomPlan })}
+                />
+                {settings.roomPlan === true ? (
+                  <button
+                    type="button"
+                    onClick={() => openRoomPlan(null)}
+                    className="press-highlight flex w-full items-center justify-between gap-3 border-t border-line px-4 py-3 text-left text-sm font-medium text-accent-strong"
+                  >
+                    Raumplan ansehen
+                    <svg {...iconProps} className="size-4 shrink-0">
+                      <path d="m9 6 6 6-6 6" />
+                    </svg>
+                  </button>
+                ) : null}
               </div>
             </Setting>
           </>

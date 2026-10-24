@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { DaySummary } from "@/components/DaySummary";
 import { FadingStatus } from "@/components/FadingStatus";
 import { CheckedLabel, statusBadges, type HeaderStatus } from "@/components/Header";
@@ -60,6 +61,8 @@ export type DesktopViewProps = {
   opening: boolean;
   /** Not during the introduction, which has its own install step (as on phones). */
   showInstallReminder: boolean;
+  /** The one-time question about the room plan, if due. */
+  roomPlanOffer: ReactNode;
   onRefresh: () => void;
   onOpenSettings: (focus?: SettingsFocus) => void;
   selectedClass: string | null | undefined;
@@ -180,6 +183,7 @@ export function DesktopView(props: DesktopViewProps) {
           />
         ) : null}
         {props.showInstallReminder ? <InstallReminder /> : null}
+        {props.roomPlanOffer}
         {props.waiting ? (
           <p className="rounded-[1.4rem] border border-line bg-card px-5 py-3 text-sm leading-6 text-muted">
             Der nächste Plan ist noch nicht online. Bis die Schule ihn hochlädt, siehst du hier den

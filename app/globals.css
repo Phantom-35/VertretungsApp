@@ -178,19 +178,23 @@ body {
   }
 }
 
-.settings-sheet[open] {
+.settings-sheet[open],
+.room-sheet[open] {
   animation: sheet-up 380ms var(--ease-ios);
 }
 
-.settings-sheet[open]::backdrop {
+.settings-sheet[open]::backdrop,
+.room-sheet[open]::backdrop {
   animation: backdrop-in 380ms var(--ease-ios);
 }
 
-.settings-sheet[data-closing] {
+.settings-sheet[data-closing],
+.room-sheet[data-closing] {
   animation: sheet-down 260ms var(--ease-ios) forwards;
 }
 
-.settings-sheet[data-closing]::backdrop {
+.settings-sheet[data-closing]::backdrop,
+.room-sheet[data-closing]::backdrop {
   animation: backdrop-out 260ms var(--ease-ios) forwards;
 }
 
@@ -265,11 +269,13 @@ body {
 }
 
 @media (min-width: 1024px) and (min-height: 600px) {
-  .settings-sheet[open] {
+  .settings-sheet[open],
+  .room-sheet[open] {
     animation: dialog-in 240ms var(--ease-ios);
   }
 
-  .settings-sheet[data-closing] {
+  .settings-sheet[data-closing],
+  .room-sheet[data-closing] {
     animation: dialog-out 180ms ease-in forwards;
   }
 }
@@ -281,6 +287,17 @@ body {
   to {
     opacity: 1;
   }
+}
+
+/* The marked room on the room plan: a ring that breathes softly. */
+@keyframes room-pulse {
+  50% {
+    stroke-opacity: 0.25;
+  }
+}
+
+.room-pulse {
+  animation: room-pulse 1600ms ease-in-out infinite;
 }
 
 .onboarding[open] {
@@ -325,6 +342,11 @@ body {
   .settings-sheet[open]::backdrop,
   .settings-sheet[data-closing],
   .settings-sheet[data-closing]::backdrop,
+  .room-sheet[open],
+  .room-sheet[open]::backdrop,
+  .room-sheet[data-closing],
+  .room-sheet[data-closing]::backdrop,
+  .room-pulse,
   .settings-page-forward,
   .settings-page-back,
   .onboarding[open],

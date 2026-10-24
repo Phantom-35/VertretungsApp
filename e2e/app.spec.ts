@@ -508,6 +508,91 @@ test("offers no printing in the installed app on an iPhone, where it does nothin
   await iphone.close();
 });
 
+test("asks once about the room plan, then shows the rooms on it", async ({ page }) => {
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const roomButtons = page.getByRole("button", { name: /auf dem Raumplan zeigen$/ });
+  const offer = page.getByRole("complementary", { name: "Neu: Raumplan" });
+  await expect(offer).toBeVisible();
+  // Until it is switched on, the room numbers are plain text.
+  await expect(page.locator("article").first()).toBeVisible();
+  await expect(roomButtons).toHaveCount(0);
+
+  await offer.getByRole("button", { name: "Ja, gerne" }).click();
+  // Then it says how to get there.
+  const confirmation = page.getByRole("complementary", { name: "Raumplan ist an" });
+  await expect(confirmation).toContainText("Raumnummer mit dem Pin-Zeichen");
+  await confirmation.getByRole("button", { name: "Ausprobieren" }).click();
+  const tryIt = page.getByRole("dialog", { name: "Raum 004" });
+  await expect(tryIt).toBeVisible();
+  await tryIt.getByRole("button", { name: "Fertig" }).click();
+  await expect(tryIt).toBeHidden();
+  await confirmation.getByRole("button", { name: "Alles klar" }).click();
+  await expect(confirmation).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Raum 004 auf dem Raumplan zeigen" }).first().click();
+  const sheet = page.getByRole("dialog", { name: "Raum 004" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText("Klassenraum der 5A (deine Klasse)")).toBeVisible();
+  await expect(sheet.getByRole("img", { name: "Erdgeschoss, Raum 004 markiert" })).toBeVisible();
+  // On another floor a hint says where the room is.
+  await sheet.getByText("2. OG", { exact: true }).click();
+  await expect(sheet.getByRole("img", { name: "2. Obergeschoss" })).toBeVisible();
+  await expect(sheet.getByText("Raum 004 ist im Erdgeschoss.")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+
+  // Two rooms in one entry, each on its own; the gym is not on the plan.
+  await chooseClass(page, "9A");
+  await expect(page.getByRole("button", { name: "Raum 248 auf dem Raumplan zeigen" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Raum 249 auf dem Raumplan zeigen" }).first()).toBeVisible();
+  await chooseClass(page, "5D");
+  await expect(page.getByText("TU3", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Raum TU3/ })).toHaveCount(0);
+  await page.getByRole("tab", { name: /Morgen/ }).click();
+  await page.getByRole("button", { name: "Raum 041 auf dem Raumplan zeigen" }).click();
+  await expect(page.getByRole("dialog", { name: "Raum 041" }).getByText("Klassenraum der 6A")).toBeVisible();
+  await page.getByRole("dialog", { name: "Raum 041" }).getByRole("button", { name: "Fertig" }).click();
+
+  // Asked only once.
+  await page.reload();
+  await expect(page.locator("article").first()).toBeVisible();
+  await expect(offer).toHaveCount(0);
+  await chooseClass(page, "5A");
+  await expect(roomButtons.first()).toBeVisible();
+
+  // The whole plan from the settings, and switched off there.
+  const dialog = await openSettings(page, "Anzeige");
+  await dialog.getByRole("button", { name: "Raumplan ansehen" }).click();
+  const plan = page.getByRole("dialog", { name: "Raumplan" });
+  await expect(plan.getByRole("img", { name: "Erdgeschoss" })).toBeVisible();
+  await plan.getByRole("button", { name: "Fertig" }).click();
+  await expect(plan).toBeHidden();
+  const roomSwitch = dialog.getByRole("switch", { name: "Räume auf dem Plan zeigen" });
+  await expect(roomSwitch).toBeChecked();
+  await dialog.getByText("Räume auf dem Plan zeigen").click();
+  await expect(roomSwitch).not.toBeChecked();
+  await expect(dialog.getByRole("button", { name: "Raumplan ansehen" })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(roomButtons).toHaveCount(0);
+  await expect(offer).toHaveCount(0);
+});
+
+test("leaves the rooms as they are after a no to the room plan", async ({ page }) => {
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const offer = page.getByRole("complementary", { name: "Neu: Raumplan" });
+  await offer.getByRole("button", { name: "Nein, danke" }).click();
+  await expect(offer).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator("article").first()).toBeVisible();
+  await expect(offer).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /auf dem Raumplan zeigen$/ })).toHaveCount(0);
+  const dialog = await openSettings(page, "Anzeige");
+  await expect(dialog.getByRole("switch", { name: "Räume auf dem Plan zeigen" })).not.toBeChecked();
+});
+
 test("help and contact: a message to click through, sent with the device details", async ({ page, request }) => {
   const received = async () =>
     (await (await request.get(`${FIXTURE_URL}/__feedback`)).json()) as { text: string }[];

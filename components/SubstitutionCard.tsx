@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { RoomText } from "@/components/RoomText";
 import {
   displayType,
   entryKindHints,
@@ -246,7 +247,7 @@ export function SubstitutionCard({
         {entry.room ? (
           <p className="text-sm text-foreground">
             <span className="text-muted">Raum </span>
-            <span className="font-semibold">{entry.room}</span>
+            <RoomText text={entry.room} />
           </p>
         ) : null}
 
