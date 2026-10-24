@@ -525,7 +525,7 @@ test("asks once about the room plan, over everything, then shows the rooms on it
   await offer.getByRole("button", { name: "Ja, gerne" }).click();
   // Then it says how to get there, and it can be tried at once.
   const confirmation = page.getByRole("dialog", { name: "Raumplan ist an" });
-  await expect(confirmation).toContainText("Raumnummer mit dem Pin-Zeichen");
+  await expect(confirmation).toContainText("neben dem Raum auf „Wo ist das?“");
   await confirmation.getByRole("button", { name: "Ausprobieren" }).click();
   await expect(confirmation).toBeHidden();
   const tryIt = page.getByRole("dialog", { name: "Raum 114" });
@@ -539,7 +539,10 @@ test("asks once about the room plan, over everything, then shows the rooms on it
 
   await chooseClass(page, "5A");
   const roomButtons = page.getByRole("button", { name: /auf dem Raumplan zeigen$/ });
-  await page.getByRole("button", { name: "Raum 004 auf dem Raumplan zeigen" }).first().click();
+  // A button next to the room, saying what it does.
+  const findRoom = page.getByRole("button", { name: /Raum 004 auf dem Raumplan zeigen$/ }).first();
+  await expect(findRoom).toHaveText("Wo ist das? Raum 004 auf dem Raumplan zeigen");
+  await findRoom.click();
   const sheet = page.getByRole("dialog", { name: "Raum 004" });
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText("Klassenraum der 5A (deine Klasse)")).toBeVisible();
@@ -548,18 +551,25 @@ test("asks once about the room plan, over everything, then shows the rooms on it
   await sheet.getByText("2. OG", { exact: true }).click();
   await expect(sheet.getByRole("img", { name: "2. Obergeschoss" })).toBeVisible();
   await expect(sheet.getByText("Raum 004 ist im Erdgeschoss.")).toBeVisible();
+  // The old floor fades away and is gone afterwards; the marker glides along.
+  await expect(sheet.locator(".floor-out-down, .floor-out-up")).toHaveCount(0);
+  await expect(sheet.getByRole("radio", { name: "2. OG" })).toBeChecked();
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
 
-  // Two rooms in one entry, each on its own; the gym is not on the plan.
+  // Two rooms in one entry: one button, both marked.
   await chooseClass(page, "9A");
-  await expect(page.getByRole("button", { name: "Raum 248 auf dem Raumplan zeigen" }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Raum 249 auf dem Raumplan zeigen" }).first()).toBeVisible();
+  await page.getByRole("button", { name: /Räume 248 und 249 auf dem Raumplan zeigen$/ }).first().click();
+  const both = page.getByRole("dialog", { name: "Räume 248 und 249" });
+  await expect(both.getByRole("img", { name: "2. Obergeschoss, Räume 248 und 249 markiert" })).toBeVisible();
+  await both.getByRole("button", { name: "Fertig" }).click();
+  await expect(both).toBeHidden();
+  // The gym is not on the plan: no button.
   await chooseClass(page, "5D");
   await expect(page.getByText("TU3", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Raum TU3/ })).toHaveCount(0);
   await page.getByRole("tab", { name: /Morgen/ }).click();
-  await page.getByRole("button", { name: "Raum 041 auf dem Raumplan zeigen" }).click();
+  await page.getByRole("button", { name: /Raum 041 auf dem Raumplan zeigen$/ }).click();
   await expect(page.getByRole("dialog", { name: "Raum 041" }).getByText("Klassenraum der 6A")).toBeVisible();
   await page.getByRole("dialog", { name: "Raum 041" }).getByRole("button", { name: "Fertig" }).click();
 

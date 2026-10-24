@@ -2,8 +2,8 @@ import { openRoomPlan } from "@/hooks/useRoomPlan";
 import { useSettings } from "@/hooks/useSettings";
 import { splitRooms } from "@/lib/rooms";
 
-/** The map pin that marks a room number as tappable. */
-export function PinIcon({ className = "size-3.5" }: { className?: string }) {
+/** A folded map: the sign for the room plan. */
+export function MapIcon({ className = "size-3.5" }: { className?: string }) {
   return (
     <svg
       aria-hidden
@@ -15,44 +15,43 @@ export function PinIcon({ className = "size-3.5" }: { className?: string }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M12 21s-6.5-5.7-6.5-11.2a6.5 6.5 0 1 1 13 0C18.5 15.3 12 21 12 21z" />
-      <circle cx="12" cy="9.8" r="2.3" />
+      <path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z" />
+      <path d="M9 4v13.5M15 6.5V20" />
     </svg>
   );
 }
 
-export const roomChipClassName =
-  "inline-flex items-center gap-1 rounded-full border border-accent/25 bg-accent-soft px-2 py-px font-semibold text-accent-strong";
+export const findRoomClassName =
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-accent/20 bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-strong";
 
-/** A room number that opens the room plan. */
-export function RoomButton({ id, text = id }: { id: string; text?: string }) {
+/** "Raum 114", "Räume 248 und 249" */
+export function roomsLabel(rooms: readonly string[]) {
+  if (rooms.length === 1) {
+    return `Raum ${rooms[0]}`;
+  }
+  return `Räume ${rooms.slice(0, -1).join(", ")} und ${rooms.at(-1)}`;
+}
+
+/** The rooms of an entry that are on the plan, if the room plan is switched on. */
+export function useRoomsOnPlan(text: string) {
+  const [settings] = useSettings();
+  if (settings.roomPlan !== true || !text) {
+    return [];
+  }
+  return [...new Set(splitRooms(text).flatMap((part) => (part.room ? [part.room.id] : [])))];
+}
+
+/** The button next to the room of an entry: opens the plan with the room marked. */
+export function FindRoomButton({ rooms }: { rooms: readonly string[] }) {
   return (
     <button
       type="button"
-      onClick={() => openRoomPlan(id)}
-      aria-label={`Raum ${text} auf dem Raumplan zeigen`}
-      className={`tap-target ${roomChipClassName} transition active:scale-95`}
+      onClick={() => openRoomPlan(rooms)}
+      className={`tap-target ${findRoomClassName} transition active:scale-95`}
     >
-      {text}
-      <PinIcon />
+      <MapIcon />
+      Wo ist das?
+      <span className="sr-only"> {roomsLabel(rooms)} auf dem Raumplan zeigen</span>
     </button>
-  );
-}
-
-/**
- * The room cell of an entry. With the room plan on, every room on the plan
- * opens it; others (gyms, other buildings) stay plain text.
- */
-export function RoomText({ text }: { text: string }) {
-  const [settings] = useSettings();
-  if (settings.roomPlan !== true) {
-    return <span className="font-semibold">{text}</span>;
-  }
-  return (
-    <span className="font-semibold">
-      {splitRooms(text).map((part, index) =>
-        part.room ? <RoomButton key={index} id={part.room.id} text={part.text} /> : <span key={index}>{part.text}</span>,
-      )}
-    </span>
   );
 }

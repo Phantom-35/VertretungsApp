@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { RoomText } from "@/components/RoomText";
+import { FindRoomButton, useRoomsOnPlan } from "@/components/RoomText";
 import {
   displayType,
   entryKindHints,
@@ -182,6 +182,7 @@ export function SubstitutionCard({
 }: SubstitutionCardProps) {
   const kind = getEntryKind(entry.type);
   const hint = entryKindHints[kind];
+  const roomsOnPlan = useRoomsOnPlan(entry.room);
   // A cancelled lesson is what students look for first: make it stand out.
   const cancelled = kind === "cancelled";
 
@@ -245,10 +246,13 @@ export function SubstitutionCard({
         <TeacherLine teacher={entry.teacher} substitute={entry.substitute} />
 
         {entry.room ? (
-          <p className="text-sm text-foreground">
-            <span className="text-muted">Raum </span>
-            <RoomText text={entry.room} />
-          </p>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <p className="text-sm text-foreground">
+              <span className="text-muted">Raum </span>
+              <span className="font-semibold">{entry.room}</span>
+            </p>
+            {roomsOnPlan.length > 0 ? <FindRoomButton rooms={roomsOnPlan} /> : null}
+          </div>
         ) : null}
 
         {entry.text ? (

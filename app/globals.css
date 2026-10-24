@@ -302,6 +302,54 @@ body {
   }
 }
 
+/*
+ * Changing floors on the room plan: going up, the floor below sinks away
+ * and the new one comes down from above; going down the other way round.
+ */
+@keyframes floor-from-above {
+  from {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.985);
+  }
+}
+
+@keyframes floor-from-below {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+}
+
+@keyframes floor-to-below {
+  to {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+}
+
+@keyframes floor-to-above {
+  to {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.985);
+  }
+}
+
+.floor-in-from-above {
+  animation: floor-from-above 380ms var(--ease-ios) both;
+}
+
+.floor-in-from-below {
+  animation: floor-from-below 380ms var(--ease-ios) both;
+}
+
+.floor-out-down {
+  animation: floor-to-below 260ms var(--ease-ios) forwards;
+}
+
+.floor-out-up {
+  animation: floor-to-above 260ms var(--ease-ios) forwards;
+}
+
 /* The marked room on the room plan: a ring that breathes softly. */
 @keyframes room-pulse {
   50% {

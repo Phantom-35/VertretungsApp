@@ -708,7 +708,7 @@ export function SettingsSheet({
             </Setting>
             <Setting
               title="Raumplan"
-              description="Tipp in einer Vertretung auf die Raumnummer, dann zeigt dir die App den Raum auf dem Plan der Schule."
+              description="In jeder Vertretung steht neben dem Raum „Wo ist das?“. Ein Tipp darauf zeigt dir den Raum auf dem Plan der Schule."
             >
               <div className="rounded-2xl border border-line bg-card">
                 <Switch
@@ -719,7 +719,7 @@ export function SettingsSheet({
                 {settings.roomPlan === true ? (
                   <button
                     type="button"
-                    onClick={() => openRoomPlan(null)}
+                    onClick={() => openRoomPlan()}
                     className="press-highlight flex w-full items-center justify-between gap-3 border-t border-line px-4 py-3 text-left text-sm font-medium text-accent-strong"
                   >
                     Raumplan ansehen

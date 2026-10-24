@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { RoomMap } from "@/components/RoomMap";
-import { PinIcon, roomChipClassName } from "@/components/RoomText";
+import { MapIcon, findRoomClassName } from "@/components/RoomText";
 import { openRoomPlan } from "@/hooks/useRoomPlan";
 import { useSettings } from "@/hooks/useSettings";
 import { findRoom } from "@/lib/rooms";
@@ -10,18 +10,25 @@ const noSubscribe = () => () => undefined;
 /** Closed with Escape: asked again next time the app opens, not now. */
 let postponed = false;
 
-function Chip({ room }: { room: string }) {
+/** How the button looks in an entry, next to the room. */
+function Example({ room }: { room: string }) {
   return (
-    <span className={`${roomChipClassName} mx-0.5 align-middle text-xs`}>
-      {room}
-      <PinIcon className="size-3" />
-    </span>
+    <div aria-hidden className="mt-3 flex items-center gap-2.5 rounded-2xl border border-line bg-card px-3.5 py-2.5">
+      <span className="text-sm text-foreground">
+        <span className="text-muted">Raum </span>
+        <span className="font-semibold">{room}</span>
+      </span>
+      <span className={findRoomClassName}>
+        <MapIcon />
+        Wo ist das?
+      </span>
+    </div>
   );
 }
 
 /**
- * Asks once, over everything, whether room numbers should open the room
- * plan; after a "yes" it shows how (the pin on the room numbers) and lets
+ * Asks once, over everything, whether entries should get a button that
+ * shows their room on the room plan; after a "yes" it shows how and lets
  * people try it. Later the switch is in Settings → Anzeige.
  */
 export function RoomPlanOffer({ ready, exampleRoom }: { ready: boolean; exampleRoom: string | null }) {
@@ -73,7 +80,7 @@ export function RoomPlanOffer({ ready, exampleRoom }: { ready: boolean; exampleR
       {open ? (
         <div className="p-5">
           <div aria-hidden className="overflow-hidden rounded-2xl border border-line bg-card p-2">
-            <RoomMap floor={exampleFloor} marked={example} className="block h-auto w-full" />
+            <RoomMap floor={exampleFloor} marked={[example]} className="block h-auto w-full" />
           </div>
           {step === "ask" ? (
             <>
@@ -82,9 +89,10 @@ export function RoomPlanOffer({ ready, exampleRoom }: { ready: boolean; exampleR
                 Raumplan
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted">
-                Soll die App dir zeigen, wo ein Raum ist? Dann tippst du in einer Vertretung auf die Raumnummer, z. B.{" "}
-                <Chip room={example} />, und siehst den Raum auf dem Plan der Schule.
+                Soll die App dir zeigen, wo ein Raum ist? Dann steht in jeder Vertretung neben dem Raum der Knopf „Wo ist
+                das?“. Ein Tipp darauf zeigt dir den Raum auf dem Plan der Schule.
               </p>
+              <Example room={example} />
               <div className="mt-5 flex flex-col gap-2">
                 <button
                   type="button"
@@ -117,15 +125,15 @@ export function RoomPlanOffer({ ready, exampleRoom }: { ready: boolean; exampleR
                 Raumplan ist an
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted">
-                So geht’s: Tipp in einer Vertretung auf die Raumnummer mit dem Pin-Zeichen, z. B. <Chip room={example} />{" "}
-                – dann siehst du, wo der Raum ist.
+                So geht’s: Tipp in einer Vertretung neben dem Raum auf „Wo ist das?“ – dann siehst du, wo der Raum ist.
               </p>
+              <Example room={example} />
               <div className="mt-5 flex flex-col gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setStep("closed");
-                    openRoomPlan(example);
+                    openRoomPlan([example]);
                   }}
                   className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
                 >

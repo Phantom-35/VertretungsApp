@@ -175,10 +175,11 @@ function ClusterTag({ cluster, text }: { cluster: Cluster; text: string }) {
   );
 }
 
-/** One floor of the main building, a room marked if given. */
-export function RoomMap({ floor, marked, className }: { floor: Floor; marked: string | null; className?: string }) {
+/** One floor of the main building, the given rooms marked (those on this floor). */
+export function RoomMap({ floor, marked, className }: { floor: Floor; marked: readonly string[]; className?: string }) {
   const shapes = FLOOR_PLANS[floor];
-  const markedShape = marked ? shapes.find((shape) => shape.id === marked) : undefined;
+  const markedShapes = shapes.filter((shape) => shape.id && marked.includes(shape.id));
+  const markedIds = markedShapes.map((shape) => shape.id!);
   const clusterNames = CLUSTERS.map((cluster) => {
     const ids = shapes.filter((shape) => shape.id && clusterOf(shape) === cluster).map((shape) => shape.id!);
     return [cluster, CLUSTER_NAMES[floor][cluster] ?? gradeOfRooms(ids)] as const;
@@ -186,7 +187,9 @@ export function RoomMap({ floor, marked, className }: { floor: Floor; marked: st
   return (
     <svg
       role="img"
-      aria-label={`${floorName(floor)}${markedShape ? `, Raum ${marked} markiert` : ""}`}
+      aria-label={`${floorName(floor)}${
+        markedIds.length === 1 ? `, Raum ${markedIds[0]} markiert` : markedIds.length > 1 ? `, Räume ${markedIds.join(" und ")} markiert` : ""
+      }`}
       viewBox={`-6 -32 ${PLAN_WIDTH + 12} ${PLAN_HEIGHT + 64}`}
       className={className}
       fontFamily="inherit"
@@ -201,7 +204,7 @@ export function RoomMap({ floor, marked, className }: { floor: Floor; marked: st
         className="fill-background-soft stroke-foreground/30"
       />
       {shapes.map((shape, index) => {
-        const isMarked = shape === markedShape;
+        const isMarked = markedShapes.includes(shape);
         const cluster = clusterOf(shape);
         const fill = cluster && (shape.kind === "room" || shape.kind === "space") ? clusterFills[cluster] : fills[shape.kind];
         return (
@@ -244,18 +247,19 @@ export function RoomMap({ floor, marked, className }: { floor: Floor; marked: st
         </>
       ) : null}
       {clusterNames.map(([cluster, text]) => (text ? <ClusterTag key={cluster} cluster={cluster} text={text} /> : null))}
-      {markedShape ? (
+      {markedShapes.map((shape) => (
         <rect
-          x={markedShape.x - 5}
-          y={markedShape.y - 5}
-          width={markedShape.w + 10}
-          height={markedShape.h + 10}
+          key={shape.id}
+          x={shape.x - 5}
+          y={shape.y - 5}
+          width={shape.w + 10}
+          height={shape.h + 10}
           rx={7}
           fill="none"
           strokeWidth={3}
           className="room-pulse stroke-accent"
         />
-      ) : null}
+      ))}
     </svg>
   );
 }

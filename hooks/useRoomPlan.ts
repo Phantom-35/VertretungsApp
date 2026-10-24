@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
-/** What the room plan shows: a room (marked), or null for the plan alone. */
-export type RoomPlanRequest = { room: string | null; id: number };
+/** What the room plan shows: the rooms of an entry (marked), or none for the plan alone. */
+export type RoomPlanRequest = { rooms: readonly string[]; id: number };
 
 let request: RoomPlanRequest | null = null;
 let count = 0;
@@ -12,9 +12,9 @@ function emit() {
 }
 
 /** Opens the room plan from anywhere (a card, the settings, the offer). */
-export function openRoomPlan(room: string | null) {
+export function openRoomPlan(rooms: readonly string[] = []) {
   count += 1;
-  request = { room, id: count };
+  request = { rooms, id: count };
   emit();
 }
 
