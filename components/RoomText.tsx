@@ -35,7 +35,7 @@ export function roomsLabel(rooms: readonly string[]) {
 /** The rooms of an entry that are on the plan, if the room plan is switched on. */
 export function useRoomsOnPlan(text: string) {
   const [settings] = useSettings();
-  if (settings.roomPlan !== true || !text) {
+  if (!settings.roomPlanButton || !text) {
     return [];
   }
   return [...new Set(splitRooms(text).flatMap((part) => (part.room ? [part.room.id] : [])))];

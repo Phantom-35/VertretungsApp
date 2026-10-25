@@ -713,10 +713,10 @@ export function SettingsSheet({
               <div className="rounded-2xl border border-line bg-card">
                 <Switch
                   label="Räume auf dem Plan zeigen"
-                  checked={settings.roomPlan === true}
-                  onChange={(roomPlan) => updateSettings({ roomPlan })}
+                  checked={settings.roomPlanButton}
+                  onChange={(roomPlanButton) => updateSettings({ roomPlanButton })}
                 />
-                {settings.roomPlan === true ? (
+                {settings.roomPlanButton ? (
                   <button
                     type="button"
                     onClick={() => openRoomPlan()}

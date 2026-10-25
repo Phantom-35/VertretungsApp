@@ -19,8 +19,8 @@ export type Settings = {
   nextDayFromHour: number;
   /** "Neu" badges for changes since the last visit. */
   showNewBadges: boolean;
-  /** Room numbers open the room plan; null until asked once. */
-  roomPlan: boolean | null;
+  /** "Wo ist das?" next to the rooms, opening the room plan. */
+  roomPlanButton: boolean;
   textSize: TextSize;
   /** Kinds of changes push notifications are sent for. */
   notifyGroups: NotifyGroup[];
@@ -43,7 +43,7 @@ export const NEXT_DAY_HOURS = [0, 14, 15, 16, 17, 24] as const;
 const DEFAULTS: Settings = {
   nextDayFromHour: NEXT_DAY_FROM_HOUR,
   showNewBadges: true,
-  roomPlan: null,
+  roomPlanButton: true,
   textSize: "normal",
   notifyGroups: [...NOTIFY_GROUPS],
   eveningSummary: false,
@@ -68,7 +68,8 @@ function parse(raw: string | null): Settings {
         : DEFAULTS.nextDayFromHour,
       showNewBadges:
         typeof stored.showNewBadges === "boolean" ? stored.showNewBadges : DEFAULTS.showNewBadges,
-      roomPlan: typeof stored.roomPlan === "boolean" ? stored.roomPlan : null,
+      // On for everyone; the earlier "roomPlan" (a yes/no question) no longer counts.
+      roomPlanButton: stored.roomPlanButton !== false,
       textSize: stored.textSize === "large" ? "large" : "normal",
       notifyGroups: parseNotifyGroups(stored.notifyGroups) ?? DEFAULTS.notifyGroups,
       eveningSummary: stored.eveningSummary === true,

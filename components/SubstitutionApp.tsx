@@ -15,7 +15,7 @@ import { RefreshStatus } from "@/components/RefreshStatus";
 import { ShareButton } from "@/components/ShareButton";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
 import { InstallReminder } from "@/components/InstallReminder";
-import { RoomPlanOffer } from "@/components/RoomPlanOffer";
+import { RoomPlanIntro } from "@/components/RoomPlanIntro";
 import { RoomPlanSheet } from "@/components/RoomPlanSheet";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { Onboarding } from "@/components/Onboarding";
@@ -454,9 +454,9 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
       appUrl: classLink(window.location.origin, selectedClass ?? ""),
       notices: visibleNotices,
     });
-  // Asked once, over everything, when the app opens; not right after the
+  // Told once, over everything, when the app opens; not right after the
   // introduction (that is enough for one visit) and not over the settings.
-  const showRoomPlanOffer = onboarding.done && !introducedNow && !settingsOpen && !opensFromAddress;
+  const showRoomPlanIntro = onboarding.done && !introducedNow && !settingsOpen && !opensFromAddress;
   const exampleRoom = firstKnownRoom(visibleEntries.map((entry) => entry.room));
   const emptyDayLabel = selectedDay
     ? `Am ${selectedDay.dayLabel ?? formatPlanDateLabel(selectedDay.date, null)}`
@@ -777,7 +777,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
         }}
       />
       <RoomPlanSheet myClass={myClass ?? null} />
-      <RoomPlanOffer ready={showRoomPlanOffer} exampleRoom={exampleRoom} />
+      <RoomPlanIntro ready={showRoomPlanIntro} exampleRoom={exampleRoom} />
       {!onboarding.done ? (
         <Onboarding
           myClass={myClass ?? null}
