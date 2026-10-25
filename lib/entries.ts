@@ -291,6 +291,35 @@ export function entryMatchesTeachers(
 }
 
 /**
+ * Some rows name no class, only a teacher (e.g. a course the plan gives no
+ * class for). Nobody can tell whose they are, except upper-school students
+ * who chose that teacher as one of their courses: they get them.
+ */
+export function classlessEntryFor(
+  entry: Pick<SubstitutionEntry, "className" | "teacher" | "text">,
+  schoolClass: string,
+  teachers: readonly string[],
+) {
+  return (
+    !entry.className &&
+    isCourseClass(schoolClass) &&
+    teachers.length > 0 &&
+    courseTeachers(entry).some((teacher) => teachers.includes(teacher))
+  );
+}
+
+/** Whether an entry is for a student: their class (and courses), or a classless row of one of their courses. */
+export function entryForStudent(
+  entry: Pick<SubstitutionEntry, "className" | "teacher" | "text">,
+  schoolClass: string,
+  teachers: readonly string[],
+) {
+  return entry.className
+    ? entryAppliesToClass(entry.className, schoolClass) && entryMatchesTeachers(entry, teachers)
+    : classlessEntryFor(entry, schoolClass, teachers);
+}
+
+/**
  * The place in the timetable an entry is about: date, class and lesson. In
  * the upper school one lesson holds many courses, so the course (its
  * teachers) is part of it; otherwise unrelated courses would be paired as

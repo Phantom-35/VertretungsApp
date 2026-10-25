@@ -1,7 +1,6 @@
 import {
   displayType,
-  entryAppliesToClass,
-  entryMatchesTeachers,
+  entryForStudent,
   getEntryKind,
   isCourseClass,
   isOpenSubstitute,
@@ -62,9 +61,7 @@ export function isRelevant(entry: KeyedEntry, audience: Audience, now: number) {
     entry.date > today || (entry.date === today && schoolHour(now) < NEXT_DAY_FROM_HOUR);
   const teachers = isCourseClass(audience.schoolClass) ? audience.teachers : [];
   return (
-    dayAhead &&
-    entryAppliesToClass(entry.className, audience.schoolClass) &&
-    entryMatchesTeachers(entry, teachers)
+    dayAhead && entryForStudent(entry, audience.schoolClass, teachers)
   );
 }
 
@@ -280,9 +277,7 @@ export function buildSummary(
   const own = unique
     .filter(
       (entry) =>
-        entry.date === date &&
-        entryAppliesToClass(entry.className, audience.schoolClass) &&
-        entryMatchesTeachers(entry, teachers),
+        entry.date === date && entryForStudent(entry, audience.schoolClass, teachers),
     )
     .sort((left, right) => lessonStart(left.lesson) - lessonStart(right.lesson));
   const day = dayLabel(date, now);

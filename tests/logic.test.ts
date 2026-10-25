@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   cancelledFirstLessons,
+  classlessEntryFor,
+  entryForStudent,
   courseTeachers,
   entryAppliesToClass,
   entryMatchesTeachers,
@@ -403,6 +405,12 @@ describe("share text", () => {
     expect(formatShareBlock({ ...base, substitute: "???" }, "5A")).toBe("❓ *1. Std.* · Vertretung\nLehrkraft noch offen");
   });
 
+  it("leaves out an empty class", () => {
+    expect(formatShareBlock({ ...base, className: "", teacher: "JUN", type: "Entfall" }, "Q1")).toBe(
+      "❌ *1. Std.* · Entfall\nLehrkraft JUN",
+    );
+  });
+
   it("says when the room is not decided yet", () => {
     expect(formatShareBlock({ ...base, type: "Raum-Vtr.", teacher: "EBT", substitute: "EBT", room: "???" }, "5A")).toBe(
       "🚪 *1. Std.* · Raumänderung\nLehrkraft EBT · Raum noch offen",
@@ -434,5 +442,23 @@ describe("cancelledFirstLessons", () => {
     // Self-study is no lesson off.
     expect(cancelledFirstLessons([e("1 - 2", "EVA")])).toBeNull();
     expect(cancelledFirstLessons([])).toBeNull();
+  });
+});
+
+describe("rows without a class", () => {
+  const classless = { className: "", teacher: "JUN", text: "" };
+
+  it("belong to upper-school students who chose that teacher, nobody else", () => {
+    expect(classlessEntryFor(classless, "Q1", ["JUN", "RUK"])).toBe(true);
+    expect(entryForStudent(classless, "EF", ["JUN"])).toBe(true);
+    // Without a chosen course nobody can tell whose they are.
+    expect(classlessEntryFor(classless, "Q1", [])).toBe(false);
+    expect(classlessEntryFor(classless, "Q1", ["RUK"])).toBe(false);
+    expect(classlessEntryFor(classless, "9A", ["JUN"])).toBe(false);
+    expect(classlessEntryFor({ ...classless, teacher: "" }, "Q1", ["JUN"])).toBe(false);
+    // Rows with a class are judged as before.
+    expect(entryForStudent({ className: "Q1", teacher: "ABC", text: "" }, "Q1", ["JUN"])).toBe(false);
+    expect(entryForStudent({ className: "Q1", teacher: "JUN", text: "" }, "Q1", ["JUN"])).toBe(true);
+    expect(entryForStudent({ className: "09AB", teacher: "JUN", text: "" }, "9A", [])).toBe(true);
   });
 });

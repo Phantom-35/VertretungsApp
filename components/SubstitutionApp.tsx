@@ -33,6 +33,7 @@ import { useWideScreen } from "@/hooks/useWideScreen";
 import {
   SCHOOL_CLASSES,
   compareEntries,
+  classlessEntryFor,
   entryAppliesToClass,
   entryMatchesTeachers,
   formatClassName,
@@ -370,7 +371,12 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const classEntries =
     data && selectedClass
       ? data.entries
-          .filter((entry) => entryAppliesToClass(entry.className, selectedClass))
+          // A classless row only if it is one of the chosen courses (see classlessEntryFor).
+          .filter((entry) =>
+            entry.className
+              ? entryAppliesToClass(entry.className, selectedClass)
+              : classlessEntryFor(entry, selectedClass, teachers),
+          )
           .sort(compareEntries)
       : [];
   // Upper school: only the courses of the student's teachers, unless asked.

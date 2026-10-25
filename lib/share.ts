@@ -80,7 +80,7 @@ export function formatShareBlock(entry: DescribedEntry, schoolClass: string) {
     roomLabel(entry.room),
   ].filter(Boolean);
   return [
-    `${symbol} *${lessonLabel(entry.lesson)}* · ${displayType(entry.type)}${className !== schoolClass ? ` (${className})` : ""}`,
+    `${symbol} *${lessonLabel(entry.lesson)}* · ${displayType(entry.type)}${className && className !== schoolClass ? ` (${className})` : ""}`,
     ...(details.length > 0 ? [details.join(" · ")] : []),
     ...(entry.text ? [`„${entry.text}“`] : []),
   ].join("\n");

@@ -36,6 +36,25 @@ describe("fetchSubstitutionData", () => {
     expect(data.diagnostics).toEqual([]);
   });
 
+  it("keeps rows without a class when they name a lesson and a teacher", async () => {
+    // As on the live plan of 03.11.2026: two cancelled lessons of JUN, no class.
+    const row = (lesson: string, teacher: string, text = "&nbsp;") =>
+      `<tr class='list odd'><td class="list" align="center">&nbsp;</td><td class="list" align="center">${lesson}</td><td class="list" align="center">Entfall</td><td class="list" align="center">---</td><td class="list">${text}</td><td class="list" align="center">${teacher}</td><td class="list" align="center">---</td></tr>`;
+    const pages = allFixturePages();
+    pages[1] = pages[1].replace(/(<tr class='list odd'>)/, `${row("3", "JUN")}${row("4", "JUN")}${row("", "&nbsp;", "Hinweis")}$1`);
+    mockSchoolServer(pages);
+    const data = await fetchSubstitutionData();
+    const classless = data.entries.filter((entry) => !entry.className);
+    expect(classless.map((entry) => [entry.lesson, entry.teacher])).toEqual([
+      ["3", "JUN"],
+      ["4", "JUN"],
+    ]);
+    // Not a class to choose.
+    expect(data.classes).not.toContain("");
+    // The self-check counts only the row without a lesson and a teacher, not the two.
+    expect(data.diagnostics).toEqual(["Seite 1: 1 Einträge ohne gültige Klasse oder Stunde."]);
+  });
+
   // The split of days and pages changes every day; none of it is hard-coded.
   it.each([
     {

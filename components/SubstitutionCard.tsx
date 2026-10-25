@@ -224,7 +224,7 @@ export function SubstitutionCard({
           {isNew ? <NewBadge onSeen={onNewSeen} /> : null}
           {showClassName ? (
             <span className="text-xs font-medium text-muted">
-              {formatClassName(entry.className)}
+              {entry.className ? formatClassName(entry.className) : "ohne Klasse im Plan"}
             </span>
           ) : null}
         </div>

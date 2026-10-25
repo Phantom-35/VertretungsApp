@@ -1,5 +1,5 @@
 import { reportPlanProblems } from "@/lib/alert";
-import { lessonStart } from "@/lib/entries";
+import { courseTeachers, lessonStart } from "@/lib/entries";
 import { normalizeWhitespace, parseSubstitutionPage } from "@/lib/parser";
 import { SCHOOL_PLAN_BASE_URL, SCHOOL_PLAN_FALLBACK_BASE_URL } from "@/lib/school";
 import { reportPlanSource } from "@/lib/source-switch";
@@ -362,9 +362,10 @@ export function checkParsedPages(pages: ParsedPage[]) {
 
     // A lesson without a number means the columns were mapped wrongly.
     // A few such rows (e.g. an all-day event, also on a short last page) are
-    // normal; many of them, making up most of the page, are not.
+    // normal; many of them, making up most of the page, are not. A row with
+    // a teacher but no class is fine (see classlessEntryFor).
     const implausible = entries.filter(
-      (entry) => !entry.className || !/\d/.test(entry.lesson),
+      (entry) => !/\d/.test(entry.lesson) || (!entry.className && courseTeachers(entry).length === 0),
     ).length;
     if (implausible > 0) {
       (implausible >= 3 && implausible * 2 >= entries.length ? problems : notes).push(
@@ -440,8 +441,12 @@ async function fetchFrom(base: string): Promise<{ payload: SubstitutionPayload; 
   // /api/health, not a reason to warn that the plan may be incomplete.
   await reportPlanProblems(problems);
 
+  // Rows without a class are kept when they name a lesson and a teacher:
+  // upper-school students with that teacher's course get them.
   const allEntries = sortEntries(
-    fetchedPages.flatMap((page) => page.entries).filter((entry) => entry.className),
+    fetchedPages
+      .flatMap((page) => page.entries)
+      .filter((entry) => entry.className || (/\d/.test(entry.lesson) && courseTeachers(entry).length > 0)),
   );
   const classes = Array.from(
     new Set(allEntries.map((entry) => entry.className).filter(Boolean)),

@@ -182,6 +182,13 @@ describe("who is told about what", () => {
     expect(isRelevant(entry({}), { schoolClass: "5A", teachers: ["KER"] }, MORNING)).toBe(true);
   });
 
+  it("tells about rows without a class only those who chose that teacher's course", () => {
+    const classless = entry({ className: "", teacher: "JUN" });
+    expect(isRelevant(classless, { schoolClass: "Q1", teachers: ["JUN"] }, MORNING)).toBe(true);
+    expect(isRelevant(classless, { schoolClass: "Q1", teachers: [] }, MORNING)).toBe(false);
+    expect(isRelevant(classless, { schoolClass: "9A", teachers: [] }, MORNING)).toBe(false);
+  });
+
   it("only reports today's changes until school is out", () => {
     const today = entry({ date: TODAY });
     const audience = { schoolClass: "5A", teachers: [] };

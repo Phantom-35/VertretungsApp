@@ -531,6 +531,39 @@ test("says when the room is not decided yet (??? in the plan)", async ({ browser
   await context.close();
 });
 
+test("shows a row without a class to the upper-school students of that teacher", async ({ browser }) => {
+  // Without the service worker, so that the plan goes through page.route.
+  const context = await browser.newContext({ serviceWorkers: "block" });
+  await context.addInitScript(() => localStorage.setItem("kag:teachers:Q1", JSON.stringify(["RUK"])));
+  const page = await context.newPage();
+  await page.clock.setFixedTime(TODAY);
+  // As on the live plan of 03.11.2026: a cancelled lesson with a teacher, but no class.
+  const row = { className: "", lesson: "6", type: "Entfall", substitute: "", teacher: "RUK", room: "", subject: "", text: "", date: "2026-10-08", page: 1, id: "1||6|Entfall||RUK|||" };
+  const addRow = async (route: Route) => {
+    const response = await route.fetch();
+    const json = JSON.stringify(row);
+    const body = (await response.text())
+      .replace('"entries":[', `"entries":[${json},`)
+      .replace('\\"entries\\":[', `\\"entries\\":[${json.replaceAll('"', '\\"')},`);
+    await route.fulfill({ response, body });
+  };
+  await page.route((url) => url.pathname === "/", addRow);
+  await page.route((url) => url.pathname === "/api/substitution", addRow);
+  await page.goto("/");
+  await chooseClass(page, "Q1");
+  const card = page.locator("article").filter({ hasText: "ohne Klasse im Plan" });
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText("Entfall");
+  await expect(card).toContainText("RUK");
+  // Nobody else can tell it is theirs.
+  await chooseClass(page, "Q2");
+  await expect(page.locator("article").first()).toBeVisible();
+  await expect(page.locator("article").filter({ hasText: "ohne Klasse im Plan" })).toHaveCount(0);
+  await chooseClass(page, "5A");
+  await expect(page.locator("article").filter({ hasText: "ohne Klasse im Plan" })).toHaveCount(0);
+  await context.close();
+});
+
 /** Opens the app as on the first start after the update: the note about the room plan not seen yet. */
 async function openUnseen(page: Page) {
   await page.goto("/");
