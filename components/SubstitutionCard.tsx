@@ -23,6 +23,8 @@ type SubstitutionCardProps = {
   compact?: boolean;
   /** The "Neu" badge was on screen long enough and has faded out. */
   onNewSeen?: () => void;
+  /** Today's lesson is already over: paler, without its colours. */
+  over?: boolean;
 };
 
 /** How long a "Neu" badge stays once it is fully on screen. */
@@ -180,6 +182,7 @@ export function SubstitutionCard({
   isNew = false,
   compact = false,
   onNewSeen,
+  over = false,
 }: SubstitutionCardProps) {
   const kind = getEntryKind(entry.type);
   const hint = entryKindHints[kind];
@@ -189,11 +192,16 @@ export function SubstitutionCard({
 
   return (
     <article
-      className={`flex border bg-[linear-gradient(180deg,var(--entry-from),var(--entry-to))] ${
-        compact
-          ? "gap-3 rounded-[1.3rem] p-3 shadow-[0_10px_24px_rgba(18,41,39,0.07)]"
-          : "gap-4 rounded-[1.6rem] p-4 shadow-[0_18px_40px_rgba(18,41,39,0.08)]"
-      } ${cancelled ? "border-warn/40" : "border-edge"}`}
+      // Over: grey and flat instead of faded, so the text keeps its contrast.
+      className={`flex border bg-[linear-gradient(180deg,var(--entry-from),var(--entry-to))] transition-[filter,box-shadow,border-color] duration-700 ${
+        compact ? "gap-3 rounded-[1.3rem] p-3" : "gap-4 rounded-[1.6rem] p-4"
+      } ${
+        over
+          ? "border-line shadow-none grayscale"
+          : `${compact ? "shadow-[0_10px_24px_rgba(18,41,39,0.07)]" : "shadow-[0_18px_40px_rgba(18,41,39,0.08)]"} ${
+              cancelled ? "border-warn/40" : "border-edge"
+            }`
+      }`}
     >
       <div
         className={`flex shrink-0 flex-col items-center justify-center ${
@@ -222,6 +230,7 @@ export function SubstitutionCard({
             {displayType(entry.type)}
           </span>
           {isNew ? <NewBadge onSeen={onNewSeen} /> : null}
+          {over ? <span className="text-xs font-medium text-muted">vorbei</span> : null}
           {showClassName ? (
             <span className="text-xs font-medium text-muted">
               {entry.className ? formatClassName(entry.className) : "ohne Klasse im Plan"}

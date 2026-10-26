@@ -47,7 +47,7 @@ import { freeUntil, holidayBreakAt, nextSchoolDay } from "@/lib/holidays";
 import { firstKnownRoom } from "@/lib/rooms";
 import { entryKey, findNewKeys } from "@/lib/seen";
 import { buildShareText, classLink } from "@/lib/share";
-import { daysBetween, pickDefaultDate, schoolHour, schoolToday } from "@/lib/time";
+import { daysBetween, isLessonOver, pickDefaultDate, schoolHour, schoolToday } from "@/lib/time";
 import type { PlanDay, SubstitutionPayload } from "@/lib/types";
 
 type SubstitutionAppProps = {
@@ -704,6 +704,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
                         onNewSeen={() => acknowledgeNewEntry(entryKey(entry))}
                         showClassName={formatClassName(entry.className) !== selectedClass}
                         compact={compactCards}
+                        over={now !== null && isLessonOver(entry, now)}
                       />
                     ))}
                   </div>

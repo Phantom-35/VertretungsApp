@@ -101,3 +101,35 @@ export function pickDefaultDate(
   const upcoming = dates.find((date) => (afterSchool ? date > today : date >= today));
   return upcoming ?? dates[dates.length - 1];
 }
+
+/**
+ * The school's lesson times (end of each lesson, minutes after midnight),
+ * from the timetable 2026/27: 1. 7:50–8:35 … 9. 14:50–15:35. Later lessons
+ * have no known end and are never "over".
+ */
+const LESSON_ENDS: Record<number, number> = {
+  1: 8 * 60 + 35,
+  2: 9 * 60 + 25,
+  3: 10 * 60 + 30,
+  4: 11 * 60 + 15,
+  5: 12 * 60 + 20,
+  6: 13 * 60 + 5,
+  7: 14 * 60 + 5,
+  8: 14 * 60 + 50,
+  9: 15 * 60 + 35,
+};
+
+/** When "3 - 4" ends (the last lesson it names), or null if unknown. */
+export function lessonEnd(lesson: string) {
+  const numbers = lesson.match(/\d+/g);
+  return numbers ? (LESSON_ENDS[Number(numbers.at(-1))] ?? null) : null;
+}
+
+/** Today's lesson that is already over: shown paler, the ones still ahead stand out. */
+export function isLessonOver(entry: { date: string; lesson: string }, now: number) {
+  if (entry.date !== schoolToday(now)) {
+    return false;
+  }
+  const end = lessonEnd(entry.lesson);
+  return end !== null && schoolMinutes(now) >= end;
+}

@@ -28,6 +28,7 @@ import {
 import type { HolidayBreak } from "@/lib/holidays";
 import { entryKey } from "@/lib/seen";
 import { buildShareText, classLink } from "@/lib/share";
+import { isLessonOver } from "@/lib/time";
 import type { PlanDay, SubstitutionEntry, SubstitutionPayload } from "@/lib/types";
 
 /** From this many changes on a day, the cards are shown smaller (as on phones). */
@@ -593,6 +594,7 @@ function DayColumn({
                   onNewSeen={() => onNewSeen(entryKey(entry))}
                   showClassName={formatClassName(entry.className) !== selectedClass}
                   compact={compact}
+                  over={now !== null && isLessonOver(entry, now)}
                 />
               ))}
             </div>

@@ -564,6 +564,26 @@ test("shows a row without a class to the upper-school students of that teacher",
   await context.close();
 });
 
+test("shows today's lessons that are already over paler", async ({ page }) => {
+  // 9:00: the 1st lesson (until 8:35) is over, the 2nd (until 9:25) is not.
+  await page.clock.setFixedTime(new Date("2026-10-08T09:00:00+02:00"));
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const first = page.locator("article").filter({ hasText: "1. Stunde" }).first();
+  const second = page.locator("article").filter({ hasText: "2. Stunde" }).first();
+  await expect(first).toContainText("vorbei");
+  await expect(first).toHaveClass(/grayscale/);
+  await expect(second).not.toContainText("vorbei");
+  await expect(second).not.toHaveClass(/grayscale/);
+  // Later in the day the 2nd is over as well; tomorrow's lessons never are.
+  await page.clock.setFixedTime(new Date("2026-10-08T09:26:00+02:00"));
+  await page.reload();
+  await expect(page.locator("article").filter({ hasText: "2. Stunde" }).first()).toContainText("vorbei");
+  await page.getByRole("tab", { name: /Morgen/ }).click();
+  await expect(page.locator("article").first()).toBeVisible();
+  await expect(page.getByText("vorbei", { exact: true })).toHaveCount(0);
+});
+
 /** Opens the app as on the first start after the update: the note about the room plan not seen yet. */
 async function openUnseen(page: Page) {
   await page.goto("/");

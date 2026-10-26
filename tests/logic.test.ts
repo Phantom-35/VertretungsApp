@@ -17,6 +17,8 @@ import {
 import { formatDayMonth, formatPlanDateLabel, formatWeekday, isPastDate, relativeDayLabel } from "@/lib/format";
 import {
   daysBetween,
+  isLessonOver,
+  lessonEnd,
   pickDefaultDate,
   schoolHour,
   schoolLocalToIso,
@@ -460,5 +462,33 @@ describe("rows without a class", () => {
     expect(entryForStudent({ className: "Q1", teacher: "ABC", text: "" }, "Q1", ["JUN"])).toBe(false);
     expect(entryForStudent({ className: "Q1", teacher: "JUN", text: "" }, "Q1", ["JUN"])).toBe(true);
     expect(entryForStudent({ className: "09AB", teacher: "JUN", text: "" }, "9A", [])).toBe(true);
+  });
+});
+
+describe("lessons already over", () => {
+  // 08.10.2026 in Meckenheim (summer time, UTC+2).
+  const at = (time: string) => Date.parse(`2026-10-08T${time}:00+02:00`);
+  const today = (lesson: string) => ({ date: "2026-10-08", lesson });
+
+  it("knows when a lesson ends, from the school's times", () => {
+    expect(lessonEnd("1")).toBe(8 * 60 + 35);
+    expect(lessonEnd("3 - 4")).toBe(11 * 60 + 15);
+    expect(lessonEnd("5-6")).toBe(13 * 60 + 5);
+    expect(lessonEnd("9")).toBe(15 * 60 + 35);
+    // Unknown: never over.
+    expect(lessonEnd("10")).toBeNull();
+    expect(lessonEnd("")).toBeNull();
+  });
+
+  it("are today's lessons whose end has passed", () => {
+    expect(isLessonOver(today("1"), at("08:34"))).toBe(false);
+    expect(isLessonOver(today("1"), at("08:35"))).toBe(true);
+    // A double lesson only after its second part.
+    expect(isLessonOver(today("3 - 4"), at("10:31"))).toBe(false);
+    expect(isLessonOver(today("3 - 4"), at("11:15"))).toBe(true);
+    // Other days never.
+    expect(isLessonOver({ date: "2026-10-09", lesson: "1" }, at("16:00"))).toBe(false);
+    expect(isLessonOver({ date: "2026-10-07", lesson: "1" }, at("16:00"))).toBe(false);
+    expect(isLessonOver(today("?"), at("16:00"))).toBe(false);
   });
 });
