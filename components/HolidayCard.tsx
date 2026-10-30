@@ -1,5 +1,5 @@
 import { formatShortDate } from "@/lib/format";
-import { freeUntil, type HolidayBreak } from "@/lib/holidays";
+import { freeUntil, lastDayOff, publicHolidayName, type HolidayBreak } from "@/lib/holidays";
 
 type HolidayCardProps = {
   holiday: HolidayBreak;
@@ -20,12 +20,23 @@ function texts(holiday: HolidayBreak, today: string | null) {
       text: holiday.from === holiday.to ? "Heute ist frei." : `Frei bis ${formatShortDate(freeUntil(holiday, today))}`,
     };
   }
-  const onHoliday = today !== null && today >= holiday.from && today <= holiday.to;
+  const todayOff = holiday.days?.find((day) => day.date === today) ?? null;
+  // Not only today (e.g. a Friday, or Thursday and Friday): until the weekend is over.
+  // (The date ends with a full stop already.)
+  const until = today !== null && lastDayOff(holiday) > today ? ` Frei bis ${formatShortDate(lastDayOff(holiday))}` : "";
+  if (todayOff) {
+    return {
+      // A day the school set (pedagogical day, study day …) is no "Feiertag".
+      title: publicHolidayName(todayOff.date) ? "Schönen Feiertag!" : "Heute ist schulfrei!",
+      text: `Heute ist ${todayOff.name}, schulfrei.${until}`,
+    };
+  }
   return {
-    title: onHoliday ? "Schönen Feiertag!" : "Schönes langes Wochenende!",
-    text: onHoliday
-      ? `Heute ist ${holiday.name}, schulfrei.`
-      : `Am ${formatShortDate(holiday.from)} ist ${holiday.name}, schulfrei.`,
+    title: "Schönes langes Wochenende!",
+    text:
+      today !== null && today > holiday.to
+        ? `Frei bis ${formatShortDate(lastDayOff(holiday))}`
+        : `Am ${formatShortDate(holiday.from)} ist ${holiday.name}, schulfrei.`,
   };
 }
 

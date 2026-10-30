@@ -43,7 +43,7 @@ import {
 } from "@/lib/entries";
 import { formatAge, formatPlanDateLabel, formatShortDate, formatTimestamp, formatWeekday, isPastDate } from "@/lib/format";
 import { addressRequest, clearAddressRequest, dayFromUrl } from "@/lib/address";
-import { freeUntil, holidayBreakAt, nextSchoolDay } from "@/lib/holidays";
+import { freeUntil, holidayBreakAt, nextSchoolDay, publicHolidayName } from "@/lib/holidays";
 import { firstKnownRoom } from "@/lib/rooms";
 import { entryKey, findNewKeys } from "@/lib/seen";
 import { buildShareText, classLink } from "@/lib/share";
@@ -258,19 +258,22 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const latestDate = days.at(-1)?.date ?? null;
   const planIsPast = latestDate !== null && isPastDate(latestDate, now);
 
-  // School holidays or a public holiday (NRW) without a plan for the days
+  // School holidays, a public holiday (NRW) or a day off of the school without a plan for the days
   // ahead yet: a friendly card instead of an old plan that looks out of date.
   const today = now !== null ? schoolToday(now) : null;
   // Decided when the app is opened, like the day shown (no jump while reading).
   const decidedAt = opened?.last ?? now;
-  const holiday = today !== null && decidedAt !== null ? holidayBreakAt(today, schoolHour(decidedAt)) : null;
+  // The school's own days off can be for some classes only (a study day for 5–10).
+  const dayOffClass = selectedClass ?? null;
+  const holiday =
+    today !== null && decidedAt !== null ? holidayBreakAt(today, schoolHour(decidedAt), undefined, dayOffClass) : null;
   const planAhead = today !== null && days.some((day) => day.date >= today);
   // The next school day, when the school has not published it yet: shown as
   // a pale extra tab, so "no changes" is not mistaken for "no plan yet".
-  const upcoming = today !== null ? nextSchoolDay(today) : null;
+  const upcoming = today !== null ? nextSchoolDay(today, undefined, dayOffClass) : null;
   // Also on the weekend after the last plan day (Friday's plan, Monday not
   // there yet), as on Friday evening; in the holidays their card says it all.
-  const followsPlan = !holiday && latestDate !== null && nextSchoolDay(latestDate) === upcoming;
+  const followsPlan = !holiday && latestDate !== null && nextSchoolDay(latestDate, undefined, dayOffClass) === upcoming;
   // Only for an ordinary (or long) weekend: before the holidays, "not online
   // yet" for a day weeks away would only confuse.
   const upcomingSoon = upcoming !== null && today !== null && daysBetween(today, upcoming) <= 4;
@@ -342,7 +345,12 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     // being down is a disruption the user cannot fix.
     headerStatus = schoolDown ? "disrupted" : "offline";
   } else if (holiday && (!planAhead || holidayMode)) {
-    headerStatus = holiday.kind === "holidays" ? "holiday" : "public-holiday";
+    headerStatus =
+      holiday.kind === "holidays"
+        ? "holiday"
+        : holiday.days?.some((day) => publicHolidayName(day.date))
+          ? "public-holiday"
+          : "day-off";
   } else if (data?.stale) {
     headerStatus = "disrupted";
   } else if (!data || fromDevice) {

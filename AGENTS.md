@@ -32,7 +32,8 @@ Repository arbeitet. Sie gehen allgemeinen Gewohnheiten vor.
   Probleme (auch einen ausgebliebenen Push-Check).
 - Wichtige Orte: `lib/scraper.ts`, `lib/parser.ts` (Untis lesen), `lib/push/*` (Prüfung,
   Vergleich, Mitteilungen), `lib/holidays.ts` (NRW-Ferien bis Ostern 2030 + berechnete
-  Feiertage – vor 2030 ergänzen), `public/sw.js` (Service Worker), `components/` (UI),
+  Feiertage – vor 2030 ergänzen; schulfreie Tage der KAG je Schuljahr aus dem
+  Terminkalender der Schule eintragen), `public/sw.js` (Service Worker), `components/` (UI),
   `e2e/` (Playwright), `tests/` (Vitest), `README.md` (Betrieb und Einstellungen).
 
 ## Verbindliche Regeln

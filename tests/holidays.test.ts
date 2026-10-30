@@ -8,6 +8,8 @@ import {
   holidayDataProblem,
   nextSchoolDay,
   publicHolidayName,
+  schoolDayOffName,
+  schoolDaysOffNote,
 } from "@/lib/holidays";
 
 describe("holidayBreak", () => {
@@ -73,16 +75,17 @@ describe("public holidays", () => {
   });
 
   it("covers a public holiday on a weekday", () => {
-    // Christi Himmelfahrt 2027: Thursday; Friday is a school day again.
-    expect(holidayBreak("2027-05-05")).toBeNull();
-    expect(holidayBreak("2027-05-06")).toEqual({
+    // Christi Himmelfahrt 2028: Thursday; Friday is a school day again.
+    expect(holidayBreak("2028-05-24")).toBeNull();
+    expect(holidayBreak("2028-05-25")).toEqual({
       name: "Christi Himmelfahrt",
-      from: "2027-05-06",
-      to: "2027-05-06",
+      from: "2028-05-25",
+      to: "2028-05-25",
       kind: "public-holiday",
-      backOn: "2027-05-07",
+      backOn: "2028-05-26",
+      days: [{ date: "2028-05-25", name: "Christi Himmelfahrt" }],
     });
-    expect(holidayBreak("2027-05-07")).toBeNull();
+    expect(holidayBreak("2028-05-26")).toBeNull();
   });
 
   it("includes the weekend next to a public holiday", () => {
@@ -111,7 +114,10 @@ describe("nextSchoolDay", () => {
     expect(nextSchoolDay("2026-10-08")).toBe("2026-10-09"); // Thursday -> Friday
     expect(nextSchoolDay("2026-10-09")).toBe("2026-10-12"); // Friday -> Monday
     expect(nextSchoolDay("2026-10-16")).toBe("2026-11-02"); // before the autumn holidays
-    expect(nextSchoolDay("2027-05-05")).toBe("2027-05-07"); // over Christi Himmelfahrt
+    expect(nextSchoolDay("2028-05-24")).toBe("2028-05-26"); // over Christi Himmelfahrt
+    // The school's own days off as well.
+    expect(nextSchoolDay("2026-12-03")).toBe("2026-12-07"); // Studientag on Friday
+    expect(nextSchoolDay("2027-05-05")).toBe("2027-05-10"); // Himmelfahrt, then a movable holiday
   });
 });
 
@@ -143,5 +149,48 @@ describe("holidayDataProblem", () => {
       "Ferien sind nur bis 27.04.2030 eingetragen (lib/holidays.ts ergänzen).",
     );
     expect(holidayDataProblem("2030-06-01")).toContain("27.04.2030"); // also once they are over
+  });
+});
+
+describe("the school's own days off (Terminkalender 2026/27)", () => {
+  it("are free for everyone, with the weekend next to them", () => {
+    // Pedagogical day on a Thursday: only that day.
+    expect(holidayBreak("2026-10-01")).toMatchObject({ name: "Pädagogischer Tag", from: "2026-10-01", backOn: "2026-10-02" });
+    expect(holidayBreak("2026-10-02")).toBeNull();
+    // Movable holiday on a Friday: Friday to Sunday.
+    expect(holidayBreak("2027-02-05")).toMatchObject({ name: "beweglicher Ferientag", backOn: "2027-02-08" });
+    expect(holidayBreak("2027-02-07")).toMatchObject({ name: "beweglicher Ferientag" });
+    expect(schoolDayOffName("2027-07-08")).toBe("Zeugniskonferenz");
+    // Not every event is a day off.
+    expect(schoolDayOffName("2026-12-22")).toBeNull(); // Weihnachtsgottesdienst
+    expect(holidayBreak("2027-02-04")).toBeNull(); // Weiberfastnacht
+  });
+
+  it("join a public holiday right before them", () => {
+    const himmelfahrt = holidayBreak("2027-05-06")!;
+    expect(himmelfahrt).toMatchObject({ from: "2027-05-06", to: "2027-05-07", backOn: "2027-05-10" });
+    expect(himmelfahrt.days).toEqual([
+      { date: "2027-05-06", name: "Christi Himmelfahrt" },
+      { date: "2027-05-07", name: "beweglicher Ferientag" },
+    ]);
+  });
+
+  it("can be for some classes only", () => {
+    // 19.05.2027: study day for 5–10; EF and Q1 write exams.
+    expect(schoolDayOffName("2027-05-19", "7A")).toBe("Studientag");
+    expect(schoolDayOffName("2027-05-19", "EF")).toBeNull();
+    expect(schoolDayOffName("2027-05-19")).toBeNull();
+    expect(holidayBreak("2027-05-19", undefined, "9B")).toMatchObject({ name: "Pfingstferien", backOn: "2027-05-20" });
+    expect(holidayBreak("2027-05-19", undefined, "Q1")).toBeNull();
+    expect(nextSchoolDay("2027-05-14", undefined, "5A")).toBe("2027-05-20");
+    expect(nextSchoolDay("2027-05-14", undefined, "Q1")).toBe("2027-05-19");
+  });
+});
+
+describe("schoolDaysOffNote", () => {
+  it("reminds to add the next school year's days off once the year is over", () => {
+    expect(schoolDaysOffNote("2026-10-30")).toBeNull();
+    expect(schoolDaysOffNote("2027-07-31")).toBeNull();
+    expect(schoolDaysOffNote("2027-08-01")).toContain("neue Schuljahr");
   });
 });

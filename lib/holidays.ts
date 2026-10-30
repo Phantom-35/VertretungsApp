@@ -10,9 +10,9 @@ export type Holiday = {
 /**
  * School holidays in North Rhine-Westphalia, from the Ferienordnung of the
  * Ministerium für Schule und Bildung NRW ("Ferienordnung für Nordrhein-
- * Westfalen für die Schuljahre bis 2029/30"). The movable holidays each
- * school sets itself are not included. Extend when the ministry publishes
- * later years.
+ * Westfalen für die Schuljahre bis 2029/30"). The days the school sets
+ * itself are in SCHOOL_DAYS_OFF. Extend when the ministry publishes later
+ * years.
  */
 export const NRW_HOLIDAYS: readonly Holiday[] = [
   { name: "Herbstferien", from: "2026-10-17", to: "2026-10-31" },
@@ -34,6 +34,33 @@ export const NRW_HOLIDAYS: readonly Holiday[] = [
   { name: "Osterferien", from: "2030-04-15", to: "2030-04-27" },
 ];
 
+export type SchoolDayOff = {
+  name: string;
+  /** YYYY-MM-DD */
+  date: string;
+  /** Only for these classes (e.g. a study day for 5–10); otherwise for all. */
+  classes?: RegExp;
+};
+
+/**
+ * The KAG's own days without lessons, from its Terminkalender 2026/27 (Stand
+ * 10.09.2026): pedagogical days, study days, movable holidays and other days
+ * marked "unterrichtsfrei". Events at school (photographer, services, short
+ * lessons) are school days and not listed. Add the next school year's days
+ * when the school publishes its calendar.
+ */
+export const SCHOOL_DAYS_OFF: readonly SchoolDayOff[] = [
+  { name: "Pädagogischer Tag", date: "2026-10-01" },
+  { name: "Studientag", date: "2026-12-04" },
+  { name: "Pädagogischer Tag", date: "2026-12-10" },
+  { name: "Studientag", date: "2027-02-03" },
+  { name: "beweglicher Ferientag", date: "2027-02-05" },
+  { name: "beweglicher Ferientag", date: "2027-05-07" },
+  // EF and Q1 write exams, Q2 has oral exams.
+  { name: "Studientag", date: "2027-05-19", classes: /^(5|6|7|8|9|10)[A-D]$/ },
+  { name: "Zeugniskonferenz", date: "2027-07-08" },
+];
+
 /** Warn this many days before the last known holidays are over. */
 const HOLIDAY_DATA_WARN_DAYS = 180;
 
@@ -48,6 +75,21 @@ export function holidayDataProblem(today: string, holidays: readonly Holiday[] =
   }
   const [year, month, day] = last.split("-");
   return `Ferien sind nur bis ${day}.${month}.${year} eingetragen (lib/holidays.ts ergänzen).`;
+}
+
+/**
+ * For the health check (a note, not a problem): once the school year of the
+ * last listed day off is over, a reminder to add the next one's from the
+ * school's Terminkalender.
+ */
+export function schoolDaysOffNote(today: string, days: readonly SchoolDayOff[] = SCHOOL_DAYS_OFF) {
+  const last = days.reduce((latest, day) => (day.date > latest ? day.date : latest), "");
+  // A new school year starts in August.
+  const nextYear = `${Number(last.slice(0, 4)) + (Number(last.slice(5, 7)) >= 8 ? 1 : 0)}-08-01`;
+  if (!last || today < nextYear) {
+    return null;
+  }
+  return "Schulfreie Tage der KAG (pädagogische Tage, bewegliche Ferientage) fürs neue Schuljahr eintragen (lib/holidays.ts, Terminkalender der Schule).";
 }
 
 function addDays(date: string, days: number) {
@@ -108,16 +150,31 @@ export function publicHolidayName(date: string) {
   return publicHolidays(Number(date.slice(0, 4))).get(date) ?? null;
 }
 
-/** No school: weekends and public holidays. */
-function isDayOff(date: string) {
-  return isWeekend(date) || publicHolidayName(date) !== null;
+/** A day off the school set itself (for this class), or null. */
+export function schoolDayOffName(date: string, schoolClass: string | null = null) {
+  const day = SCHOOL_DAYS_OFF.find(
+    (item) => item.date === date && (!item.classes || (schoolClass !== null && item.classes.test(schoolClass))),
+  );
+  return day?.name ?? null;
+}
+
+/** Why there is no school on a weekday: a public holiday or a day the school set. */
+function dayOffName(date: string, schoolClass: string | null) {
+  return publicHolidayName(date) ?? schoolDayOffName(date, schoolClass);
+}
+
+/** No school: weekends, public holidays and the school's own days off. */
+function isDayOff(date: string, schoolClass: string | null) {
+  return isWeekend(date) || dayOffName(date, schoolClass) !== null;
 }
 
 export type HolidayBreak = Holiday & {
-  /** School holidays, or a public holiday (with the weekend around it). */
+  /** School holidays, or a public holiday or day off of the school (with the weekend around it). */
   kind: "holidays" | "public-holiday";
   /** First school day after the holidays (and the days off around them). */
   backOn: string;
+  /** For a public holiday or day off: each weekday off and why. */
+  days?: { date: string; name: string }[];
 };
 
 /**
@@ -126,15 +183,20 @@ export type HolidayBreak = Holiday & {
  * a weekday together with the weekend next to it, e.g. Saturday to
  * Pfingstmontag. Null on school days and ordinary weekends.
  */
-export function holidayBreak(date: string, holidays: readonly Holiday[] = NRW_HOLIDAYS): HolidayBreak | null {
+export function holidayBreak(
+  date: string,
+  holidays: readonly Holiday[] = NRW_HOLIDAYS,
+  schoolClass: string | null = null,
+): HolidayBreak | null {
+  const off = (day: string) => isDayOff(day, schoolClass);
   for (const holiday of holidays) {
     // The days off before: Saturday/Sunday leading into the first day.
     let start = holiday.from;
-    while (isDayOff(addDays(start, -1))) {
+    while (off(addDays(start, -1))) {
       start = addDays(start, -1);
     }
     let backOn = addDays(holiday.to, 1);
-    while (isDayOff(backOn)) {
+    while (off(backOn)) {
       backOn = addDays(backOn, 1);
     }
     if (date >= start && daysBetween(date, backOn) > 0) {
@@ -142,17 +204,18 @@ export function holidayBreak(date: string, holidays: readonly Holiday[] = NRW_HO
     }
   }
 
-  if (!isDayOff(date)) {
+  if (!off(date)) {
     return null;
   }
   // The run of days off around `date`; it counts when a weekday in it is a
-  // public holiday (a holiday on a Saturday or Sunday changes nothing).
+  // public holiday or a day off of the school (one on a Saturday or Sunday
+  // changes nothing).
   let start = date;
-  while (isDayOff(addDays(start, -1))) {
+  while (off(addDays(start, -1))) {
     start = addDays(start, -1);
   }
   let backOn = date;
-  while (isDayOff(backOn)) {
+  while (off(backOn)) {
     backOn = addDays(backOn, 1);
   }
   const weekdayHolidays: string[] = [];
@@ -165,11 +228,12 @@ export function holidayBreak(date: string, holidays: readonly Holiday[] = NRW_HO
     return null;
   }
   return {
-    name: weekdayHolidays.map((day) => publicHolidayName(day)).join(" und "),
+    name: [...new Set(weekdayHolidays.map((day) => dayOffName(day, schoolClass)))].join(" und "),
     from: weekdayHolidays[0],
     to: weekdayHolidays.at(-1)!,
     kind: "public-holiday",
     backOn,
+    days: weekdayHolidays.map((day) => ({ date: day, name: dayOffName(day, schoolClass)! })),
   };
 }
 
@@ -181,9 +245,14 @@ export const HOLIDAY_FROM_HOUR = 10;
  * on: in the morning after the last school day the plan stays, as on an
  * ordinary Saturday. `hour` is the hour (0–23) in the school's time zone.
  */
-export function holidayBreakAt(date: string, hour: number, holidays: readonly Holiday[] = NRW_HOLIDAYS) {
-  const holiday = holidayBreak(date, holidays);
-  if (holiday && hour < HOLIDAY_FROM_HOUR && !holidayBreak(addDays(date, -1), holidays)) {
+export function holidayBreakAt(
+  date: string,
+  hour: number,
+  holidays: readonly Holiday[] = NRW_HOLIDAYS,
+  schoolClass: string | null = null,
+) {
+  const holiday = holidayBreak(date, holidays, schoolClass);
+  if (holiday && hour < HOLIDAY_FROM_HOUR && !holidayBreak(addDays(date, -1), holidays, schoolClass)) {
     return null;
   }
   return holiday;
@@ -193,10 +262,14 @@ export function holidayBreakAt(date: string, hour: number, holidays: readonly Ho
  * The next day with school after `date`: not a weekend, not in the school
  * holidays, not a public holiday.
  */
-export function nextSchoolDay(date: string, holidays: readonly Holiday[] = NRW_HOLIDAYS) {
+export function nextSchoolDay(
+  date: string,
+  holidays: readonly Holiday[] = NRW_HOLIDAYS,
+  schoolClass: string | null = null,
+) {
   let day = addDays(date, 1);
   // A year at most, in case the holiday data were ever inconsistent.
-  for (let tries = 0; tries < 366 && (isWeekend(day) || holidayBreak(day, holidays)); tries += 1) {
+  for (let tries = 0; tries < 366 && (isWeekend(day) || holidayBreak(day, holidays, schoolClass)); tries += 1) {
     day = addDays(day, 1);
   }
   return day;
@@ -207,6 +280,11 @@ export function nextSchoolDay(date: string, holidays: readonly Holiday[] = NRW_H
  * after them (e.g. Sunday after holidays ending on Saturday) that weekend's
  * last day, so the text never names a day that is already over.
  */
+/** The last day off before school again (including the weekend after). */
+export function lastDayOff(holiday: HolidayBreak) {
+  return addDays(holiday.backOn, -1);
+}
+
 export function freeUntil(holiday: HolidayBreak, today: string | null) {
   return today !== null && today > holiday.to ? addDays(holiday.backOn, -1) : holiday.to;
 }

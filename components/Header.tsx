@@ -1,7 +1,17 @@
 import { RoomPlanHeaderButton } from "@/components/RoomText";
 import { SettingsButton, ThemeToggle } from "@/components/ThemeSettings";
 
-export type HeaderStatus = "current" | "updating" | "offline" | "disrupted" | "outdated" | "incomplete" | "holiday" | "public-holiday" | "waiting";
+export type HeaderStatus =
+  | "current"
+  | "updating"
+  | "offline"
+  | "disrupted"
+  | "outdated"
+  | "incomplete"
+  | "holiday"
+  | "public-holiday"
+  | "day-off"
+  | "waiting";
 
 type HeaderProps = {
   selectedClass: string | null | undefined;
@@ -73,6 +83,11 @@ export const statusBadges: Record<HeaderStatus, { label: string; className: stri
   },
   "public-holiday": {
     label: "Feiertag",
+    className: "border-accent/10 bg-accent-soft text-accent-strong",
+  },
+  // A day off the school set itself (pedagogical day, study day …).
+  "day-off": {
+    label: "Schulfrei",
     className: "border-accent/10 bg-accent-soft text-accent-strong",
   },
   incomplete: {

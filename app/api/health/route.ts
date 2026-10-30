@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCachedSubstitutionData } from "@/lib/cache";
-import { holidayDataProblem } from "@/lib/holidays";
+import { holidayDataProblem, schoolDaysOffNote } from "@/lib/holidays";
 import { SCHOOL_PLAN_FALLBACK_BASE_URL } from "@/lib/school";
 import { LAST_CHECK_META } from "@/lib/push/check";
 import { getPushService } from "@/lib/push/service";
@@ -73,6 +73,7 @@ export async function GET() {
       // For information only, they do not change the status.
       notes: [
         ...payload.diagnostics.filter((item) => !payload.warnings.includes(item)),
+        ...[schoolDaysOffNote(schoolToday(Date.now()))].filter((note): note is string => note !== null),
         ...(payload.success && payload.sourceUrl.startsWith(SCHOOL_PLAN_FALLBACK_BASE_URL)
           ? ["Notlösung aktiv: monitor2020 liefert nicht, der Plan kommt von vertretung.meckenheim-kag.com."]
           : []),

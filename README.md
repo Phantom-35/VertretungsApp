@@ -207,7 +207,11 @@ Ausführliche Arbeitsregeln (auch für KI-Agenten): [`AGENTS.md`](AGENTS.md).
 
 - **Ferien:** `lib/holidays.ts` enthält die NRW-Ferien laut Ferienordnung bis
   **Ostern 2030** und muss vorher ergänzt werden. Gesetzliche Feiertage in NRW berechnet
-  die App selbst. Bewegliche Ferientage der Schule sind nicht enthalten. Liegt für
+  die App selbst. Die eigenen schulfreien Tage der KAG (pädagogische Tage, Studientage,
+  bewegliche Ferientage, „unterrichtsfrei“) stehen in `SCHOOL_DAYS_OFF`, auf Wunsch nur
+  für bestimmte Klassen (z. B. Studientag nur für 5–10); sie werden jedes Schuljahr aus
+  dem Terminkalender der Schule eingetragen. Ab dem 1. August ohne Einträge fürs neue
+  Schuljahr erinnert `/api/health` daran (als Hinweis). Liegt für
   freie Tage noch kein Plan vor, zeigt die App eine Ferien- bzw. Feiertagskarte – am
   ersten freien Tag erst ab 10 Uhr (vorher wie an einem normalen Samstag). In den
   Schulferien bleibt die Ferienkarte auch dann, wenn der Plan danach schon online ist;

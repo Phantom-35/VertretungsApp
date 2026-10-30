@@ -113,6 +113,24 @@ test("shows the NRW holidays instead of an old plan", async ({ page }) => {
   await expect(card).toContainText("Frei bis So., 01.11. Der Plan für Mo., 02.11. erscheint hier");
 });
 
+test("knows the school's own days off: pedagogical days, study days, movable holidays", async ({ page }) => {
+  // Friday 04.12.2026: Elternsprechtag, study day for all; school again on Monday.
+  await page.clock.setFixedTime(new Date("2026-12-04T11:00:00+01:00"));
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  const card = page.getByRole("region", { name: "Heute ist schulfrei!" });
+  await expect(card).toContainText("Heute ist Studientag, schulfrei. Frei bis So., 06.12. Der Plan für Mo., 07.12. erscheint hier");
+  // No "Feiertag": the school set this day itself.
+  await expect(page.locator("header")).toContainText("Schulfrei");
+  await expect(page.locator("header")).not.toContainText("Feiertag");
+  // The study day on 19.05.2027 is for 5–10 only: EF has exams.
+  await page.clock.setFixedTime(new Date("2027-05-19T11:00:00+02:00"));
+  await page.reload();
+  await expect(page.getByRole("region", { name: /Schöne Pfingstferien|Heute ist schulfrei/ })).toBeVisible();
+  await chooseClass(page, "EF");
+  await expect(page.getByRole("region", { name: /Schöne|schulfrei/ })).toHaveCount(0);
+});
+
 test("keeps the holidays in front when the plan after them is already online", async ({ browser }) => {
   // Without the service worker, so that the plan goes through page.route:
   // the saved plan's Friday (09.10.) becomes the Monday after the holidays.
@@ -368,8 +386,8 @@ test("shows the next school day as not online yet, instead of no changes", async
 });
 
 test("shows a public holiday instead of an old plan", async ({ page }) => {
-  // Christi Himmelfahrt 2027 (Thursday, from 10:00); the saved plan is from 08./09.10.2026.
-  await page.clock.setFixedTime(new Date("2027-05-06T11:00:00+02:00"));
+  // Christi Himmelfahrt 2028 (Thursday, from 10:00); the saved plan is from 08./09.10.2026.
+  await page.clock.setFixedTime(new Date("2028-05-25T11:00:00+02:00"));
   await page.goto("/");
   await chooseClass(page, "5A");
   const header = page.locator("header");
@@ -377,7 +395,17 @@ test("shows a public holiday instead of an old plan", async ({ page }) => {
   await expect(header).toContainText("Feiertag");
   const card = page.getByRole("region", { name: "Schönen Feiertag!" });
   await expect(card).toContainText("Heute ist Christi Himmelfahrt, schulfrei.");
-  await expect(card).toContainText("Der Plan für Fr., 07.05. erscheint hier");
+  await expect(card).toContainText("Der Plan für Fr., 26.05. erscheint hier");
+
+  // 2027 the Friday after is a movable holiday of the school: free until Sunday.
+  await page.clock.setFixedTime(new Date("2027-05-06T11:00:00+02:00"));
+  await page.reload();
+  await expect(card).toContainText("Heute ist Christi Himmelfahrt, schulfrei. Frei bis So., 09.05. Der Plan für Mo., 10.05.");
+  await page.clock.setFixedTime(new Date("2027-05-07T11:00:00+02:00"));
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Heute ist schulfrei!" })).toContainText(
+    "Heute ist beweglicher Ferientag, schulfrei. Frei bis So., 09.05.",
+  );
 });
 
 test("a class only looked at is gone when the app is opened anew", async ({ page }) => {
