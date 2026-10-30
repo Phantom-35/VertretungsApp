@@ -55,3 +55,23 @@ export function FindRoomButton({ rooms }: { rooms: readonly string[] }) {
     </button>
   );
 }
+
+/** Round button in the header: the room plan with a search, to look something up. */
+export function RoomPlanHeaderButton() {
+  const [settings] = useSettings();
+  if (!settings.roomPlanButton) {
+    return null;
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => openRoomPlan([], { search: true })}
+      aria-label="Raumplan"
+      title="Raumplan"
+      aria-haspopup="dialog"
+      className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface/70 text-foreground transition active:scale-95"
+    >
+      <MapIcon className="size-[1.1rem]" />
+    </button>
+  );
+}

@@ -1,7 +1,10 @@
 import { useSyncExternalStore } from "react";
 
-/** What the room plan shows: the rooms of an entry (marked), or none for the plan alone. */
-export type RoomPlanRequest = { rooms: readonly string[]; id: number };
+/**
+ * What the room plan shows: the rooms of an entry (marked), or none for the
+ * plan alone; with a search field when opened to look something up.
+ */
+export type RoomPlanRequest = { rooms: readonly string[]; id: number; search: boolean };
 
 let request: RoomPlanRequest | null = null;
 let count = 0;
@@ -11,10 +14,10 @@ function emit() {
   listeners.forEach((listener) => listener());
 }
 
-/** Opens the room plan from anywhere (a card, the settings, the offer). */
-export function openRoomPlan(rooms: readonly string[] = []) {
+/** Opens the room plan from anywhere (a card, the settings, the note, the header). */
+export function openRoomPlan(rooms: readonly string[] = [], { search = false }: { search?: boolean } = {}) {
   count += 1;
-  request = { rooms, id: count };
+  request = { rooms, id: count, search };
   emit();
 }
 

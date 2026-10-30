@@ -12,6 +12,7 @@ import { RefreshStatus } from "@/components/RefreshStatus";
 import type { SettingsFocus } from "@/components/SettingsSheet";
 import { ShareButton } from "@/components/ShareButton";
 import { SubstitutionCard } from "@/components/SubstitutionCard";
+import { RoomPlanHeaderButton } from "@/components/RoomText";
 import { SettingsButton, ThemeToggle } from "@/components/ThemeSettings";
 import type { PushControls } from "@/hooks/usePushNotifications";
 import { formatClassName, isCourseClass } from "@/lib/entries";
@@ -358,6 +359,7 @@ function TopBar(props: DesktopViewProps) {
                   <path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5" />
                 </svg>
               </button>
+              <RoomPlanHeaderButton />
               <ThemeToggle />
               <SettingsButton onClick={() => props.onOpenSettings()} />
             </div>

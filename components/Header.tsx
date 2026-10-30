@@ -1,3 +1,4 @@
+import { RoomPlanHeaderButton } from "@/components/RoomText";
 import { SettingsButton, ThemeToggle } from "@/components/ThemeSettings";
 
 export type HeaderStatus = "current" | "updating" | "offline" | "disrupted" | "outdated" | "incomplete" | "holiday" | "public-holiday" | "waiting";
@@ -107,6 +108,7 @@ export function Header({
             KAG Vertretungsplan
           </p>
           <div className="flex shrink-0 items-center gap-2">
+            <RoomPlanHeaderButton />
             <ThemeToggle />
             <SettingsButton onClick={onOpenSettings} />
           </div>

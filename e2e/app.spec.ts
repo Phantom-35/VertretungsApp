@@ -675,12 +675,62 @@ test("tells once about the room plan, over everything; the rooms are on it for e
   await expect(roomButtons).toHaveCount(0);
 });
 
+test("the room plan from the header, with a smart search", async ({ page }) => {
+  await page.goto("/");
+  await chooseClass(page, "9B");
+  await page.getByRole("button", { name: "Raumplan", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Raumplan", exact: true })).toBeVisible();
+  // Named after the room found from now on.
+  const plan = page.getByRole("dialog");
+  const search = plan.getByRole("searchbox", { name: "Raum suchen" });
+  // By what is in the room, also in everyday words.
+  await search.fill("Chemi");
+  await expect(plan.getByRole("list", { name: "Gefundene Räume" })).toContainText("Chemie 1");
+  await search.fill("bio");
+  await plan.getByRole("button", { name: /^112/ }).click();
+  await expect(plan.getByRole("heading", { name: "Raum 112" })).toBeVisible();
+  await expect(plan.getByRole("img", { name: "1. Obergeschoss, Raum 112 markiert" })).toBeVisible();
+  await expect(plan.getByRole("list", { name: "Gefundene Räume" })).toHaveCount(0);
+  // A class's room, picked with Enter; the floor changes along.
+  await search.fill("9b");
+  await search.press("Enter");
+  await expect(plan.getByRole("heading", { name: "Raum 202" })).toBeVisible();
+  await expect(plan.getByText("Klassenraum der 9B (deine Klasse)")).toBeVisible();
+  await expect(plan.getByRole("radio", { name: "2. OG" })).toBeChecked();
+  // A number without the leading zero.
+  await search.fill("41");
+  await search.press("Enter");
+  await expect(plan.getByRole("img", { name: "Erdgeschoss, Raum 041 markiert" })).toBeVisible();
+  // What is not on the plan gets a word on where it is.
+  await search.fill("Turnhalle");
+  await expect(plan.getByRole("status")).toContainText("nicht im Hauptgebäude");
+  await plan.getByRole("button", { name: "Fertig" }).click();
+  await expect(plan).toBeHidden();
+
+  // "Wo ist das?" in an entry stays as it is: no search there.
+  await page.getByRole("button", { name: /auf dem Raumplan zeigen$/ }).first().click();
+  const room = page.getByRole("dialog", { name: /^Räume? / });
+  await expect(room).toBeVisible();
+  await expect(room.getByRole("searchbox")).toHaveCount(0);
+  await room.getByRole("button", { name: "Fertig" }).click();
+
+  // Switched off in the settings, the header button goes as well.
+  const settings = await openSettings(page, "Anzeige");
+  await settings.getByText("Räume auf dem Plan zeigen").click();
+  await settings.getByRole("button", { name: "Fertig" }).click();
+  await expect(page.getByRole("button", { name: "Raumplan", exact: true })).toHaveCount(0);
+});
+
 test("the note about the room plan counts as seen however it is closed", async ({ page }) => {
   await openUnseen(page);
   const intro = page.getByRole("dialog", { name: "Raumplan", exact: true });
   await expect(intro).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(intro).toBeHidden();
+  await page.reload();
+  await expect(page.locator("main")).toBeVisible();
+  await expect(intro).toHaveCount(0);
+  // Not with a later version either: it was a one-time note.
   await page.reload();
   await expect(page.locator("main")).toBeVisible();
   await expect(intro).toHaveCount(0);

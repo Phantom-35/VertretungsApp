@@ -5,7 +5,8 @@ import { RoomMap } from "@/components/RoomMap";
 import { roomsLabel } from "@/components/RoomText";
 import { closeRoomPlan, useRoomPlanRequest, type RoomPlanRequest } from "@/hooks/useRoomPlan";
 import { classOfRoom, classRoomLabel } from "@/lib/class-rooms";
-import { FLOORS, PLAN_WIDTH, ROOM_PLAN_EDITION, findRoom, floorName, type Floor } from "@/lib/rooms";
+import { searchRooms, type RoomHit } from "@/lib/room-search";
+import { FLOORS, PLAN_WIDTH, ROOM_PLAN_EDITION, findRoom, floorName, type Floor, type Room } from "@/lib/rooms";
 import { lockPageScroll } from "@/lib/scroll-lock";
 
 /** What the room is for, as far as the plan says ("Kunst", "Klassenraum der 6A"). */
@@ -63,8 +64,81 @@ function FloorPicker({ value, onChange, withRoom }: { value: Floor; onChange: (f
 /** Up: the floor below sinks away, the new one comes from above; down the other way round. */
 type Change = { from: Floor; up: boolean; id: number };
 
+/** Search field with what fits, best first; a tap marks the room on the plan. */
+function RoomSearch({ onPick }: { onPick: (room: Room) => void }) {
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<string | null>(null);
+  const { hits, note } = searchRooms(query);
+  const showList = query.trim() !== "" && picked !== query;
+  const pick = (hit: RoomHit) => {
+    setPicked(query);
+    onPick(hit.room);
+  };
+  return (
+    <div className="mb-3">
+      <label className="relative block">
+        <span className="sr-only">Raum suchen</span>
+        <svg
+          aria-hidden
+          viewBox="0 0 24 24"
+          className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && hits[0]) {
+              event.preventDefault();
+              pick(hits[0]);
+            }
+          }}
+          placeholder="Raum, Fach oder Klasse, z. B. 114, Chemie, 6a"
+          enterKeyHint="search"
+          autoComplete="off"
+          className="w-full rounded-[1.15rem] border border-line bg-surface py-2.5 pl-10 pr-3 text-base text-foreground outline-none transition placeholder:text-muted focus:border-accent/35 focus:ring-4 focus:ring-accent/10"
+        />
+      </label>
+      {showList ? (
+        hits.length > 0 ? (
+          <ul aria-label="Gefundene Räume" className="mt-2 overflow-hidden rounded-2xl border border-line bg-card motion-safe:animate-[fade-in_160ms_ease-out]">
+            {hits.map((hit) => (
+              <li key={hit.room.id} className="border-t border-line first:border-t-0">
+                <button
+                  type="button"
+                  onClick={() => pick(hit)}
+                  className="press-highlight flex w-full items-center gap-3 px-3.5 py-2.5 text-left"
+                >
+                  <span className="w-10 shrink-0 text-base font-semibold text-foreground">{hit.room.id}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-muted">{hit.label || "Raum"}</span>
+                  <span className="shrink-0 text-xs font-semibold text-accent-strong">
+                    {FLOORS.find((item) => item.floor === hit.room.floor)!.short}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p role="status" className="mt-2 rounded-2xl bg-surface-muted px-3.5 py-2.5 text-sm text-muted">
+            {note ?? "Nichts gefunden. Versuch es mit der Raumnummer oder dem Fach."}
+          </p>
+        )
+      ) : null}
+    </div>
+  );
+}
+
 function RoomPlanContent({ request, myClass, onClose }: { request: RoomPlanRequest; myClass: string | null; onClose: () => void }) {
-  const rooms = request.rooms.map(findRoom).filter((room) => room !== null);
+  // The rooms marked: those of the entry, or the one found with the search.
+  const [marked, setMarked] = useState<readonly string[]>(request.rooms);
+  const rooms = marked.map(findRoom).filter((room) => room !== null);
   const first = rooms[0] ?? null;
   const [floor, setFloor] = useState<Floor>(first?.floor ?? 0);
   const [change, setChange] = useState<Change | null>(null);
@@ -91,19 +165,23 @@ function RoomPlanContent({ request, myClass, onClose }: { request: RoomPlanReque
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const chooseFloor = (next: Floor) => {
-    if (next === floor) {
-      return;
-    }
+  const chooseFloor = (next: Floor, target = rooms.find((room) => room.floor === next)) => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    changes.current += 1;
-    setChange(reduced ? null : { from: floor, up: next > floor, id: changes.current });
-    setFloor(next);
+    if (next !== floor) {
+      changes.current += 1;
+      setChange(reduced ? null : { from: floor, up: next > floor, id: changes.current });
+      setFloor(next);
+    }
     // Same place in the building on the other floor; to the room if it is there.
-    const target = rooms.find((room) => room.floor === next);
     if (target) {
       centerOn(target, reduced ? "instant" : "smooth");
     }
+  };
+
+  /** A room found with the search: marked, its floor shown, in the middle. */
+  const showRoom = (room: Room) => {
+    setMarked([room.id]);
+    chooseFloor(room.floor, room);
   };
 
   const single = rooms.length === 1 ? first : null;
@@ -138,7 +216,9 @@ function RoomPlanContent({ request, myClass, onClose }: { request: RoomPlanReque
         ) : null}
       </div>
 
-      <FloorPicker value={floor} onChange={chooseFloor} withRoom={floorsWithRoom} />
+      {request.search ? <RoomSearch onPick={showRoom} /> : null}
+
+      <FloorPicker value={floor} onChange={(next) => chooseFloor(next)} withRoom={floorsWithRoom} />
 
       <div
         ref={scroller}

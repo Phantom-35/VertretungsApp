@@ -719,7 +719,7 @@ export function SettingsSheet({
                 {settings.roomPlanButton ? (
                   <button
                     type="button"
-                    onClick={() => openRoomPlan()}
+                    onClick={() => openRoomPlan([], { search: true })}
                     className="press-highlight flex w-full items-center justify-between gap-3 border-t border-line px-4 py-3 text-left text-sm font-medium text-accent-strong"
                   >
                     Raumplan ansehen
