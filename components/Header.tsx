@@ -101,13 +101,16 @@ export function Header({
     <header className="relative overflow-hidden rounded-[2rem] border border-edge bg-[linear-gradient(145deg,var(--header-from),var(--header-to))] px-5 py-4 shadow-[0_24px_60px_rgba(18,41,39,0.10)]">
       <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(31,107,103,0.16),transparent_65%)]" />
       <div className="relative">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2.5">
           {/* Smaller on narrow screens: "VERTRETUNGSPLAN" cannot wrap and would push
-              the buttons (settings!) off the screen, e.g. with large text. */}
-          <p className="min-w-0 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-accent-strong/85 [overflow-wrap:anywhere] min-[360px]:text-[0.72rem] min-[360px]:tracking-[0.28em]">
+              the buttons (settings!) off the screen, e.g. with large text. The
+              letters spread only as far as one line next to the three buttons allows. */}
+          <p className="min-w-0 text-[0.56rem] font-semibold uppercase tracking-[0.06em] text-accent-strong/85 [overflow-wrap:anywhere] min-[360px]:text-[0.66rem] min-[360px]:tracking-[0.14em] min-[390px]:text-[0.72rem] min-[390px]:tracking-[0.18em] min-[430px]:tracking-[0.28em]">
             KAG Vertretungsplan
           </p>
-          <div className="flex shrink-0 items-center gap-2">
+          {/* A little smaller than elsewhere, so the title keeps to one line; each
+              still has its full touch area (tap-target). */}
+          <div className="flex shrink-0 items-center gap-1.5 *:size-8">
             <RoomPlanHeaderButton />
             <ThemeToggle />
             <SettingsButton onClick={onOpenSettings} />
