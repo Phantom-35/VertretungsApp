@@ -304,8 +304,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const newPlanDate = today !== null ? (days.find((day) => day.date >= today)?.date ?? null) : null;
   const oldPlanDate = today !== null ? (days.findLast((day) => day.date < today)?.date ?? null) : null;
   const picksPlanDay = requestedDate !== null && days.some((day) => day.date === requestedDate);
-  // On the last free day, from 16:00 (or earlier, as set), the plan for the
-  // first day back comes first, as on an ordinary weekend.
+  // On the last free day, from 16:00, the plan for the first day back comes
+  // first, as on an ordinary weekend.
   // Decided when the app is opened, like the day shown.
   const backTomorrow =
     holiday !== null &&
@@ -313,7 +313,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     decidedAt !== null &&
     daysBetween(today, holiday.backOn) === 1 &&
     newPlanDate === holiday.backOn &&
-    schoolHour(decidedAt) >= Math.min(settings.nextDayHour, NEXT_DAY_FROM_HOUR);
+    schoolHour(decidedAt) >= NEXT_DAY_FROM_HOUR;
   const holidayMode = Boolean(
     holiday && (!planAhead || (holiday.kind === "holidays" && !backTomorrow)) && !picksPlanDay,
   );

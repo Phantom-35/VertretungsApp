@@ -1558,25 +1558,38 @@ test("opens on today until the day is over, also after a tapped day", async ({ p
 });
 
 test("settings: next day hour and new badges", async ({ page }) => {
-  // Thursday 15:30: today is shown.
-  await page.clock.setFixedTime(new Date("2026-10-08T15:30:00+02:00"));
+  // Thursday 16:30: today is shown by default.
+  await page.clock.setFixedTime(new Date("2026-10-08T16:30:00+02:00"));
   await page.goto("/");
   await chooseClass(page, "5A");
   await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
 
+  // Two choices only: today, or from 16:00 the next school day.
   const dialog = await openSettings(page, "Anzeige");
-  await dialog.getByText("15 Uhr", { exact: true }).click();
+  const choices = dialog.getByRole("group", { name: "Beim Öffnen zeigen" }).getByRole("radio");
+  await expect(choices).toHaveCount(2);
+  await expect(dialog.getByRole("radio", { name: "Heute" })).toBeChecked();
+  await dialog.getByText("Ab 16 Uhr morgen", { exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
 
-  // Kept after a reload; "Nie" stays on today.
+  // Kept after a reload; "Heute" goes back to today.
   await page.reload();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
   await openSettings(page, "Anzeige");
-  await dialog.getByText("Nie", { exact: true }).click();
+  await dialog.getByText("Heute", { exact: true }).click();
   await dialog.getByRole("button", { name: "Fertig" }).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
+
+  // The choices of earlier versions: "Immer" is today now, an hour is 16:00.
+  for (const [stored, shown] of [[0, "Heute"], [15, "Morgen"], [17, "Morgen"]] as const) {
+    await page.evaluate((hour) => localStorage.setItem("kag:settings", JSON.stringify({ nextDayHour: hour })), stored);
+    await page.reload();
+    await expect(page.getByRole("tab", { selected: true })).toContainText(shown);
+  }
+  await page.evaluate(() => localStorage.removeItem("kag:settings"));
+  await page.reload();
 
   // "Neu" badges can be switched off.
   const unseen = plan.entries
@@ -1630,13 +1643,13 @@ test("a dot on another day's tab when something is new there", async ({ page }) 
 test("settings: swipe down closes the sheet without refreshing", async ({ browser }) => {
   const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
-  await page.clock.setFixedTime(new Date("2026-10-08T08:00:00+02:00"));
+  await page.clock.setFixedTime(new Date("2026-10-08T16:30:00+02:00"));
   await page.goto("/");
   await chooseClass(page, "5A");
 
-  // "Immer" shows the next school day right away.
+  // "Ab 16 Uhr morgen" shows the next school day right away.
   const dialog = await openSettings(page, "Anzeige");
-  await dialog.getByText("Immer", { exact: true }).click();
+  await dialog.getByText("Ab 16 Uhr morgen", { exact: true }).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
 
   const forced: string[] = [];
@@ -1644,7 +1657,7 @@ test("settings: swipe down closes the sheet without refreshing", async ({ browse
     if (request.url().includes("force=1")) forced.push(request.url());
   });
   await settled(dialog);
-  // Choosing "Immer" may have scrolled the sheet's content; swipes start at its top.
+  // Choosing may have scrolled the sheet's content; swipes start at its top.
   await dialog.evaluate((element) => {
     element.scrollTop = 0;
   });

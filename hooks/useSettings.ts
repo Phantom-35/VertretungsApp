@@ -38,7 +38,8 @@ export type TextSize = "normal" | "large";
 /** Root font size per text size; everything is sized in rem. */
 export const TEXT_SIZES: Record<TextSize, string> = { normal: "", large: "112.5%" };
 
-export const NEXT_DAY_HOURS = [0, 14, 15, 16, 17, 24] as const;
+/** "Heute" (24: today until the day is over) or "Ab 16 Uhr morgen" (16). */
+export const NEXT_DAY_HOURS = [24, 16] as const;
 
 const DEFAULTS: Settings = {
   nextDayHour: DEFAULT_NEXT_DAY_HOUR,
@@ -60,16 +61,20 @@ let memoryValue: string | null = null;
 let cached: { raw: string | null; value: Settings } = { raw: null, value: DEFAULTS };
 
 /**
- * The hour from which the next day is shown. It used to be "nextDayFromHour"
- * with 16 as the default, saved along with any other setting: a stored 16 is
- * that old default, not a choice, and now means today (DEFAULT_NEXT_DAY_HOUR).
+ * The hour from which the next day is shown: today (24) or from 16:00 on.
+ * Earlier versions offered more ("Immer" = 0, 14, 15, 17 Uhr); "Immer" now
+ * means today, any hour means 16:00. The older field "nextDayFromHour" had
+ * 16 as its default, saved along with any other setting: a stored 16 there
+ * is that default, not a choice, and means today.
  */
 function readNextDayHour(stored: Partial<Settings> & { nextDayFromHour?: unknown }) {
-  if (NEXT_DAY_HOURS.includes(stored.nextDayHour as never)) {
-    return stored.nextDayHour as number;
+  const fromHour = (value: unknown) =>
+    typeof value === "number" && value > 0 && value < 24 ? 16 : DEFAULT_NEXT_DAY_HOUR;
+  if (typeof stored.nextDayHour === "number") {
+    return fromHour(stored.nextDayHour);
   }
   const old = stored.nextDayFromHour;
-  return NEXT_DAY_HOURS.includes(old as never) && old !== 16 ? (old as number) : DEFAULT_NEXT_DAY_HOUR;
+  return old === 16 ? DEFAULT_NEXT_DAY_HOUR : fromHour(old);
 }
 
 function parse(raw: string | null): Settings {

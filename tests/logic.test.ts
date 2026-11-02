@@ -198,9 +198,9 @@ describe("default day", () => {
     const halfPastThree = at("2026-10-08T13:30:00Z");
     expect(pickDefaultDate(plan, halfPastThree)).toBe("2026-10-08");
     expect(pickDefaultDate(plan, halfPastThree, 15)).toBe("2026-10-09");
-    // "Immer": always the next school day, also in the morning.
+    // 0: always the next school day, also in the morning (no longer offered).
     expect(pickDefaultDate(plan, at("2026-10-08T05:00:00Z"), 0)).toBe("2026-10-09");
-    // "Nie": always today.
+    // 24 ("Heute"): always today.
     expect(pickDefaultDate(plan, at("2026-10-08T19:00:00Z"), 24)).toBe("2026-10-08");
   });
 

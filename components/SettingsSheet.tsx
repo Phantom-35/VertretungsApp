@@ -49,7 +49,7 @@ type SettingsSheetProps = {
 
 const nextDayOptions = NEXT_DAY_HOURS.map((hour) => ({
   value: hour,
-  label: hour === 0 ? "Immer" : hour === 24 ? "Nie" : `${hour} Uhr`,
+  label: hour === 24 ? "Heute" : "Ab 16 Uhr morgen",
 }));
 
 const textSizeOptions: { value: TextSize; label: string }[] = [
@@ -683,12 +683,12 @@ export function SettingsSheet({
               />
             </Setting>
             <Setting
-              title="Ab wann den nächsten Schultag zeigen?"
-              description="Öffnest du die App nach dieser Uhrzeit, siehst du gleich den Plan für den nächsten Schultag. „Nie“ (Standard): immer heute, bis der Tag vorbei ist. „Immer“: immer den nächsten Schultag."
+              title="Beim Öffnen zeigen"
+              description="„Heute“: der heutige Tag, bis er vorbei ist, am Wochenende der nächste Schultag. „Ab 16 Uhr morgen“: genauso, nur nach der Schule schon der nächste Schultag."
             >
               <Segmented
                 name="next-day"
-                label="Nächsten Tag anzeigen ab"
+                label="Beim Öffnen zeigen"
                 options={nextDayOptions}
                 value={settings.nextDayHour}
                 onChange={(nextDayHour) => updateSettings({ nextDayHour })}

@@ -217,12 +217,11 @@ Ausführliche Arbeitsregeln (auch für KI-Agenten): [`AGENTS.md`](AGENTS.md).
   Schulferien bleibt die Ferienkarte auch dann, wenn der Plan danach schon online ist;
   sie bietet ihn und den letzten Plan vor den Ferien zum Antippen an (gilt bis zum
   nächsten Tag; ein Link aus einer Benachrichtigung öffnet den Plan direkt). Am letzten
-  freien Tag zeigt die App ab 16 Uhr (oder früher, falls unter „Ab wann den nächsten
-  Schultag zeigen?“ eingestellt) direkt den Plan für den ersten Schultag, wie an einem
-  normalen Wochenende.
-- **Angezeigter Tag:** Beim Öffnen zeigt die App heute, bis der Tag vorbei ist (Standard
-  „Nie“ unter „Ab wann den nächsten Schultag zeigen?“), am Wochenende den nächsten
-  Schultag. Ein angetippter Tag gilt nur bis zum nächsten Öffnen (nach mehr als einer
+  freien Tag zeigt die App ab 16 Uhr direkt den Plan für den ersten Schultag, wie an
+  einem normalen Wochenende.
+- **Angezeigter Tag:** Beim Öffnen zeigt die App heute, bis der Tag vorbei ist, am
+  Wochenende den nächsten Schultag (Einstellung „Beim Öffnen zeigen“: „Heute“, Standard;
+  „Ab 16 Uhr morgen“ zeigt nach der Schule schon den nächsten Schultag). Ein angetippter Tag gilt nur bis zum nächsten Öffnen (nach mehr als einer
   Minute in einer anderen App) bzw. bis Mitternacht.
 - **Abhängigkeiten:** `.github/dependabot.yml` öffnet wöchentlich Update-Pull-Requests,
   die die CI prüft. Für Sicherheits-Updates in GitHub unter *Settings → Code security*
