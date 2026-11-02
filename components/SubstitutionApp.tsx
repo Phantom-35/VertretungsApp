@@ -205,7 +205,6 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   // look elsewhere, or on a new day), the app starts at today again.
   const [chosen, setChosen] = useState<{ date: string; at: number | null } | null>(null);
   const opened = useOpened();
-  const openedDay = opened !== null ? schoolToday(opened.last) : null;
   const openedAtRef = useRef(opened?.last ?? null);
   useEffect(() => {
     openedAtRef.current = opened?.last ?? null;
@@ -214,9 +213,10 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const chosenDate = chosen && (opened === null || chosen.at === null || chosen.at === opened.last) ? chosen.date : null;
   // A page served from the service worker cache was rendered without
   // "?day=" (e.g. opened from a notification): the address still has it.
-  // Like a choice, it only applies on the day the app was opened with it.
+  // Like a choice, it only applies to the opening it came with: opened again
+  // later (the app kept in the background), the app starts at today.
   const addressDay = useSyncExternalStore(noSubscribe, dayInAddress, () => null);
-  const linkDayApplies = opened === null || schoolToday(opened.first) === openedDay;
+  const linkDayApplies = opened === null || opened.last === opened.first;
   // After hydration the address is the truth: a cached page may carry the
   // day it was rendered for.
   const linkDay = opened === null ? initialDay : addressDay;

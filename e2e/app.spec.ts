@@ -464,6 +464,25 @@ test("a day from a notification applies once, not to every reload", async ({ pag
   await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
 });
 
+test("a day from a notification does not stay when the app is opened again later", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-08T08:00:00+02:00") });
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  // Opened from a notification about tomorrow; the app then stays in the background.
+  await page.goto("/?day=2026-10-09");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
+  const setVisibility = (state: "hidden" | "visible") =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, "visibilityState", { value, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, state);
+  await setVisibility("hidden");
+  await page.clock.runFor(10 * 60_000);
+  await setVisibility("visible");
+  // Opened again later the same day: today, also with no changes for the class.
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
+});
+
 test("links the legal pages and offers a QR code to pass the app on", async ({ page }) => {
   await page.goto("/");
   await chooseClass(page, "5A");
