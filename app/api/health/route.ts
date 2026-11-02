@@ -4,6 +4,7 @@ import { holidayDataProblem, schoolDaysOffNote } from "@/lib/holidays";
 import { SCHOOL_PLAN_FALLBACK_BASE_URL } from "@/lib/school";
 import { LAST_CHECK_META } from "@/lib/push/check";
 import { getPushService } from "@/lib/push/service";
+import { WATCH_META, parseSparseState, roomPlanNote, sparseProblem } from "@/lib/push/watch";
 import { schoolToday } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -12,25 +13,35 @@ export const runtime = "nodejs";
 /** The scheduler calls the push check every 10 minutes. */
 const CHECK_OVERDUE_MS = 30 * 60_000;
 
-/** With notifications set up: whether the scheduler still calls the check. */
-async function pushCheckProblem(now: number) {
+/**
+ * With notifications set up: whether the scheduler still calls the check,
+ * and whether the check found the plan too empty for a while.
+ */
+async function pushCheckProblems(now: number): Promise<string[]> {
   // The in-memory store is for tests, which have no scheduler.
   const service = process.env.CRON_SECRET && process.env.PUSH_STORE !== "memory" ? getPushService() : null;
   if (!service) {
-    return null;
+    return [];
   }
   try {
+    const problems: string[] = [];
     const last = await service.store.getMeta(LAST_CHECK_META);
     const age = last ? now - Date.parse(last) : Number.POSITIVE_INFINITY;
     if (age > CHECK_OVERDUE_MS) {
-      return last
-        ? `Push-Check lief zuletzt vor ${Math.round(age / 60_000)} Minuten (cron-job.org prüfen).`
-        : "Push-Check lief noch nie (cron-job.org prüfen).";
+      problems.push(
+        last
+          ? `Push-Check lief zuletzt vor ${Math.round(age / 60_000)} Minuten (cron-job.org prüfen).`
+          : "Push-Check lief noch nie (cron-job.org prüfen).",
+      );
     }
+    const sparse = sparseProblem(parseSparseState(await service.store.getMeta(WATCH_META)), now);
+    if (sparse) {
+      problems.push(sparse);
+    }
+    return problems;
   } catch {
-    return "Push-Speicher (Redis) nicht erreichbar.";
+    return ["Push-Speicher (Redis) nicht erreichbar."];
   }
-  return null;
 }
 
 /**
@@ -56,10 +67,7 @@ export async function GET() {
     }
   }
 
-  const pushProblem = await pushCheckProblem(Date.now());
-  if (pushProblem) {
-    problems.push(pushProblem);
-  }
+  problems.push(...(await pushCheckProblems(Date.now())));
   const holidayProblem = holidayDataProblem(schoolToday(Date.now()));
   if (holidayProblem) {
     problems.push(holidayProblem);
@@ -73,7 +81,9 @@ export async function GET() {
       // For information only, they do not change the status.
       notes: [
         ...payload.diagnostics.filter((item) => !payload.warnings.includes(item)),
-        ...[schoolDaysOffNote(schoolToday(Date.now()))].filter((note): note is string => note !== null),
+        ...[schoolDaysOffNote(schoolToday(Date.now())), roomPlanNote(schoolToday(Date.now()))].filter(
+          (note): note is string => note !== null,
+        ),
         ...(payload.success && payload.sourceUrl.startsWith(SCHOOL_PLAN_FALLBACK_BASE_URL)
           ? ["Notlösung aktiv: monitor2020 liefert nicht, der Plan kommt von vertretung.meckenheim-kag.com."]
           : []),

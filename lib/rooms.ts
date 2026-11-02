@@ -5,7 +5,9 @@
  * When the school changes rooms for a new school year, update it here.
  */
 
-export const ROOM_PLAN_EDITION = "Raumplan 2026/27";
+/** The school year (its first year) the plan and the class rooms are for. */
+export const ROOM_PLAN_SCHOOL_YEAR = 2026;
+export const ROOM_PLAN_EDITION = `Raumplan ${ROOM_PLAN_SCHOOL_YEAR}/${String((ROOM_PLAN_SCHOOL_YEAR + 1) % 100).padStart(2, "0")}`;
 
 export type Floor = 0 | 1 | 2;
 

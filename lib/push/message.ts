@@ -3,6 +3,7 @@ import {
   entryForStudent,
   getEntryKind,
   isCourseClass,
+  isOpenRoom,
   isOpenSubstitute,
   lessonStart,
   roomLabel,
@@ -160,6 +161,22 @@ function describeChange(change: Change): [symbol: string, text: string] {
     case "added":
       return [entrySymbol(change.entry), describeShort(change.entry)];
     case "changed":
+      // The school has now set the room it had left open ("???"): said so
+      // plainly instead of "Raumänderung statt Raumänderung".
+      if (
+        change.entry.type === change.previous.type &&
+        isOpenRoom(change.previous.room) &&
+        change.entry.room &&
+        !isOpenRoom(change.entry.room)
+      ) {
+        const room = roomLabel(change.entry.room);
+        return [
+          entrySymbol(change.entry),
+          [displayType(change.entry.type), `${room} steht fest`, ...details(change.entry).filter((item) => item !== room)]
+            .filter(Boolean)
+            .join(" · "),
+        ];
+      }
       return [
         entrySymbol(change.entry),
         describeShort(change.entry, `${displayType(change.entry.type)} statt ${displayType(change.previous.type)}`),

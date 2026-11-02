@@ -126,3 +126,28 @@ export async function reportDeliveryProblem(failed: number, now = Date.now()) {
     return "failed" as const;
   }
 }
+
+/**
+ * A message to the maintainer from the push check (lib/push/watch.ts): a
+ * "warning" goes where the plan warnings go (ALERT_WEBHOOK_URL), a "reminder"
+ * to the maintainer's own channel (see maintainerWebhook). Says whether it
+ * was sent; never throws.
+ */
+export async function tellMaintainer(message: string, kind: "warning" | "reminder") {
+  const url =
+    kind === "warning"
+      ? process.env.ALERT_WEBHOOK_URL?.trim() || maintainerWebhook()
+      : maintainerWebhook();
+  if (!url) {
+    return false;
+  }
+  try {
+    await send(url, `${TITLE}: ${message}`);
+    return true;
+  } catch (error) {
+    console.warn("[push] Nachricht an den Betreiber konnte nicht gesendet werden:", error);
+    return false;
+  }
+}
+
+export type TellMaintainer = typeof tellMaintainer;

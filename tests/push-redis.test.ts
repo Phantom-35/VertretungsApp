@@ -128,11 +128,12 @@ describe("Redis push store (Upstash REST)", () => {
       }
       expect(planWrites()).toBe(1);
       expect(sent).toHaveLength(0);
-      // A check without changes: four commands (time of the check, lock,
-      // plan state, unlock); the devices are neither listed nor counted.
+      // A check without changes: five commands (time of the check, lock,
+      // the watch over the plan's size, plan state, unlock); the devices are
+      // neither listed nor counted.
       const before = upstash.commands.length;
       const idle = await check([entry("1")]);
-      expect(upstash.commands.slice(before).map(([name]) => name.toUpperCase())).toEqual(["SET", "SET", "GET", "DEL"]);
+      expect(upstash.commands.slice(before).map(([name]) => name.toUpperCase())).toEqual(["SET", "SET", "GET", "GET", "DEL"]);
       expect(idle).toMatchObject({ status: "checked", subscribers: 0 });
       expect(idle).not.toHaveProperty("devices");
 

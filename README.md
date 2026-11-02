@@ -169,6 +169,16 @@ GitHub-Secrets und cron-job.org, niemals im Repository.
   alle paar Minuten abfragen und meldet sich, wenn etwas nicht stimmt, auch wenn die
   Schulseite ganz ausfällt oder cron-job.org nicht mehr aufruft.
 - **`ALERT_WEBHOOK_URL`** (siehe oben) meldet Lesefehler und Zustellprobleme von selbst.
+- **Auffällig leerer Plan** (`lib/push/watch.ts`): Der Push-Check merkt sich, wie viele
+  Einträge ein Schultag üblicherweise hat (Mittel der letzten Schultage). Haben alle
+  Schultage im Plan zwei Stunden lang weniger als ein Zehntel davon (ohne Verlauf: gar
+  keine Einträge), kommt eine Warnung über `ALERT_WEBHOOK_URL` – das fängt z. B. ein
+  geändertes Format ab, bei dem die Selbstkontrolle der Seiten nichts mehr findet. Sind
+  die Einträge zurück, kommt eine Entwarnung; `/api/health` meldet es ebenfalls.
+- **Erinnerung fürs neue Schuljahr:** Fehlen Ferien, schulfreie Tage oder der neue
+  Raumplan (`ROOM_PLAN_SCHOOL_YEAR` in `lib/rooms.ts`, ab 1. August), schickt der
+  Push-Check einmal pro Woche tagsüber eine Erinnerung an den Betreiber
+  (`FEEDBACK_WEBHOOK_URL`, sonst `ALERT_WEBHOOK_URL`), bis alles eingetragen ist.
 - **Live-Check:** `.github/workflows/live-check.yml` liest montags bis freitags früh den
   echten Plan. Schlägt das fehl (auch beim zweiten Versuch zehn Minuten später),
   schickt GitHub eine E-Mail. Von Hand: GitHub → *Actions* → *Live-Check* →
@@ -211,7 +221,7 @@ Ausführliche Arbeitsregeln (auch für KI-Agenten): [`AGENTS.md`](AGENTS.md).
   bewegliche Ferientage, „unterrichtsfrei“) stehen in `SCHOOL_DAYS_OFF`, auf Wunsch nur
   für bestimmte Klassen (z. B. Studientag nur für 5–10); sie werden jedes Schuljahr aus
   dem Terminkalender der Schule eingetragen. Ab dem 1. August ohne Einträge fürs neue
-  Schuljahr erinnert `/api/health` daran (als Hinweis). Liegt für
+  Schuljahr erinnern `/api/health` (als Hinweis) und eine wöchentliche Nachricht daran. Liegt für
   freie Tage noch kein Plan vor, zeigt die App eine Ferien- bzw. Feiertagskarte – am
   ersten freien Tag erst ab 10 Uhr (vorher wie an einem normalen Samstag). In den
   Schulferien bleibt die Ferienkarte auch dann, wenn der Plan danach schon online ist;
@@ -219,6 +229,10 @@ Ausführliche Arbeitsregeln (auch für KI-Agenten): [`AGENTS.md`](AGENTS.md).
   nächsten Tag; ein Link aus einer Benachrichtigung öffnet den Plan direkt). Am letzten
   freien Tag zeigt die App ab 16 Uhr direkt den Plan für den ersten Schultag, wie an
   einem normalen Wochenende.
+- **Raumplan:** `lib/rooms.ts` (Räume) und `lib/class-rooms.ts` (Klassenräume) sind nach
+  dem Raumplan-Aushang eines Schuljahres gezeichnet. Für ein neues Schuljahr beides
+  anpassen und `ROOM_PLAN_SCHOOL_YEAR` hochsetzen; bis dahin kommt ab 1. August die
+  wöchentliche Erinnerung.
 - **Angezeigter Tag:** Beim Öffnen zeigt die App heute, bis der Tag vorbei ist, am
   Wochenende den nächsten Schultag (Einstellung „Beim Öffnen zeigen“: „Heute“, Standard;
   „Ab 16 Uhr morgen“ zeigt nach der Schule schon den nächsten Schultag). Ein angetippter Tag gilt nur bis zum nächsten Öffnen (nach mehr als einer

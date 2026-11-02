@@ -168,6 +168,11 @@ function isDayOff(date: string, schoolClass: string | null) {
   return isWeekend(date) || dayOffName(date, schoolClass) !== null;
 }
 
+/** A day with lessons: a weekday that is neither in the holidays nor off for everyone. */
+export function isSchoolDay(date: string, holidays: readonly Holiday[] = NRW_HOLIDAYS) {
+  return !isDayOff(date, null) && !holidays.some((holiday) => date >= holiday.from && date <= holiday.to);
+}
+
 export type HolidayBreak = Holiday & {
   /** School holidays, or a public holiday or day off of the school (with the weekend around it). */
   kind: "holidays" | "public-holiday";

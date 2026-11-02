@@ -1,4 +1,4 @@
-import { reportDeliveryProblem } from "@/lib/alert";
+import { reportDeliveryProblem, tellMaintainer, type TellMaintainer } from "@/lib/alert";
 import { diffPlan, type PlanState } from "@/lib/push/diff";
 import {
   buildNotification,
@@ -21,6 +21,7 @@ import {
 } from "@/lib/notify";
 import type { SendPush } from "@/lib/push/sender";
 import type { PushStore, Subscriber } from "@/lib/push/store";
+import { sendReminders, watchPlanSize } from "@/lib/push/watch";
 import { SCHOOL_PLAN_FALLBACK_BASE_URL } from "@/lib/school";
 import { schoolToday } from "@/lib/time";
 import type { SubstitutionPayload } from "@/lib/types";
@@ -56,6 +57,8 @@ type CheckOptions = {
   send: SendPush;
   loadPlan: () => Promise<SubstitutionPayload>;
   now?: number;
+  /** Messages to the maintainer (see lib/push/watch.ts). */
+  tell?: TellMaintainer;
 };
 
 /**
@@ -134,7 +137,13 @@ export const LAST_CHECK_META = "last-check";
  * minutes; runs that overlap are skipped. In the morning it sends the
  * summaries of the day.
  */
-export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: CheckOptions): Promise<CheckResult> {
+export async function runPushCheck({
+  store,
+  send,
+  loadPlan,
+  now = Date.now(),
+  tell = tellMaintainer,
+}: CheckOptions): Promise<CheckResult> {
   // Also at night: shows that the scheduler still runs.
   await store.setMeta(LAST_CHECK_META, new Date(now).toISOString());
   if (isQuietTime(now)) {
@@ -146,12 +155,18 @@ export async function runPushCheck({ store, send, loadPlan, now = Date.now() }: 
   }
 
   try {
+    // Only for the maintainer: must never cost anyone a notification.
+    await sendReminders(store, now, tell).catch(() => undefined);
+
     const plan = await loadPlan();
     // An incomplete plan (school website down, upload in progress, unreadable
     // page) would look like withdrawn changes: compare complete plans only.
     if (!plan.success || plan.stale || plan.error) {
       return { status: "incomplete", reason: plan.error ?? "Plan nicht verfügbar" };
     }
+    await watchPlanSize(store, { entries: plan.entries, dates: plan.days?.map((day) => day.date) ?? [] }, now, tell).catch(
+      () => undefined,
+    );
 
     const previous = await store.getPlanState();
     const source = plan.sourceUrl?.startsWith(SCHOOL_PLAN_FALLBACK_BASE_URL) ? ("fallback" as const) : undefined;

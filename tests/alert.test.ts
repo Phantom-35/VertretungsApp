@@ -87,3 +87,27 @@ describe("reportPlanProblems", () => {
     expect(await reportPlanProblems(["Seite 1: Datum nicht erkannt."], 60_000)).toBe("sent");
   });
 });
+
+describe("tellMaintainer", () => {
+  it("sends warnings to the warning channel and reminders to the maintainer's own", async () => {
+    const calls = mockWebhook();
+    vi.stubEnv("ALERT_WEBHOOK_URL", "https://ntfy.sh/warnings-test");
+    vi.stubEnv("FEEDBACK_WEBHOOK_URL", "https://ntfy.sh/own-test");
+    const { tellMaintainer } = await loadAlert();
+    expect(await tellMaintainer("Plan leer", "warning")).toBe(true);
+    expect(await tellMaintainer("Neues Schuljahr", "reminder")).toBe(true);
+    expect(calls.map((call) => String(call.url))).toEqual(["https://ntfy.sh/warnings-test", "https://ntfy.sh/own-test"]);
+    expect(calls[0].init.body).toBe("KAG Vertretungsplan: Plan leer");
+  });
+
+  it("uses the other channel when only one is set, and never throws", async () => {
+    mockWebhook(500);
+    vi.stubEnv("FEEDBACK_WEBHOOK_URL", "https://ntfy.sh/own-test");
+    const { tellMaintainer } = await loadAlert();
+    expect(await tellMaintainer("Plan leer", "warning")).toBe(false);
+    vi.stubEnv("FEEDBACK_WEBHOOK_URL", "");
+    const calls = mockWebhook();
+    expect(await tellMaintainer("Plan leer", "warning")).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+});

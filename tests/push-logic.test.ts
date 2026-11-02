@@ -245,6 +245,22 @@ describe("notification text", () => {
     expect(buildNotification("5A", changed, MORNING).body).toBe(
       "🔄 Vertretung statt Entfall · ABC → DEF",
     );
+    // A room the school had left open is set now.
+    const roomSet = changesFor(
+      { added: [entry({ type: "Raum-Vtr.", room: "218" })], removed: [entry({ type: "Raum-Vtr.", room: "???" })] },
+      audience,
+      MORNING,
+    );
+    expect(buildNotification("5A", roomSet, MORNING).body).toBe("🚪 Raumänderung · Raum 218 steht fest · ABC");
+    const substitutionRoomSet = changesFor(
+      {
+        added: [entry({ type: "Vertretung", substitute: "DEF", room: "105" })],
+        removed: [entry({ type: "Vertretung", substitute: "DEF", room: "???" })],
+      },
+      audience,
+      MORNING,
+    );
+    expect(buildNotification("5A", substitutionRoomSet, MORNING).body).toBe("🔄 Vertretung · Raum 105 steht fest · ABC → DEF");
     const withdrawn = changesFor({ added: [], removed: [entry({})] }, audience, MORNING);
     expect(buildNotification("5A", withdrawn, MORNING).body).toBe(
       "✅ Findet doch statt (war: Entfall)",
