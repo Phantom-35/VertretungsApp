@@ -684,14 +684,14 @@ export function SettingsSheet({
             </Setting>
             <Setting
               title="Ab wann den nächsten Schultag zeigen?"
-              description="Öffnest du die App nach dieser Uhrzeit, siehst du gleich den Plan für den nächsten Schultag. „Immer“: immer den nächsten Schultag, „Nie“: immer heute."
+              description="Öffnest du die App nach dieser Uhrzeit, siehst du gleich den Plan für den nächsten Schultag. „Nie“ (Standard): immer heute, bis der Tag vorbei ist. „Immer“: immer den nächsten Schultag."
             >
               <Segmented
                 name="next-day"
                 label="Nächsten Tag anzeigen ab"
                 options={nextDayOptions}
-                value={settings.nextDayFromHour}
-                onChange={(nextDayFromHour) => updateSettings({ nextDayFromHour })}
+                value={settings.nextDayHour}
+                onChange={(nextDayHour) => updateSettings({ nextDayHour })}
               />
             </Setting>
             <Setting

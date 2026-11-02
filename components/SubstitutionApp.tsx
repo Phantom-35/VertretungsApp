@@ -47,7 +47,7 @@ import { freeUntil, holidayBreakAt, nextSchoolDay, publicHolidayName } from "@/l
 import { firstKnownRoom } from "@/lib/rooms";
 import { entryKey, findNewKeys } from "@/lib/seen";
 import { buildShareText, classLink } from "@/lib/share";
-import { daysBetween, isLessonOver, pickDefaultDate, schoolHour, schoolToday } from "@/lib/time";
+import { NEXT_DAY_FROM_HOUR, daysBetween, isLessonOver, pickDefaultDate, schoolHour, schoolToday } from "@/lib/time";
 import type { PlanDay, SubstitutionPayload } from "@/lib/types";
 
 type SubstitutionAppProps = {
@@ -201,21 +201,17 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const isBusy = status !== "idle";
 
   // A day tapped by the user (or in a notification while the app is open),
-  // with the school day it was chosen on: the next day it no longer applies.
-  const [chosen, setChosen] = useState<{ date: string; on: string } | null>(null);
+  // with the opening it was chosen in: opened again (after more than a quick
+  // look elsewhere, or on a new day), the app starts at today again.
+  const [chosen, setChosen] = useState<{ date: string; at: number | null } | null>(null);
   const opened = useOpened();
   const openedDay = opened !== null ? schoolToday(opened.last) : null;
-  // A choice belongs to the opening it was made in (also past midnight while
-  // the app stays on screen).
-  const openedDayRef = useRef(openedDay);
+  const openedAtRef = useRef(opened?.last ?? null);
   useEffect(() => {
-    openedDayRef.current = openedDay;
-  }, [openedDay]);
-  const chooseDate = useCallback(
-    (date: string) => setChosen({ date, on: openedDayRef.current ?? schoolToday(Date.now()) }),
-    [],
-  );
-  const chosenDate = chosen && (openedDay === null || chosen.on === openedDay) ? chosen.date : null;
+    openedAtRef.current = opened?.last ?? null;
+  }, [opened]);
+  const chooseDate = useCallback((date: string) => setChosen({ date, at: openedAtRef.current }), []);
+  const chosenDate = chosen && (opened === null || chosen.at === null || chosen.at === opened.last) ? chosen.date : null;
   // A page served from the service worker cache was rendered without
   // "?day=" (e.g. opened from a notification): the address still has it.
   // Like a choice, it only applies on the day the app was opened with it.
@@ -295,10 +291,10 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     ? requestedDate
     : pickDefaultDate(
         tabDays.map((day) => day.date),
-        // Decided when the app is opened, not on every tick: at 16:00 the
-        // view does not jump to tomorrow while the user is reading.
+        // Decided when the app is opened, not on every tick: the view does
+        // not jump to another day while the user is reading.
         opened?.last ?? now,
-        settings.nextDayFromHour,
+        settings.nextDayHour,
       );
   const showsPendingDay = selectedDate !== null && selectedDate === pendingDate;
   const selectedDay = days.find((day) => day.date === selectedDate) ?? null;
@@ -308,8 +304,8 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
   const newPlanDate = today !== null ? (days.find((day) => day.date >= today)?.date ?? null) : null;
   const oldPlanDate = today !== null ? (days.findLast((day) => day.date < today)?.date ?? null) : null;
   const picksPlanDay = requestedDate !== null && days.some((day) => day.date === requestedDate);
-  // On the last free day, from the hour the next day is shown (setting), the
-  // plan for the first day back comes first, as on an ordinary weekend.
+  // On the last free day, from 16:00 (or earlier, as set), the plan for the
+  // first day back comes first, as on an ordinary weekend.
   // Decided when the app is opened, like the day shown.
   const backTomorrow =
     holiday !== null &&
@@ -317,7 +313,7 @@ export function SubstitutionApp({ initialData, initialDay = null }: Substitution
     decidedAt !== null &&
     daysBetween(today, holiday.backOn) === 1 &&
     newPlanDate === holiday.backOn &&
-    schoolHour(decidedAt) >= settings.nextDayFromHour;
+    schoolHour(decidedAt) >= Math.min(settings.nextDayHour, NEXT_DAY_FROM_HOUR);
   const holidayMode = Boolean(
     holiday && (!planAhead || (holiday.kind === "holidays" && !backTomorrow)) && !picksPlanDay,
   );

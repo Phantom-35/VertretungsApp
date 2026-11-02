@@ -337,14 +337,14 @@ test("says when the next plan is not online yet, and marks past days", async ({ 
   await expect(page.locator("header")).toContainText("Letzter Plan");
 });
 
-test("keeps the day across midnight and starts the next day fresh", async ({ page }) => {
-  // Friday night with the app open: Monday (not online yet) is shown.
+test("shows today until the day is over, then at once the next school day", async ({ page }) => {
+  // Friday night with the app open: still Friday, the day is not over yet.
   await page.clock.install({ time: new Date("2026-10-09T23:58:00+02:00") });
   await page.goto("/");
   await chooseClass(page, "5A");
   const selected = page.getByRole("tab", { selected: true });
-  await expect(selected).toContainText("noch nicht da");
-  // Saturday 00:01: nothing jumps.
+  await expect(selected).toContainText("09.10.");
+  // Saturday 00:01, still on screen: the next school day (Monday, not online yet).
   await page.clock.runFor(3 * 60_000);
   await expect(selected).toContainText("noch nicht da");
 
@@ -379,8 +379,8 @@ test("shows the next school day as not online yet, instead of no changes", async
   await expect(page.getByText("Die Schule hat den Plan für Mo., 12.10. noch nicht hochgeladen.", { exact: false })).toBeVisible();
   await expect(page.getByText("Keine Änderungen", { exact: true })).toHaveCount(0);
   await expect(page.locator("article")).toHaveCount(0);
-  // After school the default is the next school day: here, the pending one.
-  await page.clock.setFixedTime(new Date("2026-10-09T17:00:00+02:00"));
+  // At the weekend the default is the next school day: here, the pending one.
+  await page.clock.setFixedTime(new Date("2026-10-10T10:00:00+02:00"));
   await page.reload();
   await expect(page.getByRole("tab", { selected: true })).toContainText("noch nicht da");
 });
@@ -1508,8 +1508,38 @@ test("settings: an overview with a few pages, and the app version", async ({ pag
   await expect(dialog.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
 });
 
+test("opens on today until the day is over, also after a tapped day", async ({ page }) => {
+  // Thursday evening: still today (no switch at 16:00 any more).
+  await page.clock.install({ time: new Date("2026-10-08T19:30:00+02:00") });
+  // Saved before, with the old default 16 along with another setting: it counts as today too.
+  await page.addInitScript(() => {
+    if (!localStorage.getItem("kag:settings")) {
+      localStorage.setItem("kag:settings", JSON.stringify({ nextDayFromHour: 16, showNewBadges: true }));
+    }
+  });
+  await page.goto("/");
+  await chooseClass(page, "5A");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
+  const setVisibility = (state: "hidden" | "visible") =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, "visibilityState", { value, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, state);
+  // Tomorrow tapped; a quick look at another app keeps it.
+  await page.getByRole("tab", { name: /Morgen/ }).click();
+  await setVisibility("hidden");
+  await page.clock.runFor(20_000);
+  await setVisibility("visible");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Morgen");
+  // Opened again after longer: at once on today again.
+  await setVisibility("hidden");
+  await page.clock.runFor(5 * 60_000);
+  await setVisibility("visible");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Heute");
+});
+
 test("settings: next day hour and new badges", async ({ page }) => {
-  // Thursday 15:30: before the default switch at 16:00 today is shown.
+  // Thursday 15:30: today is shown.
   await page.clock.setFixedTime(new Date("2026-10-08T15:30:00+02:00"));
   await page.goto("/");
   await chooseClass(page, "5A");

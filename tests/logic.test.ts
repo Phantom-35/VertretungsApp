@@ -178,13 +178,20 @@ describe("default day", () => {
     expect(pickDefaultDate(plan, at("2026-10-08T13:59:00Z"))).toBe("2026-10-08");
   });
 
-  it("switches to the next plan day once school is over", () => {
-    expect(pickDefaultDate(plan, at("2026-10-08T14:00:00Z"))).toBe("2026-10-09");
-    // Friday afternoon and the weekend: Monday.
-    expect(pickDefaultDate(plan, at("2026-10-09T15:00:00Z"))).toBe("2026-10-12");
+  it("stays on today until the day is over, then the next plan day", () => {
+    // The default: today also in the evening.
+    expect(pickDefaultDate(plan, at("2026-10-08T14:00:00Z"))).toBe("2026-10-08");
+    expect(pickDefaultDate(plan, at("2026-10-08T21:59:00Z"))).toBe("2026-10-08");
+    // The weekend: Monday.
     expect(pickDefaultDate(plan, at("2026-10-10T08:00:00Z"))).toBe("2026-10-12");
-    expect(pickDefaultDate(["2026-12-01", "2026-12-02"], at("2026-12-01T14:30:00Z"))).toBe("2026-12-01");
-    expect(pickDefaultDate(["2026-12-01", "2026-12-02"], at("2026-12-01T15:30:00Z"))).toBe("2026-12-02");
+  });
+
+  it("switches to the next plan day after school when set so", () => {
+    expect(pickDefaultDate(plan, at("2026-10-08T14:00:00Z"), 16)).toBe("2026-10-09");
+    // Friday afternoon: Monday.
+    expect(pickDefaultDate(plan, at("2026-10-09T15:00:00Z"), 16)).toBe("2026-10-12");
+    expect(pickDefaultDate(["2026-12-01", "2026-12-02"], at("2026-12-01T14:30:00Z"), 16)).toBe("2026-12-01");
+    expect(pickDefaultDate(["2026-12-01", "2026-12-02"], at("2026-12-01T15:30:00Z"), 16)).toBe("2026-12-02");
   });
 
   it("uses the hour chosen in the settings", () => {

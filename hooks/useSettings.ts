@@ -12,11 +12,11 @@ import {
   type NotifyGroup,
 } from "@/lib/notify";
 import { SETTINGS_STORAGE_KEY } from "@/lib/theme";
-import { NEXT_DAY_FROM_HOUR } from "@/lib/time";
+import { DEFAULT_NEXT_DAY_HOUR } from "@/lib/time";
 
 export type Settings = {
   /** From this hour on the next day is shown by default; 0 = always, 24 = never. */
-  nextDayFromHour: number;
+  nextDayHour: number;
   /** "Neu" badges for changes since the last visit. */
   showNewBadges: boolean;
   /** "Wo ist das?" next to the rooms, opening the room plan. */
@@ -41,7 +41,7 @@ export const TEXT_SIZES: Record<TextSize, string> = { normal: "", large: "112.5%
 export const NEXT_DAY_HOURS = [0, 14, 15, 16, 17, 24] as const;
 
 const DEFAULTS: Settings = {
-  nextDayFromHour: NEXT_DAY_FROM_HOUR,
+  nextDayHour: DEFAULT_NEXT_DAY_HOUR,
   showNewBadges: true,
   roomPlanButton: true,
   textSize: "normal",
@@ -59,13 +59,24 @@ let memoryValue: string | null = null;
 // Keeps the snapshot identical while the stored text is unchanged.
 let cached: { raw: string | null; value: Settings } = { raw: null, value: DEFAULTS };
 
+/**
+ * The hour from which the next day is shown. It used to be "nextDayFromHour"
+ * with 16 as the default, saved along with any other setting: a stored 16 is
+ * that old default, not a choice, and now means today (DEFAULT_NEXT_DAY_HOUR).
+ */
+function readNextDayHour(stored: Partial<Settings> & { nextDayFromHour?: unknown }) {
+  if (NEXT_DAY_HOURS.includes(stored.nextDayHour as never)) {
+    return stored.nextDayHour as number;
+  }
+  const old = stored.nextDayFromHour;
+  return NEXT_DAY_HOURS.includes(old as never) && old !== 16 ? (old as number) : DEFAULT_NEXT_DAY_HOUR;
+}
+
 function parse(raw: string | null): Settings {
   try {
     const stored = raw ? (JSON.parse(raw) as Partial<Settings>) : {};
     return {
-      nextDayFromHour: NEXT_DAY_HOURS.includes(stored.nextDayFromHour as never)
-        ? (stored.nextDayFromHour as number)
-        : DEFAULTS.nextDayFromHour,
+      nextDayHour: readNextDayHour(stored),
       showNewBadges:
         typeof stored.showNewBadges === "boolean" ? stored.showNewBadges : DEFAULTS.showNewBadges,
       // On for everyone; the earlier "roomPlan" (a yes/no question) no longer counts.

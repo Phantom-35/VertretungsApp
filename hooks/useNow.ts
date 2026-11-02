@@ -73,8 +73,18 @@ function reopen() {
   }
 }
 
+/** Away for less than this (a quick look at another app): not opened anew. */
+const QUICK_LOOK_MS = 60_000;
+let hiddenAt: number | null = null;
+
 function onOpenedVisibility() {
-  if (document.visibilityState === "visible") {
+  if (document.visibilityState === "hidden") {
+    hiddenAt = Date.now();
+    return;
+  }
+  const away = hiddenAt === null ? Infinity : Date.now() - hiddenAt;
+  hiddenAt = null;
+  if (away >= QUICK_LOOK_MS || (opened && schoolToday(Date.now()) !== schoolToday(opened.last))) {
     reopen();
   }
 }

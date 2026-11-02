@@ -61,8 +61,18 @@ export function daysBetween(from: string, to: string) {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 }
 
-/** From this hour on, the next school day is more relevant than today. */
+/**
+ * From this hour on, the next school day is more relevant than today: for
+ * notifications (today's changes count until then) and the last day of the
+ * holidays (the plan for the day back comes first).
+ */
 export const NEXT_DAY_FROM_HOUR = 16;
+
+/**
+ * The day shown when the app opens: today, as long as it is in the plan
+ * ("Nie" in the settings, 24); the next one only once today is over.
+ */
+export const DEFAULT_NEXT_DAY_HOUR = 24;
 
 /** Minutes after midnight (0–1439) in the school's time zone. */
 export function schoolMinutes(now: number) {
@@ -87,7 +97,7 @@ export function schoolHour(now: number) {
 export function pickDefaultDate(
   dates: string[],
   now: number | null,
-  nextDayFromHour = NEXT_DAY_FROM_HOUR,
+  nextDayFromHour = DEFAULT_NEXT_DAY_HOUR,
 ) {
   if (dates.length === 0) {
     return null;
