@@ -6,8 +6,8 @@ import { entryKey, type KeyedEntry } from "@/lib/seen";
 import { daysBetween, schoolHour, schoolToday } from "@/lib/time";
 
 /*
- * Two things the push check (every 10 minutes, with the database) also keeps
- * an eye on for the maintainer:
+ * What the push check (every 10 minutes, with the database) also keeps an
+ * eye on for the maintainer (never shown to users):
  *
  * 1. A plan that reads without errors but holds (almost) nothing on school
  *    days. Each page has its own self-check (lib/scraper.ts); this catches
@@ -16,6 +16,7 @@ import { daysBetween, schoolHour, schoolToday } from "@/lib/time";
  *    of recent school days, reported once it has lasted a while.
  * 2. Data to add for a new school year (holidays, days off, room plan),
  *    as a reminder once a week until it is done.
+ * 3. A weekly report of how many devices have notifications switched on.
  */
 
 /**
@@ -225,6 +226,58 @@ export async function sendReminders(store: PushStore, now: number, tell: TellMai
   );
   if (sent) {
     await store.setMeta(REMINDER_META, today);
+  }
+  return sent;
+}
+
+/** The devices counted for the last weekly report (JSON `DeviceReport`). */
+const DEVICE_REPORT_META = "device-report";
+/** The weekly report goes out on Mondays (1), in the daytime. */
+const DEVICE_REPORT_WEEKDAY = 1;
+
+type DeviceReport = { day: string; count: number };
+
+/** " (+5 seit letzter Woche)", " (unverändert seit dem 02.11.)", or "" for the first report. */
+function deviceChange(count: number, previous: DeviceReport | null, today: string) {
+  if (!previous || typeof previous.count !== "number" || typeof previous.day !== "string") {
+    return "";
+  }
+  const since =
+    daysBetween(previous.day, today) <= 7
+      ? "seit letzter Woche"
+      : `seit dem ${previous.day.slice(8, 10)}.${previous.day.slice(5, 7)}.`;
+  const difference = count - previous.count;
+  return difference === 0
+    ? ` (unverändert ${since})`
+    : ` (${difference > 0 ? "+" : "−"}${Math.abs(difference)} ${since})`;
+}
+
+/**
+ * Once a week (Monday, daytime) the number of devices with notifications
+ * switched on, to the maintainer only. A count, nothing about anyone. On
+ * other days nothing is read, so the checks stay as cheap as before.
+ */
+export async function sendDeviceReport(store: PushStore, now: number, tell: TellMaintainer) {
+  const hour = schoolHour(now);
+  const today = schoolToday(now);
+  if (
+    new Date(`${today}T12:00:00Z`).getUTCDay() !== DEVICE_REPORT_WEEKDAY ||
+    hour < REMINDER_FROM_HOUR ||
+    hour >= REMINDER_UNTIL_HOUR
+  ) {
+    return false;
+  }
+  const previous = parseJson<DeviceReport>(await store.getMeta(DEVICE_REPORT_META));
+  if (previous?.day === today) {
+    return false;
+  }
+  const count = await store.countSubscribers();
+  const sent = await tell(
+    `Wochenbericht: ${count === 1 ? "1 Gerät hat" : `${count} Geräte haben`} Benachrichtigungen eingeschaltet${deviceChange(count, previous, today)}.`,
+    "reminder",
+  );
+  if (sent) {
+    await store.setMeta(DEVICE_REPORT_META, JSON.stringify({ day: today, count } satisfies DeviceReport));
   }
   return sent;
 }

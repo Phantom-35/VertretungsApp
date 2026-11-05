@@ -21,7 +21,7 @@ import {
 } from "@/lib/notify";
 import type { SendPush } from "@/lib/push/sender";
 import type { PushStore, Subscriber } from "@/lib/push/store";
-import { sendReminders, watchPlanSize } from "@/lib/push/watch";
+import { sendDeviceReport, sendReminders, watchPlanSize } from "@/lib/push/watch";
 import { SCHOOL_PLAN_FALLBACK_BASE_URL } from "@/lib/school";
 import { schoolToday } from "@/lib/time";
 import type { SubstitutionPayload } from "@/lib/types";
@@ -157,6 +157,7 @@ export async function runPushCheck({
   try {
     // Only for the maintainer: must never cost anyone a notification.
     await sendReminders(store, now, tell).catch(() => undefined);
+    await sendDeviceReport(store, now, tell).catch(() => undefined);
 
     const plan = await loadPlan();
     // An incomplete plan (school website down, upload in progress, unreadable

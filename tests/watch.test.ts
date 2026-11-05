@@ -7,6 +7,7 @@ import {
   isSparse,
   parseSparseState,
   roomPlanNote,
+  sendDeviceReport,
   sendReminders,
   sparseProblem,
   usualCount,
@@ -188,5 +189,57 @@ describe("reminders for a new school year", () => {
     expect(messages[0].message).toMatch(/^Bitte fürs neue Schuljahr nachtragen lassen[^\n]*\n• /);
     // Nothing left to add: nothing sent.
     expect(await sendReminders(new MemoryStore(), Date.parse("2026-11-02T10:00:00+01:00"), tell)).toBe(false);
+  });
+});
+
+describe("the weekly device report", () => {
+  // Monday 09.11.2026.
+  const MONDAY = Date.parse("2026-11-09T10:00:00+01:00");
+  const WEEK = 7 * 24 * HOUR;
+
+  async function storeWith(devices: number) {
+    const store = new MemoryStore();
+    for (let index = 0; index < devices; index += 1) {
+      await store.saveSubscriber({
+        id: `d${index}`,
+        subscription: { endpoint: `https://web.push.apple.com/d${index}`, keys: { p256dh: "B", auth: "A" } },
+        schoolClass: "5A",
+        teachers: [],
+        createdAt: "",
+        updatedAt: "",
+      });
+    }
+    return store;
+  }
+
+  it("counts the devices once on Mondays in the daytime, with the change since last week", async () => {
+    const store = await storeWith(3);
+    const { messages, tell } = teller();
+    // Not on other days, not early in the morning: then nothing is read at all.
+    const getMeta = vi.spyOn(store, "getMeta");
+    expect(await sendDeviceReport(store, MONDAY - 24 * HOUR, tell)).toBe(false);
+    expect(await sendDeviceReport(store, Date.parse("2026-11-09T07:00:00+01:00"), tell)).toBe(false);
+    expect(getMeta).not.toHaveBeenCalled();
+
+    expect(await sendDeviceReport(store, MONDAY, tell)).toBe(true);
+    expect(await sendDeviceReport(store, MONDAY + HOUR, tell)).toBe(false);
+    expect(messages).toEqual([{ message: "Wochenbericht: 3 Geräte haben Benachrichtigungen eingeschaltet.", kind: "reminder" }]);
+
+    await store.deleteSubscriber("d0");
+    expect(await sendDeviceReport(store, MONDAY + WEEK, tell)).toBe(true);
+    expect(messages.at(-1)?.message).toBe("Wochenbericht: 2 Geräte haben Benachrichtigungen eingeschaltet (−1 seit letzter Woche).");
+    expect(await sendDeviceReport(store, MONDAY + 3 * WEEK, tell)).toBe(true);
+    expect(messages.at(-1)?.message).toBe(
+      "Wochenbericht: 2 Geräte haben Benachrichtigungen eingeschaltet (unverändert seit dem 16.11.).",
+    );
+  });
+
+  it("tries again at the next check when the message could not be sent", async () => {
+    const store = await storeWith(1);
+    const tell = vi.fn(async () => false);
+    expect(await sendDeviceReport(store, MONDAY, tell)).toBe(false);
+    const { messages, tell: working } = teller();
+    expect(await sendDeviceReport(store, MONDAY + 600_000, working)).toBe(true);
+    expect(messages[0].message).toBe("Wochenbericht: 1 Gerät hat Benachrichtigungen eingeschaltet.");
   });
 });

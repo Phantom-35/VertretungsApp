@@ -179,6 +179,11 @@ GitHub-Secrets und cron-job.org, niemals im Repository.
   Raumplan (`ROOM_PLAN_SCHOOL_YEAR` in `lib/rooms.ts`, ab 1. August), schickt der
   Push-Check einmal pro Woche tagsüber eine Erinnerung an den Betreiber
   (`FEEDBACK_WEBHOOK_URL`, sonst `ALERT_WEBHOOK_URL`), bis alles eingetragen ist.
+- **Wochenbericht:** Montags tagsüber meldet der Push-Check dem Betreiber auf demselben
+  Weg, wie viele Geräte Benachrichtigungen eingeschaltet haben, mit der Veränderung
+  zur Vorwoche (nur eine Zahl, nichts über einzelne Nutzer). Genauer als die
+  „Visitors“ von Vercel Analytics, die WLAN-/Mobilfunkwechsel und den Tageswechsel
+  doppelt zählen; Nutzer ohne Benachrichtigungen fehlen darin aber.
 - **Live-Check:** `.github/workflows/live-check.yml` liest montags bis freitags früh den
   echten Plan. Schlägt das fehl (auch beim zweiten Versuch zehn Minuten später),
   schickt GitHub eine E-Mail. Von Hand: GitHub → *Actions* → *Live-Check* →

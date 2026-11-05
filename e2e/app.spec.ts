@@ -308,9 +308,10 @@ test("does not announce a day after the holidays as not online yet", async ({ br
 });
 
 test("says that no plan is online when the plan has no day at all", async ({ page }) => {
-  // Weeks later (the saved copy is old, so the app asks again) the school's
-  // export has no readable day.
-  await page.clock.setFixedTime(new Date("2026-11-03T09:00:00+01:00"));
+  // Much later (the saved copy is old, so the app asks again) the school's
+  // export has no readable day. Far ahead on purpose: the plan is fetched at
+  // the real time, and a day that has passed would make it look fresh.
+  await page.clock.setFixedTime(new Date("2029-11-06T09:00:00+01:00"));
   await page.route("**/api/substitution*", async (route) => {
     const response = await route.fetch();
     const body = { ...(await response.json()), days: [], entries: [], notices: [] };
