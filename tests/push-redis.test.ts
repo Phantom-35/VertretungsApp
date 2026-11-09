@@ -67,6 +67,30 @@ describe("Redis push store (Upstash REST)", () => {
     }
   });
 
+  it("reads stored JSON back as the same text, so a weekly report goes out once", async () => {
+    const upstash = await startFakeUpstash();
+    vi.stubEnv("KV_REST_API_URL", upstash.url);
+    vi.stubEnv("KV_REST_API_TOKEN", "token");
+    try {
+      const store = getPushStore()!;
+      const value = JSON.stringify({ day: "2026-11-09", count: 247 });
+      await store.setMeta("device-report", value);
+      expect(await store.getMeta("device-report")).toBe(value);
+      await store.setMeta("summary-day", "2026-11-09");
+      expect(await store.getMeta("summary-day")).toBe("2026-11-09");
+
+      const { sendDeviceReport } = await import("@/lib/push/watch");
+      const tell = vi.fn(async () => true);
+      // Monday 16.11.2026, two checks ten minutes apart: one report.
+      const monday = Date.parse("2026-11-16T10:00:00+01:00");
+      expect(await sendDeviceReport(store, monday, tell)).toBe(true);
+      expect(await sendDeviceReport(store, monday + 600_000, tell)).toBe(false);
+      expect(tell).toHaveBeenCalledTimes(1);
+    } finally {
+      await upstash.close();
+    }
+  });
+
   it("runs a whole check against Redis", async () => {
     const upstash = await startFakeUpstash();
     vi.stubEnv("KV_REST_API_URL", upstash.url);

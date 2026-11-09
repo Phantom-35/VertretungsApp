@@ -103,7 +103,12 @@ class RedisStore implements PushStore {
 
   async getMeta(name: string) {
     const value = await this.redis.get<unknown>(META_PREFIX + name);
-    return value === null || value === undefined ? null : String(value);
+    if (value === null || value === undefined) {
+      return null;
+    }
+    // Upstash hands back stored JSON already parsed: an object must become its
+    // JSON text again, not "[object Object]" (which read as "nothing stored").
+    return typeof value === "string" ? value : JSON.stringify(value);
   }
 
   async setMeta(name: string, value: string) {
