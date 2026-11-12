@@ -1,4 +1,4 @@
-import { timetableSlot } from "@/lib/entries";
+import { sharesLesson } from "@/lib/entries";
 import { entryKey, parseEntryKey, type KeyedEntry } from "@/lib/seen";
 
 /**
@@ -52,11 +52,6 @@ function dateOf(key: string) {
   return key.slice(0, key.indexOf("|"));
 }
 
-/** The place in the timetable an entry is about (see `timetableSlot`). */
-function slotOf(key: string) {
-  return timetableSlot(parseEntryKey(key));
-}
-
 /** Entries of today and later; entries without a date cannot be placed. */
 function isCurrent(key: string, today: string) {
   const date = dateOf(key);
@@ -104,9 +99,26 @@ export function diffPlan(
   const kept = [...known].filter((key) => !currentSet.has(key) && dayMissing(key));
   const gone = [...known].filter((key) => !currentSet.has(key) && !dayMissing(key));
   // An entry replaced by a new one for the same lesson was edited, not lost
-  // in an incomplete upload: report it at once, as one change with the new one.
-  const replacedSlots = new Set(added.map(slotOf));
-  const replaced = gone.filter((key) => replacedSlots.has(slotOf(key)));
+  // in an incomplete upload: report it at once, as one change with the new one
+  // (also when "3 - 4" became "3" and "4", or the other way round).
+  const addedEntries = added.map(parseEntryKey);
+  const replaced = gone.filter((key) => {
+    const entry = parseEntryKey(key);
+    return addedEntries.some((other) => sharesLesson(entry, other));
+  });
+  // Gone, but the same lesson of the same teacher is still in the plan with
+  // an entry known before: the new one came first (and was reported then), the
+  // old one is only now taken out. Not "back to normal": dropped silently.
+  const stayed = [...known].filter((key) => currentSet.has(key)).map(parseEntryKey);
+  const superseded = new Set(
+    gone.filter((key) => {
+      if (replaced.includes(key)) {
+        return false;
+      }
+      const entry = parseEntryKey(key);
+      return entry.teacher !== "" && stayed.some((other) => other.teacher === entry.teacher && sharesLesson(entry, other));
+    }),
+  );
 
   // Nearly a whole day gone at once (e.g. its page uploaded empty): kept as it
   // was until that has lasted a while, so that nobody gets "back to normal"
@@ -117,7 +129,7 @@ export function diffPlan(
   for (const key of known) {
     const day = byDay.get(dateOf(key)) ?? { known: 0, vanished: [] };
     day.known += 1;
-    if (gone.includes(key) && !replaced.includes(key)) {
+    if (gone.includes(key) && !replaced.includes(key) && !superseded.has(key)) {
       day.vanished.push(key);
     }
     byDay.set(dateOf(key), day);
@@ -132,7 +144,7 @@ export function diffPlan(
       day.vanished.forEach((key) => held.add(key));
     }
   }
-  const settled = gone.filter((key) => !held.has(key));
+  const settled = gone.filter((key) => !held.has(key) && !superseded.has(key));
   // After the wait, such a day is reported at once (it was checked often enough).
   const waited = (key: string) => previous.vanishedSince?.[dateOf(key)] !== undefined;
   const removed = settled.filter((key) => replaced.includes(key) || wasMissing.has(key) || waited(key));

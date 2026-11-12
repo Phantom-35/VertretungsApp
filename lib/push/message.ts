@@ -7,7 +7,7 @@ import {
   isOpenSubstitute,
   lessonStart,
   roomLabel,
-  timetableSlot,
+  sharesLesson,
 } from "@/lib/entries";
 import { formatShortDate, relativeDayLabel } from "@/lib/format";
 import { entryKey, type KeyedEntry } from "@/lib/seen";
@@ -66,29 +66,35 @@ export function isRelevant(entry: KeyedEntry, audience: Audience, now: number) {
   );
 }
 
-const slotOf = (entry: KeyedEntry) => timetableSlot(entry);
-
 /**
  * The changes one subscriber is told about. An entry replaced by another one
- * for the same lesson is reported as one change ("jetzt …").
+ * for the same lesson is reported as one change ("jetzt …"), also when the
+ * school split or joined lessons ("3 - 4" now "3" and "4"). Replaced entries
+ * of the same teacher left over (two single lessons now one block) are part
+ * of that change, not "back to normal".
  */
 export function changesFor(diff: Pick<PlanDiff, "added" | "removed">, audience: Audience, now: number) {
   const added = diff.added.filter((entry) => isRelevant(entry, audience, now));
   const removed = diff.removed.filter((entry) => isRelevant(entry, audience, now));
   const changes: Change[] = [];
-  const removedBySlot = new Map<string, KeyedEntry[]>();
-  removed.forEach((entry) => {
-    removedBySlot.set(slotOf(entry), [...(removedBySlot.get(slotOf(entry)) ?? []), entry]);
-  });
+  const left = [...removed];
 
   added.forEach((entry) => {
-    const candidates = removedBySlot.get(slotOf(entry));
-    const previous = candidates?.shift();
-    changes.push(previous ? { kind: "changed", entry, previous } : { kind: "added", entry });
+    // The same teacher's lesson first: two groups can share a lesson.
+    let index = left.findIndex((other) => other.teacher === entry.teacher && sharesLesson(other, entry));
+    if (index < 0) {
+      index = left.findIndex((other) => sharesLesson(other, entry));
+    }
+    if (index < 0) {
+      changes.push({ kind: "added", entry });
+      return;
+    }
+    const [previous] = left.splice(index, 1);
+    changes.push({ kind: "changed", entry, previous });
   });
-  removedBySlot.forEach((entries) =>
-    entries.forEach((entry) => changes.push({ kind: "removed", entry })),
-  );
+  const covered = (entry: KeyedEntry) =>
+    added.some((other) => other.teacher === entry.teacher && sharesLesson(entry, other));
+  left.filter((entry) => !covered(entry)).forEach((entry) => changes.push({ kind: "removed", entry }));
 
   return changes.filter((change) => matchesGroups(change, audience.notifyGroups)).sort(
     (left, right) =>
@@ -179,7 +185,12 @@ function describeChange(change: Change): [symbol: string, text: string] {
       }
       return [
         entrySymbol(change.entry),
-        describeShort(change.entry, `${displayType(change.entry.type)} statt ${displayType(change.previous.type)}`),
+        describeShort(
+          change.entry,
+          displayType(change.entry.type) === displayType(change.previous.type)
+            ? `${displayType(change.entry.type)} geändert`
+            : `${displayType(change.entry.type)} statt ${displayType(change.previous.type)}`,
+        ),
       ];
     case "removed": {
       // A lesson that was off takes place after all: said so plainly (the old

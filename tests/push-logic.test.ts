@@ -416,3 +416,42 @@ describe("evening summary", () => {
     expect(summary.title).toBe("Q1 · Morgen: 1 Änderung");
   });
 });
+
+describe("changes of the same lesson in other words", () => {
+  const audience = { schoolClass: "5A", teachers: [] };
+  const vertretung = (lesson: string, substitute = "DEF") => entry({ lesson, type: "Vertretung", substitute });
+  const entfall = (lesson: string) => entry({ lesson, type: "Entfall" });
+  const state = (entries: KeyedEntry[]): PlanState => ({ keys: entries.map(entryKey), missing: [], updatedAt: "" });
+  const bodies = (before: KeyedEntry[], after: KeyedEntry[]) => {
+    const diff = diffPlan(state(before), after, TODAY, new Date(MORNING));
+    const changes = changesFor(diff, audience, MORNING);
+    return changes.length === 0 ? [] : buildNotification("5A", changes, MORNING).body.split("\n");
+  };
+
+  it("pairs a block that was split, without 'back to normal'", () => {
+    expect(bodies([vertretung("3 - 4")], [entfall("3"), vertretung("4", "GHI")])).toEqual([
+      "❌ 3. Std.: Entfall statt Vertretung · ABC",
+      "🔄 4. Std.: Vertretung · ABC → GHI",
+    ]);
+  });
+
+  it("pairs single lessons that became a block", () => {
+    expect(bodies([vertretung("3"), vertretung("4")], [entfall("3 - 4")])).toEqual(["❌ Entfall statt Vertretung · ABC"]);
+  });
+
+  it("says nothing when the old entry goes after the new one came", () => {
+    // The new entry came first (and was reported), the old one goes a check later.
+    expect(bodies([vertretung("3"), entfall("3")], [entfall("3")])).toEqual([]);
+  });
+
+  it("still reports a withdrawn lesson next to another group's", () => {
+    const other = entry({ lesson: "3", type: "Vertretung", teacher: "XYZ", substitute: "DEF" });
+    const diff = diffPlan(state([entfall("3"), other]), [other], TODAY, new Date(MORNING));
+    const again = diffPlan(diff.state, [other], TODAY, new Date(MORNING + 600_000));
+    expect(buildNotification("5A", changesFor(again, audience, MORNING), MORNING).body).toBe("✅ Findet doch statt (war: Entfall)");
+  });
+
+  it("calls a change of the same kind a change", () => {
+    expect(bodies([vertretung("3")], [vertretung("3", "GHI")])).toEqual(["🔄 Vertretung geändert · ABC → GHI"]);
+  });
+});

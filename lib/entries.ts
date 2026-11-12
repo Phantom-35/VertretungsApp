@@ -194,7 +194,7 @@ export function summarizeEntries(entries: Pick<SubstitutionEntry, "type">[]) {
 
 /** Classes of the upper school, where students attend courses, not one class. */
 /** The lessons an entry covers: "3 - 4" -> [3, 4], "5" -> [5]; none without a number. */
-function lessonNumbers(lesson: string) {
+export function lessonNumbers(lesson: string) {
   const numbers = (lesson.match(/\d+/g) ?? []).map(Number);
   if (numbers.length === 0) {
     return [];
@@ -332,4 +332,28 @@ export function timetableSlot(
   return isCourseClass(formatClassName(entry.className))
     ? `${slot}|${[...courseTeachers(entry)].sort().join(",")}`
     : slot;
+}
+
+type SlotEntry = Pick<SubstitutionEntry, "date" | "className" | "lesson" | "teacher" | "text">;
+
+/**
+ * Whether two entries are about the same place in the timetable: same day,
+ * class (and course, see timetableSlot) and at least one lesson in common.
+ * The school writes a lesson alone ("3") or in a block ("3 - 4"), and an
+ * entry may change from one to the other: "Vertretung 3 - 4" can become
+ * "Entfall 3" and "Vertretung 4".
+ */
+export function sharesLesson(left: SlotEntry, right: SlotEntry) {
+  if (left.date !== right.date || left.className !== right.className) {
+    return false;
+  }
+  if (
+    isCourseClass(formatClassName(left.className)) &&
+    [...courseTeachers(left)].sort().join(",") !== [...courseTeachers(right)].sort().join(",")
+  ) {
+    return false;
+  }
+  const lessons = lessonNumbers(left.lesson);
+  const other = new Set(lessonNumbers(right.lesson));
+  return lessons.length === 0 || other.size === 0 ? left.lesson === right.lesson : lessons.some((lesson) => other.has(lesson));
 }
